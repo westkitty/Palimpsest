@@ -1,0 +1,6 @@
+{
+  "name": "Palimpsest — The Impossible Living Atlas",
+  "description": "An interactive three-dimensional magical pop-up storybook with three living illustrated worlds, 24-hour day/night cycles, dynamic weather, and ten tactile paper-engineered interactions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
