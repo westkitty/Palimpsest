@@ -532,7 +532,10 @@ export interface WorldState {
   creatures: CreatureState[];
   hiddenLayers: HiddenLayerState[];
   discoveredSecrets: string[];
+  stainLevel: number;
 }
+
+export type NarrationStatus = 'idle' | 'speaking' | 'paused';
 
 export interface AtlasSnapshot {
   bookPhase: BookPhase;
@@ -545,6 +548,11 @@ export interface AtlasSnapshot {
   cameraMode: CameraMode;
   activeTool: InteractionTool;
   audioMuted: boolean;
+  narrationEnabled: boolean;
+  narrationStatus: NarrationStatus;
+  narrationCaption: string | null;
+  narrationSpeakerLabel: string | null;
+  narrationProgress: { line: number; total: number } | null;
   reducedMotion: boolean;
   qualityTier: QualityTier;
   hudCollapsed: boolean;

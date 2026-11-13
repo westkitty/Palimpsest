@@ -7,12 +7,121 @@ export const BOOK_PAGE_D = 5.6; // page depth (front-to-back)
 export const BOOK_SPREAD_W = BOOK_PAGE_W * 2; // 8.4 total open spread width
 export const BOOK_BASE_Y = 0.24; // top surface height of open pages
 
+const _stainTmpCol = new THREE.Color();
+
+const CHRONICLE_STAIN_GLSL_HELPERS = /* glsl */ `
+uniform float uStainTime;
+uniform float uStainLevel;
+uniform float uStainActivity;
+uniform float uStainSeed;
+uniform vec3 uStainInkColor;
+uniform vec3 uStainEdgeGlow;
+
+float stainHash(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+float stainNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(stainHash(i), stainHash(i + vec2(1.0, 0.0)), u.x),
+    mix(stainHash(i + vec2(0.0, 1.0)), stainHash(i + vec2(1.0, 1.0)), u.x),
+    u.y
+  );
+}
+
+float stainFbm(vec2 p) {
+  float v = 0.0;
+  float amp = 0.5;
+  for (int i = 0; i < 3; i++) {
+    v += amp * stainNoise(p);
+    p = p * 2.07 + vec2(4.3, 2.9);
+    amp *= 0.5;
+  }
+  return v;
+}
+
+vec3 applyChronicleStaining(vec3 baseRgb, vec2 uv, float isSingleLeaf) {
+  float level = clamp(uStainLevel, 0.0, 1.0);
+  if (level <= 0.005) return baseRgb;
+
+  float edgeY = min(uv.y, 1.0 - uv.y) * 2.0;
+  float perimeter;
+  float spineMask;
+  vec2 aspectUv;
+
+  if (isSingleLeaf > 0.5) {
+    float edgeOuter = 1.0 - uv.x;
+    perimeter = min(edgeOuter * 1.45, edgeY);
+    spineMask = uv.x * 2.2;
+    aspectUv = vec2(uv.x * 0.75 + 0.75, uv.y);
+  } else {
+    float edgeX = min(uv.x, 1.0 - uv.x) * 2.0;
+    perimeter = min(edgeX, edgeY);
+    spineMask = abs(uv.x - 0.5) * 2.0 * 1.85;
+    aspectUv = vec2(uv.x * 1.5, uv.y);
+  }
+
+  float driftSpeed = 0.10 + 0.28 * uStainActivity;
+  vec2 animShift = vec2(sin(uStainTime * 0.23), cos(uStainTime * 0.19)) * (0.045 * uStainActivity);
+  float fbmA = stainFbm(aspectUv * 9.5 + vec2(uStainSeed * 3.1, uStainSeed * 1.7) + animShift + uStainTime * driftSpeed * 0.05);
+  float fbmB = stainFbm(aspectUv * 21.0 - vec2(uStainSeed * 2.3, uStainTime * driftSpeed * 0.08));
+
+  // Four deterministic localized ink-bleed pockets hugging corners & outer margins per folio
+  float s0 = fract(sin(uStainSeed * 12.9898 + 1.1) * 43758.5453);
+  float s1 = fract(sin(uStainSeed * 78.233 + 2.7) * 43758.5453);
+  float s2 = fract(sin(uStainSeed * 39.425 + 4.3) * 43758.5453);
+  float s3 = fract(sin(uStainSeed * 91.117 + 6.9) * 43758.5453);
+
+  vec2 c0 = isSingleLeaf > 0.5 ? vec2(0.71, 0.05 + s0 * 0.16) : vec2(0.05 + s0 * 0.14, 0.06 + s1 * 0.14);
+  vec2 c1 = isSingleLeaf > 0.5 ? vec2(0.72, 0.94 - s1 * 0.18) : vec2(1.45 - s2 * 0.14, 0.07 + s3 * 0.16);
+  vec2 c2 = isSingleLeaf > 0.5 ? vec2(0.68, 0.45 + s2 * 0.24) : vec2(0.06 + s1 * 0.18, 0.93 - s0 * 0.14);
+  vec2 c3 = isSingleLeaf > 0.5 ? vec2(0.18 + s3 * 0.2, 0.06) : vec2(1.44 - s0 * 0.16, 0.92 - s2 * 0.16);
+
+  float d0 = length(aspectUv - c0);
+  float d1 = length(aspectUv - c1);
+  float d2 = length(aspectUv - c2);
+  float d3 = length(aspectUv - c3);
+  float pocketNear = min(min(d0, d1), min(d2, d3));
+  float pocketPulse = 0.024 * uStainActivity * sin(uStainTime * (1.2 + uStainActivity * 1.5) - pocketNear * 24.0 + fbmB * 4.0);
+  float pocketInfluence = (1.0 - smoothstep(0.04, 0.26 + level * 0.18, pocketNear - (fbmA - 0.5) * 0.12 - pocketPulse));
+
+  float edgePerturb = (fbmA - 0.44) * (0.09 + 0.16 * level) + (fbmB - 0.5) * 0.045;
+  float creepRipple = 0.015 * uStainActivity * sin(uStainTime * 1.45 + fbmA * 9.0 - perimeter * 18.0);
+  float reach = mix(0.032, 0.23, level);
+
+  float edgeField = perimeter - edgePerturb - creepRipple;
+  float spineField = spineMask - (fbmB - 0.45) * 0.085;
+  float marginField = min(edgeField, spineField * 1.15);
+
+  float marginBleed = 1.0 - smoothstep(reach * 0.12, reach, marginField);
+  float combinedBleed = clamp(max(marginBleed, pocketInfluence * (0.35 + 0.65 * level)), 0.0, 1.0);
+
+  // Watercolor capillary tide-line along the advancing wet ink front
+  float frontCenter = reach * 0.86;
+  float tideBand = exp(-pow((marginField - frontCenter) / max(0.014, reach * 0.22), 2.0));
+  float pocketRing = exp(-pow((pocketNear - (0.14 + level * 0.14)) / 0.035, 2.0)) * (0.35 + 0.65 * uStainActivity);
+  float tideLine = clamp(tideBand * (0.45 + 0.55 * uStainActivity) + pocketRing, 0.0, 1.0);
+
+  // Translucent rag-paper pigment absorption keeping underlying ink & map lines visible
+  float stainAlpha = combinedBleed * (0.30 + 0.48 * level) * (0.82 + 0.18 * fbmB);
+  vec3 absorbed = mix(baseRgb, baseRgb * (0.44 + uStainInkColor * 1.15) + uStainInkColor * 0.18, stainAlpha);
+  vec3 withTide = mix(absorbed, absorbed * (0.62 + uStainEdgeGlow * 0.72), tideLine * (0.28 + 0.42 * level));
+  return withTide;
+}
+`;
+
 export class BookAndDeskRig {
   public readonly root = new THREE.Group();
   public readonly bookGroup = new THREE.Group();
 
   // Hinged left wing for closed->open book animation
   private leftCoverPivot = new THREE.Group();
+  private spineGroup = new THREE.Group();
   private claspLatch = new THREE.Group();
   public readonly claspHitMesh: THREE.Mesh;
 
@@ -49,6 +158,16 @@ export class BookAndDeskRig {
     uSpreadPortalColor: { value: new THREE.Color(0xf0c96a) },
   };
 
+  // Chronicle Staining: localized animated edge ink-bleed uniforms shared across spread & turning leaf
+  private chronicleStainUniforms = {
+    uStainTime: { value: 0.0 },
+    uStainLevel: { value: 0.12 },
+    uStainActivity: { value: 0.18 },
+    uStainSeed: { value: 0.0 },
+    uStainInkColor: { value: new THREE.Color(0x3a2a1d) },
+    uStainEdgeGlow: { value: new THREE.Color(0x5b3f28) },
+  };
+
   private openAmount = 0; // 0 = closed, 1 = open flat
   private currentCornerLift = 0;
 
@@ -68,29 +187,57 @@ export class BookAndDeskRig {
       map: textures.leatherColor,
       bumpMap: textures.leatherBump,
       bumpScale: 0.025,
-      roughness: 0.68,
-      metalness: 0.06,
+      roughness: 0.62,
+      metalness: 0.05,
     });
 
-    const frontCoverMat = new THREE.MeshStandardMaterial({
+    const frontCoverMat = new THREE.MeshPhysicalMaterial({
       map: textures.coverFrontColor,
       bumpMap: textures.coverFrontBump,
-      bumpScale: 0.035,
-      roughness: 0.48,
-      metalness: 0.22,
+      bumpScale: 0.036,
+      metalnessMap: textures.coverFrontMetalness,
+      metalness: 0.95,
+      roughnessMap: textures.coverFrontRoughness,
+      roughness: 0.85,
+      clearcoat: 0.34,
+      clearcoatRoughness: 0.3,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
     });
 
     const brassMat = new THREE.MeshStandardMaterial({
-      color: 0xd4af6e,
-      roughness: 0.26,
-      metalness: 0.88,
+      color: 0xd9b36c,
+      roughness: 0.24,
+      metalness: 0.9,
+    });
+
+    const darkBrassMat = new THREE.MeshStandardMaterial({
+      color: 0x9b793e,
+      roughness: 0.36,
+      metalness: 0.85,
+    });
+
+    const jewelMat = new THREE.MeshPhysicalMaterial({
+      color: 0xa82824,
+      roughness: 0.14,
+      metalness: 0.08,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.1,
+      emissive: 0x4b110d,
+      emissiveIntensity: 0.55,
     });
 
     const pageEdgeMat = new THREE.MeshStandardMaterial({
       map: textures.pageEdgeColor,
-      roughness: 0.85,
+      roughness: 0.84,
       metalness: 0.04,
     });
+
+    const boardThickness = 0.09;
+    const boardWidth = BOOK_PAGE_W + 0.38;
+    const boardDepth = BOOK_PAGE_D + 0.44;
+    const stackThickness = 0.14;
 
     // Book contact shadow on desk
     const bookShadow = new THREE.Mesh(
@@ -98,7 +245,7 @@ export class BookAndDeskRig {
       new THREE.MeshBasicMaterial({
         map: textures.contactShadow,
         transparent: true,
-        opacity: 0.62,
+        opacity: 0.64,
         depthWrite: false,
       }),
     );
@@ -106,106 +253,190 @@ export class BookAndDeskRig {
     bookShadow.position.y = 0.005;
     this.bookGroup.add(bookShadow);
 
-    // Back / Right board (remains resting on desk)
-    const boardThickness = 0.09;
+    // Back / Right board (remains resting flush on desk Y = 0..0.09)
     const rightBoard = new THREE.Mesh(
-      new THREE.BoxGeometry(BOOK_PAGE_W + 0.35, boardThickness, BOOK_PAGE_D + 0.4),
+      new THREE.BoxGeometry(boardWidth, boardThickness, boardDepth),
       coverMat,
     );
-    rightBoard.position.set((BOOK_PAGE_W + 0.35) / 2, boardThickness / 2, 0);
+    rightBoard.position.set(boardWidth / 2, boardThickness / 2, 0);
     rightBoard.castShadow = true;
     rightBoard.receiveShadow = true;
     this.bookGroup.add(rightBoard);
 
-    // Right page block (gilt stack)
+    // Right page block (Y = 0.09..0.23, slightly recessed within board overhang)
     const rightStack = new THREE.Mesh(
-      new THREE.BoxGeometry(BOOK_PAGE_W, 0.14, BOOK_PAGE_D),
+      new THREE.BoxGeometry(BOOK_PAGE_W, stackThickness, BOOK_PAGE_D),
       pageEdgeMat,
     );
-    rightStack.position.set(BOOK_PAGE_W / 2, boardThickness + 0.07, 0);
+    rightStack.position.set(BOOK_PAGE_W / 2 + 0.02, boardThickness + stackThickness / 2, 0);
     rightStack.castShadow = true;
     rightStack.receiveShadow = true;
     this.bookGroup.add(rightStack);
 
-    // Rounded leather spine with raised cords
+    // Rounded leather spine with raised hubs & gold-tooled bands (wraps Y = 0..0.46 when closed)
+    this.spineGroup.position.set(0, 0.23, 0);
     const spine = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.18, 0.18, BOOK_PAGE_D + 0.4, 16, 1, false, 0, Math.PI),
+      new THREE.CylinderGeometry(0.23, 0.23, boardDepth, 20, 1, false, 0, Math.PI),
       coverMat,
     );
     spine.rotation.x = Math.PI / 2;
     spine.rotation.z = Math.PI;
-    spine.position.set(0, 0.12, 0);
     spine.castShadow = true;
-    this.bookGroup.add(spine);
+    spine.receiveShadow = true;
+    this.spineGroup.add(spine);
 
     for (let i = -2; i <= 2; i++) {
       const rib = new THREE.Mesh(
-        new THREE.TorusGeometry(0.19, 0.025, 8, 16, Math.PI),
+        new THREE.TorusGeometry(0.235, 0.024, 8, 18, Math.PI),
         brassMat,
       );
       rib.rotation.x = Math.PI / 2;
       rib.rotation.y = Math.PI / 2;
-      rib.position.set(0, 0.12, i * 1.15);
-      this.bookGroup.add(rib);
+      rib.position.set(0, 0, i * 1.15);
+      this.spineGroup.add(rib);
     }
+    this.bookGroup.add(this.spineGroup);
 
-    // Left cover wing (hinges from Z-axis at X=0 from closed (angle=PI) to open (angle=0))
-    this.leftCoverPivot.position.set(0, 0.09, 0);
+    // Left cover wing (hinges from closed at angle=-PI, pivotY=0.37 -> open at angle=0, pivotY=0.09)
+    this.leftCoverPivot.position.set(0, 0.37, 0);
     this.bookGroup.add(this.leftCoverPivot);
 
     const leftBoard = new THREE.Mesh(
-      new THREE.BoxGeometry(BOOK_PAGE_W + 0.35, boardThickness, BOOK_PAGE_D + 0.4),
-      [coverMat, coverMat, coverMat, frontCoverMat, coverMat, coverMat],
+      new THREE.BoxGeometry(boardWidth, boardThickness, boardDepth),
+      coverMat,
     );
-    leftBoard.position.set(-(BOOK_PAGE_W + 0.35) / 2, -boardThickness / 2, 0);
+    leftBoard.position.set(-boardWidth / 2, -boardThickness / 2, 0);
     leftBoard.castShadow = true;
     leftBoard.receiveShadow = true;
     this.leftCoverPivot.add(leftBoard);
 
-    // Left page stack
+    // Correctly oriented un-mirrored embossed leather & 24k gold-leaf front cover plate
+    const plateWidth = boardWidth - 0.1;
+    const plateDepth = boardDepth - 0.1;
+    const frontCoverPlate = new THREE.Mesh(
+      new THREE.PlaneGeometry(plateWidth, plateDepth),
+      frontCoverMat,
+    );
+    // Oriented via explicit orthonormal basis: Plane +X->local -X (World +X right), +Y->local -Z (World -Z top), Normal +Z->local -Y (World +Y up when closed)
+    const coverBasis = new THREE.Matrix4().makeBasis(
+      new THREE.Vector3(-1, 0, 0),
+      new THREE.Vector3(0, 0, -1),
+      new THREE.Vector3(0, -1, 0),
+    );
+    frontCoverPlate.quaternion.setFromRotationMatrix(coverBasis);
+    frontCoverPlate.position.set(-boardWidth / 2, -boardThickness - 0.002, 0);
+    frontCoverPlate.receiveShadow = true;
+    this.leftCoverPivot.add(frontCoverPlate);
+
+    // Four sculpted L-shaped brass corner protectors with corner bosses & rivet studs
+    const cornerSpecs: [number, number, number, number][] = [
+      [-boardWidth, -boardDepth / 2, 1, 1], // closed: top-right (fore-edge north)
+      [-boardWidth, boardDepth / 2, 1, -1], // closed: bottom-right (fore-edge south)
+      [0, -boardDepth / 2, -1, 1],          // closed: top-left (spine north)
+      [0, boardDepth / 2, -1, -1],          // closed: bottom-left (spine south)
+    ];
+    const cornerArmXGeo = new THREE.BoxGeometry(0.62, boardThickness + 0.028, 0.11);
+    const cornerArmZGeo = new THREE.BoxGeometry(0.11, boardThickness + 0.028, 0.62);
+    const cornerPlateGeo = new THREE.BoxGeometry(0.32, boardThickness + 0.026, 0.32);
+    const rivetGeo = new THREE.SphereGeometry(0.024, 10, 8);
+
+    cornerSpecs.forEach(([cx, cz, sx, sz]) => {
+      const cGroup = new THREE.Group();
+      cGroup.position.set(cx, -boardThickness / 2, cz);
+
+      const armX = new THREE.Mesh(cornerArmXGeo, brassMat);
+      armX.position.set(sx * 0.28, -0.004, sz * 0.03);
+      armX.castShadow = true;
+
+      const armZ = new THREE.Mesh(cornerArmZGeo, brassMat);
+      armZ.position.set(sx * 0.03, -0.004, sz * 0.28);
+      armZ.castShadow = true;
+
+      const gusset = new THREE.Mesh(cornerPlateGeo, darkBrassMat);
+      gusset.position.set(sx * 0.14, -0.003, sz * 0.14);
+
+      const boss = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 8), brassMat);
+      boss.scale.set(1, 0.48, 1);
+      boss.position.set(sx * 0.16, -boardThickness / 2 - 0.015, sz * 0.16);
+
+      const rivA = new THREE.Mesh(rivetGeo, brassMat);
+      rivA.position.set(sx * 0.5, -boardThickness / 2 - 0.014, sz * 0.04);
+      const rivB = new THREE.Mesh(rivetGeo, brassMat);
+      rivB.position.set(sx * 0.04, -boardThickness / 2 - 0.014, sz * 0.5);
+
+      cGroup.add(gusset, armX, armZ, boss, rivA, rivB);
+      this.leftCoverPivot.add(cGroup);
+    });
+
+    // Raised 3D Brass Meridian Medallion & Cabochon Jewel aligned with cover astrolabe (canvas cy=700/1400 -> z=0)
+    const medallionGroup = new THREE.Group();
+    medallionGroup.position.set(-boardWidth / 2, -boardThickness - 0.004, 0);
+
+    const outerBezel = new THREE.Mesh(new THREE.TorusGeometry(0.68, 0.036, 12, 36), brassMat);
+    outerBezel.rotation.x = Math.PI / 2;
+    outerBezel.castShadow = true;
+
+    const innerBezel = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.026, 10, 28), brassMat);
+    innerBezel.rotation.x = Math.PI / 2;
+    innerBezel.position.y = -0.008;
+
+    const colletRing = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.23, 0.042, 16),
+      darkBrassMat,
+    );
+    colletRing.position.y = -0.018;
+
+    const centerGem = new THREE.Mesh(new THREE.OctahedronGeometry(0.14, 1), jewelMat);
+    centerGem.scale.set(1, 0.55, 1);
+    centerGem.position.y = -0.036;
+
+    medallionGroup.add(outerBezel, innerBezel, colletRing, centerGem);
+
+    // 8 raised brass compass rays inside the central medallion
+    const rayGeo = new THREE.BoxGeometry(0.048, 0.022, 0.44);
+    for (let r = 0; r < 4; r++) {
+      const ray = new THREE.Mesh(rayGeo, brassMat);
+      ray.rotation.y = (r * Math.PI) / 4;
+      ray.position.y = -0.012;
+      medallionGroup.add(ray);
+    }
+    this.leftCoverPivot.add(medallionGroup);
+
+    // Left page stack (Y = 0..0.14 local -> rests atop rightStack when closed, desk when open)
     const leftStack = new THREE.Mesh(
-      new THREE.BoxGeometry(BOOK_PAGE_W, 0.14, BOOK_PAGE_D),
+      new THREE.BoxGeometry(BOOK_PAGE_W, stackThickness, BOOK_PAGE_D),
       pageEdgeMat,
     );
-    leftStack.position.set(-BOOK_PAGE_W / 2, 0.07, 0);
+    leftStack.position.set(-BOOK_PAGE_W / 2 - 0.02, stackThickness / 2, 0);
     leftStack.castShadow = true;
     leftStack.receiveShadow = true;
     this.leftCoverPivot.add(leftStack);
 
-    // Brass corner brackets on left cover
-    const cornerOffsets = [
-      [-(BOOK_PAGE_W + 0.32), -(BOOK_PAGE_D / 2 + 0.17)],
-      [-(BOOK_PAGE_W + 0.32), BOOK_PAGE_D / 2 + 0.17],
-    ];
-    cornerOffsets.forEach(([cx, cz]) => {
-      const cap = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.11, 0.28), brassMat);
-      cap.position.set(cx, -boardThickness / 2, cz);
-      this.leftCoverPivot.add(cap);
-    });
+    // Hinged leather-and-brass clasp strap wrapping the outer fore-edge when closed
+    this.claspLatch.position.set(-boardWidth - 0.01, -boardThickness / 2, 0);
+    const strapHinge = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.06, 0.52), brassMat);
+    strapHinge.position.set(0.12, -0.048, 0);
 
-    // Brass book clasp latch (on outer edge of left cover when closed)
-    this.claspLatch.position.set(-(BOOK_PAGE_W + 0.36), -0.04, 0);
-    const hasp = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.26, 0.62), brassMat);
+    const strapLeather = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.36, 0.44), coverMat);
+    strapLeather.position.set(-0.02, 0.14, 0);
+
+    const hasp = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.34, 0.56), brassMat);
+    hasp.position.set(-0.04, 0.15, 0);
     hasp.castShadow = true;
-    const gem = new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.1, 0),
-      new THREE.MeshStandardMaterial({
-        color: 0xb8433e,
-        roughness: 0.2,
-        metalness: 0.2,
-        emissive: 0x451210,
-      }),
-    );
-    gem.position.set(-0.08, -0.02, 0);
-    this.claspLatch.add(hasp, gem);
+
+    const claspGem = new THREE.Mesh(new THREE.OctahedronGeometry(0.09, 1), jewelMat);
+    claspGem.scale.set(0.65, 1.0, 1.0);
+    claspGem.position.set(-0.09, 0.15, 0);
+
+    this.claspLatch.add(strapHinge, strapLeather, hasp, claspGem);
     this.leftCoverPivot.add(this.claspLatch);
 
-    // Invisible larger hit volume for easy clicking on the closed book/clasp
+    // Invisible larger hit volume for easy clicking anywhere on the closed book/clasp
     this.claspHitMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(BOOK_PAGE_W + 0.7, 0.65, BOOK_PAGE_D + 0.6),
+      new THREE.BoxGeometry(boardWidth + 0.5, 0.72, boardDepth + 0.5),
       new THREE.MeshBasicMaterial({ visible: false }),
     );
-    this.claspHitMesh.position.set(-(BOOK_PAGE_W + 0.2) / 2, 0.12, 0);
+    this.claspHitMesh.position.set(-boardWidth / 2, -0.05, 0);
     this.claspHitMesh.userData = { interactionType: 'openBook' };
     this.leftCoverPivot.add(this.claspHitMesh);
 
@@ -221,7 +452,7 @@ export class BookAndDeskRig {
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -1,
     });
-    this.spreadMat.customProgramCacheKey = () => 'spread-magnifier-portal-v1';
+    this.spreadMat.customProgramCacheKey = () => 'spread-magnifier-portal-stain-v2';
     this.spreadMat.onBeforeCompile = (shader) => {
       shader.uniforms.uMagActive = this.magnifierUniforms.uMagActive;
       shader.uniforms.uMagCenter = this.magnifierUniforms.uMagCenter;
@@ -230,6 +461,12 @@ export class BookAndDeskRig {
       shader.uniforms.uSpreadPortalMorph = this.spreadPortalUniforms.uSpreadPortalMorph;
       shader.uniforms.uSpreadPortalUv = this.spreadPortalUniforms.uSpreadPortalUv;
       shader.uniforms.uSpreadPortalColor = this.spreadPortalUniforms.uSpreadPortalColor;
+      shader.uniforms.uStainTime = this.chronicleStainUniforms.uStainTime;
+      shader.uniforms.uStainLevel = this.chronicleStainUniforms.uStainLevel;
+      shader.uniforms.uStainActivity = this.chronicleStainUniforms.uStainActivity;
+      shader.uniforms.uStainSeed = this.chronicleStainUniforms.uStainSeed;
+      shader.uniforms.uStainInkColor = this.chronicleStainUniforms.uStainInkColor;
+      shader.uniforms.uStainEdgeGlow = this.chronicleStainUniforms.uStainEdgeGlow;
 
       shader.vertexShader =
         `
@@ -264,12 +501,15 @@ export class BookAndDeskRig {
         uniform sampler2D uSecretTex;
         uniform vec3 uSpreadPortalColor;
         varying float vPortalWave;
-        ` + shader.fragmentShader;
+        ` +
+        CHRONICLE_STAIN_GLSL_HELPERS +
+        shader.fragmentShader;
 
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <map_fragment>',
         `
         #include <map_fragment>
+        diffuseColor.rgb = applyChronicleStaining(diffuseColor.rgb, vMapUv, 0.0);
         if (uMagActive > 0.01) {
           vec2 d = vMapUv - uMagCenter;
           d.x *= 1.5; // compensate 8.4:5.6 spread aspect ratio
@@ -312,6 +552,24 @@ export class BookAndDeskRig {
       metalness: 0.03,
       side: THREE.DoubleSide,
     });
+    this.turningLeafMat.customProgramCacheKey = () => 'leaf-stain-v1';
+    this.turningLeafMat.onBeforeCompile = (shader) => {
+      shader.uniforms.uStainTime = this.chronicleStainUniforms.uStainTime;
+      shader.uniforms.uStainLevel = this.chronicleStainUniforms.uStainLevel;
+      shader.uniforms.uStainActivity = this.chronicleStainUniforms.uStainActivity;
+      shader.uniforms.uStainSeed = this.chronicleStainUniforms.uStainSeed;
+      shader.uniforms.uStainInkColor = this.chronicleStainUniforms.uStainInkColor;
+      shader.uniforms.uStainEdgeGlow = this.chronicleStainUniforms.uStainEdgeGlow;
+
+      shader.fragmentShader = CHRONICLE_STAIN_GLSL_HELPERS + shader.fragmentShader;
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <map_fragment>',
+        `
+        #include <map_fragment>
+        diffuseColor.rgb = applyChronicleStaining(diffuseColor.rgb, vMapUv, 1.0);
+        `,
+      );
+    };
     this.turningLeafMesh = new THREE.Mesh(this.turningLeafGeo, this.turningLeafMat);
     this.turningLeafMesh.position.set(0, BOOK_BASE_Y + 0.012, 0);
     this.turningLeafMesh.castShadow = true;
@@ -502,16 +760,21 @@ export class BookAndDeskRig {
 
   public setBookOpenProgress(progress: number): void {
     this.openAmount = Math.max(0, Math.min(1, progress));
-    // Closed: left wing folded onto right wing (rotation.z = -PI + small thickness)
-    // Open: left wing flat at rotation.z = 0
+    // Closed: left wing folded onto right wing (rotation.z = -PI, pivotY = 0.37) so front board sits atop full page stack
+    // Open: left wing rests flat on desk (rotation.z = 0, pivotY = 0.09)
     const angle = (1 - this.openAmount) * -Math.PI;
     this.leftCoverPivot.rotation.z = angle;
+    this.leftCoverPivot.position.y = THREE.MathUtils.lerp(0.37, 0.09, this.openAmount);
 
-    // Center the closed book at X=0 when closed, or centered spread when open
-    this.bookGroup.position.x = (1 - this.openAmount) * -(BOOK_PAGE_W / 2);
+    // Spine smoothly lowers & tucks neatly beneath the crease when open
+    this.spineGroup.position.y = THREE.MathUtils.lerp(0.23, 0.04, this.openAmount);
+    this.spineGroup.scale.setScalar(THREE.MathUtils.lerp(1.0, 0.62, this.openAmount));
 
-    // Clasp lifts open slightly before cover swings
-    this.claspLatch.rotation.z = -Math.min(1, this.openAmount * 4) * 0.75;
+    // Center the closed book at X~0 when closed, or centered spread when open
+    this.bookGroup.position.x = (1 - this.openAmount) * -(BOOK_PAGE_W / 2 + 0.18);
+
+    // Clasp unhooks outward & folds flat cleanly as the cover opens
+    this.claspLatch.rotation.z = Math.min(1, this.openAmount * 3.5) * 0.85;
 
     this.spreadMesh.visible = this.openAmount > 0.82;
     this.claspHitMesh.visible = this.openAmount < 0.25;
@@ -552,6 +815,54 @@ export class BookAndDeskRig {
     this.portalRingMesh.scale.setScalar(scale);
     this.portalRingMat.color.set(accentHex);
     this.portalRingMat.opacity = wave * 0.72;
+  }
+
+  public updateChronicleStain(
+    elapsed: number,
+    stainLevel: number,
+    weather: WeatherPreset,
+    worldId: number,
+    accentHex: string,
+  ): void {
+    const u = this.chronicleStainUniforms;
+    u.uStainTime.value = elapsed;
+    u.uStainLevel.value = THREE.MathUtils.clamp(stainLevel, 0, 1);
+    u.uStainSeed.value = worldId + 1;
+
+    const targetActivity =
+      weather === 'thunderstorm'
+        ? 1.0
+        : weather === 'rain'
+          ? 0.88
+          : weather === 'mist'
+            ? 0.65
+            : weather === 'overcast'
+              ? 0.42
+              : weather === 'windy'
+                ? 0.36
+                : 0.16;
+    u.uStainActivity.value += (targetActivity - u.uStainActivity.value) * 0.12;
+
+    // Weather-driven iron-gall / sepia ink tones blended subtly with chapter pigment
+    const baseHex =
+      weather === 'thunderstorm'
+        ? 0x1a1e2e
+        : weather === 'rain'
+          ? 0x222534
+          : weather === 'mist'
+            ? 0x283238
+            : weather === 'windy'
+              ? 0x3f2d1d
+              : 0x3a291b;
+    const glowHex =
+      weather === 'thunderstorm' || weather === 'rain'
+        ? 0x3b4863
+        : weather === 'mist'
+          ? 0x4b5c63
+          : 0x6b4b2e;
+
+    u.uStainInkColor.value.setHex(baseHex).lerp(_stainTmpCol.set(accentHex), 0.22);
+    u.uStainEdgeGlow.value.setHex(glowHex).lerp(_stainTmpCol, 0.18);
   }
 
   /**

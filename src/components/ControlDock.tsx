@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Anchor,
   ArrowDown,
@@ -97,37 +97,114 @@ function formatClock(hours: number): string {
 export function ControlDock(props: ControlDockProps) {
   const { snapshot } = props;
   const [tab, setTab] = useState<DockTab>('tools');
+  const [isHovering, setIsHovering] = useState(false);
+  const [isFocusedInside, setIsFocusedInside] = useState(false);
+  const leaveTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (snapshot.hudCollapsed) {
+      setIsHovering(false);
+      setIsFocusedInside(false);
+    }
+  }, [snapshot.hudCollapsed]);
+
+  useEffect(() => {
+    return () => {
+      if (leaveTimerRef.current !== null) {
+        window.clearTimeout(leaveTimerRef.current);
+      }
+    };
+  }, []);
 
   if (snapshot.bookPhase === 'closed') return null;
 
   const activeWorldState = snapshot.worlds[snapshot.activeWorld];
   const activeMeta = WORLD_METADATA[snapshot.activeWorld];
   const portalTargetMeta = WORLD_METADATA[activeMeta.portal.targetWorld];
+  const isVisible = isHovering || isFocusedInside || !snapshot.hudCollapsed;
+
+  const handleMouseEnter = () => {
+    if (leaveTimerRef.current !== null) {
+      window.clearTimeout(leaveTimerRef.current);
+      leaveTimerRef.current = null;
+    }
+    setIsHovering(true);
+  };
+
+  const handleMouseLeave = () => {
+    if (leaveTimerRef.current !== null) {
+      window.clearTimeout(leaveTimerRef.current);
+    }
+    leaveTimerRef.current = window.setTimeout(() => {
+      setIsHovering(false);
+    }, 220);
+  };
+
+  const handleBottomReveal = () => {
+    if (snapshot.hudCollapsed) {
+      props.onToggleHud();
+    }
+    setIsHovering(true);
+  };
+
+  const handleCollapse = () => {
+    if (leaveTimerRef.current !== null) {
+      window.clearTimeout(leaveTimerRef.current);
+      leaveTimerRef.current = null;
+    }
+    setIsHovering(false);
+    setIsFocusedInside(false);
+    if (!snapshot.hudCollapsed) {
+      props.onToggleHud();
+    }
+  };
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-3 z-20 flex flex-col items-center px-3 sm:bottom-4">
-      {/* Collapse / Expand Handle */}
-      <button
-        type="button"
-        onClick={props.onToggleHud}
-        className="pointer-events-auto mb-1.5 inline-flex items-center gap-1.5 rounded-t-md border border-b-0 border-[#D4AF6E]/30 bg-[#16100C]/94 px-3 py-1 text-[11px] font-medium text-[#E2C996] transition-colors hover:text-[#F4ECDC] focus-visible:outline-2 focus-visible:outline-[#D4AF6E] cursor-pointer"
-        title="Toggle controls dock (H)"
-      >
-        {snapshot.hudCollapsed ? (
-          <>
-            <ChevronUp className="h-3.5 w-3.5" />
-            <span>Show Controls</span>
-          </>
-        ) : (
-          <>
-            <ChevronDown className="h-3.5 w-3.5" />
-            <span>Hide Controls</span>
-          </>
-        )}
-      </button>
+    <div
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onFocusCapture={() => setIsFocusedInside(true)}
+      onBlurCapture={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setIsFocusedInside(false);
+        }
+      }}
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-20 flex flex-col items-center px-3 pb-3 sm:pb-4"
+    >
+      {/* Subtle bottom hover / tap zone when the menu bar is tucked away */}
+      {!isVisible ? (
+        <button
+          type="button"
+          onClick={handleBottomReveal}
+          aria-label="Reveal controls menu"
+          title="Hover or tap the bottom edge to open controls (H)"
+          className="pointer-events-auto flex h-12 w-full max-w-[min(960px,96vw)] items-end justify-center pb-1.5 cursor-pointer focus-visible:outline-2 focus-visible:outline-[#D4AF6E]"
+        >
+          <span className="h-1 w-14 rounded-full bg-[#D4AF6E]/35 transition-colors hover:bg-[#D4AF6E]/80" />
+        </button>
+      ) : (
+        <>
+          {/* Collapse / Pin Handle */}
+          <button
+            type="button"
+            onClick={snapshot.hudCollapsed ? handleBottomReveal : handleCollapse}
+            className="pointer-events-auto mb-1.5 inline-flex items-center gap-1.5 rounded-t-md border border-b-0 border-[#D4AF6E]/30 bg-[#16100C]/94 px-3 py-1 text-[11px] font-medium text-[#E2C996] transition-colors hover:text-[#F4ECDC] focus-visible:outline-2 focus-visible:outline-[#D4AF6E] cursor-pointer"
+            title={snapshot.hudCollapsed ? 'Pin menu bar open (H)' : 'Hide menu bar (H)'}
+          >
+            {snapshot.hudCollapsed ? (
+              <>
+                <ChevronUp className="h-3.5 w-3.5" />
+                <span>Pin Menu</span>
+              </>
+            ) : (
+              <>
+                <ChevronDown className="h-3.5 w-3.5" />
+                <span>Hide Menu</span>
+              </>
+            )}
+          </button>
 
-      {!snapshot.hudCollapsed && (
-        <div className="pointer-events-auto w-full max-w-[min(960px,96vw)] rounded-lg border border-[#D4AF6E]/28 bg-[#16100C]/94 px-3 py-2.5 shadow-2xl sm:px-4">
+          <div className="pointer-events-auto w-full max-w-[min(960px,96vw)] rounded-lg border border-[#D4AF6E]/28 bg-[#16100C]/94 px-3 py-2.5 shadow-2xl sm:px-4">
           {/* Top Slim Row: Folio Turning + Section Tabs + Camera Presets */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#D4AF6E]/15 pb-2">
             {/* World Folio Switcher (Folios I–X) */}
@@ -579,7 +656,8 @@ export function ControlDock(props: ControlDockProps) {
               </div>
             </div>
           )}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

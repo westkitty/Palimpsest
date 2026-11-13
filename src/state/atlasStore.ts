@@ -5,6 +5,7 @@ import {
   INTERACTION_TOOLS,
   InteractionTool,
   MagnifierDiscovery,
+  NarrationStatus,
   PlantedTreeState,
   PortalLink,
   QualityTier,
@@ -59,6 +60,7 @@ function createInitialWorlds(): WorldState[] {
       ],
       hiddenLayers: [{ id: 'k-grotto', label: 'Root Sanctuary Vault', revealed: false }],
       discoveredSecrets: [],
+      stainLevel: 0.12,
     },
     // 1: The Forgotten Harbor
     {
@@ -110,6 +112,7 @@ function createInitialWorlds(): WorldState[] {
       ],
       hiddenLayers: [{ id: 'h-cove', label: "Smuggler's Sea Cave", revealed: false }],
       discoveredSecrets: [],
+      stainLevel: 0.14,
     },
     // 2: The Celestial Desert
     {
@@ -153,6 +156,7 @@ function createInitialWorlds(): WorldState[] {
       ],
       hiddenLayers: [{ id: 'd-vault', label: 'Sunken Crystal Vault', revealed: false }],
       discoveredSecrets: [],
+      stainLevel: 0.1,
     },
     // 3: The Frostbound Spire
     {
@@ -195,6 +199,7 @@ function createInitialWorlds(): WorldState[] {
       ],
       hiddenLayers: [{ id: 'f-cavern', label: 'Permafrost Ice Cavern', revealed: false }],
       discoveredSecrets: [],
+      stainLevel: 0.12,
     },
     // 4: The Sunken Athenaeum
     {
@@ -238,6 +243,7 @@ function createInitialWorlds(): WorldState[] {
       ],
       hiddenLayers: [{ id: 'a-vault', label: 'Drowned Scroll Vault', revealed: false }],
       discoveredSecrets: [],
+      stainLevel: 0.16,
     },
     // 5: The Ember Foundry
     {
@@ -280,6 +286,7 @@ function createInitialWorlds(): WorldState[] {
       ],
       hiddenLayers: [{ id: 'e-crucible', label: 'Magma Crucible Vault', revealed: false }],
       discoveredSecrets: [],
+      stainLevel: 0.14,
     },
     // 6: The Clockwork Sky
     {
@@ -322,6 +329,7 @@ function createInitialWorlds(): WorldState[] {
       ],
       hiddenLayers: [{ id: 's-engine', label: 'Cloud-Core Engine', revealed: false }],
       discoveredSecrets: [],
+      stainLevel: 0.1,
     },
     // 7: The Whispering Mycelium
     {
@@ -365,6 +373,7 @@ function createInitialWorlds(): WorldState[] {
       ],
       hiddenLayers: [{ id: 'm-crypt', label: 'Ancient Heartwood Crypt', revealed: false }],
       discoveredSecrets: [],
+      stainLevel: 0.15,
     },
     // 8: The Glass Archipelago
     {
@@ -407,6 +416,7 @@ function createInitialWorlds(): WorldState[] {
       ],
       hiddenLayers: [{ id: 'g-grotto', label: 'Mirror-Glass Grotto', revealed: false }],
       discoveredSecrets: [],
+      stainLevel: 0.11,
     },
     // 9: The Meridian Heart
     {
@@ -450,6 +460,7 @@ function createInitialWorlds(): WorldState[] {
       ],
       hiddenLayers: [{ id: 'z-chamber', label: "Architect's Final Chamber", revealed: false }],
       discoveredSecrets: [],
+      stainLevel: 0.12,
     },
   ];
 }
@@ -652,9 +663,14 @@ class AtlasStore {
       cameraMode: 'inspection',
       activeTool: 'explore',
       audioMuted: false,
+      narrationEnabled: true,
+      narrationStatus: 'idle',
+      narrationCaption: null,
+      narrationSpeakerLabel: null,
+      narrationProgress: null,
       reducedMotion: Boolean(prefersReduced),
       qualityTier: isMobile ? 'medium' : 'high',
-      hudCollapsed: false,
+      hudCollapsed: true,
       chronicleOpen: false,
       portalTransition: null,
       hoveredPortal: null,
@@ -752,6 +768,20 @@ class AtlasStore {
     this.state.timeOfDay = ((hours % 24) + 24) % 24;
   }
 
+  public advanceWorldStainQuietly(worldId: WorldId, delta: number): void {
+    const world = this.state.worlds[worldId];
+    if (!world || delta <= 0) return;
+    world.stainLevel = Math.min(1, world.stainLevel + delta);
+  }
+
+  public blotWorldStain(worldId: WorldId): void {
+    const world = this.state.worlds[worldId];
+    if (!world) return;
+    world.stainLevel = 0.06;
+    this.state.statusHint = `Parchment margins on Folio ${WORLD_METADATA[worldId].roman} gently blotted dry.`;
+    this.emit();
+  }
+
   public notify(): void {
     this.emit();
   }
@@ -804,6 +834,27 @@ class AtlasStore {
   public setAudioMuted(muted: boolean): void {
     this.state.audioMuted = muted;
     this.emit();
+  }
+
+  public setNarrationEnabled(enabled: boolean): void {
+    this.state.narrationEnabled = enabled;
+    this.emit();
+  }
+
+  public setNarrationState(
+    status: NarrationStatus,
+    caption: string | null,
+    speakerLabel: string | null,
+    progress: { line: number; total: number } | null,
+  ): void {
+    this.state = {
+      ...this.state,
+      narrationStatus: status,
+      narrationCaption: caption,
+      narrationSpeakerLabel: speakerLabel,
+      narrationProgress: progress,
+    };
+    this.listeners.forEach((l) => l(this.state));
   }
 
   public setReducedMotion(reduced: boolean): void {

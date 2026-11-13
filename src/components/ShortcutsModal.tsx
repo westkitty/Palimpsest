@@ -13,10 +13,11 @@ export function ShortcutsModal({ open, onClose }: ShortcutsModalProps) {
     ['Enter', 'Cross the active folio’s 3D portal landmark to its linked chapter'],
     ['[  /  ]', 'Turn physically across all 10 world folios (I through X)'],
     ['N', 'Open or close the Cartographer’s Chronicle narrative'],
+    ['V', 'Play or pause voiced Cartographer narration'],
     ['1  ·  2  ·  3', 'Switch camera: Desk Inspection · Diorama · Miniature Immersion'],
     ['W A S D / Arrows', 'Navigate inside Immersion view or glide Magical Magnifier'],
     ['T', 'Pause or resume 24-hour celestial time progression'],
-    ['H', 'Collapse or expand the bottom control dock'],
+    ['H', 'Pin or hide the bottom menu bar (also reveals on bottom hover or tap)'],
     ['Touch / Mouse', 'Click portal gates, drag corners to turn pages, pull tabs, draw routes'],
   ];
 

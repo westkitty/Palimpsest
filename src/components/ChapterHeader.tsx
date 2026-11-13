@@ -1,9 +1,10 @@
-import { BookOpen, HelpCircle, ScrollText, Volume2, VolumeX } from 'lucide-react';
+import { BookOpen, Headphones, HelpCircle, Pause, ScrollText, Volume2, VolumeX } from 'lucide-react';
 import { WORLD_METADATA, AtlasSnapshot } from '../types/atlas';
 
 interface ChapterHeaderProps {
   snapshot: AtlasSnapshot;
   onToggleMute: () => void;
+  onToggleNarration: () => void;
   onCloseBook: () => void;
   onToggleChronicle: () => void;
   onOpenHelp: () => void;
@@ -19,6 +20,7 @@ function formatClock(hours: number): string {
 export function ChapterHeader({
   snapshot,
   onToggleMute,
+  onToggleNarration,
   onCloseBook,
   onToggleChronicle,
   onOpenHelp,
@@ -65,6 +67,30 @@ export function ChapterHeader({
       <div className="pointer-events-auto flex items-center gap-2">
         {isOpen && (
           <>
+            <button
+              type="button"
+              onClick={onToggleNarration}
+              aria-pressed={snapshot.narrationStatus === 'speaking'}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                snapshot.narrationStatus === 'speaking'
+                  ? 'border-[#D4AF6E]/75 bg-[#3A2218] text-[#F4ECDC]'
+                  : 'border-[#D4AF6E]/25 bg-[#16100C]/92 text-[#E9DEC8] hover:border-[#D4AF6E]/55 hover:text-[#F4ECDC]'
+              }`}
+              title="Listen to voiced chapter narration (V)"
+            >
+              {snapshot.narrationStatus === 'speaking' ? (
+                <Pause className="h-3.5 w-3.5 text-[#D4AF6E]" />
+              ) : (
+                <Headphones className="h-3.5 w-3.5 text-[#D4AF6E]" />
+              )}
+              <span className="hidden sm:inline">
+                {snapshot.narrationStatus === 'speaking'
+                  ? 'Pause Voice'
+                  : snapshot.narrationStatus === 'paused'
+                    ? 'Resume Voice'
+                    : 'Narrate'}
+              </span>
+            </button>
             <button
               type="button"
               onClick={onToggleChronicle}

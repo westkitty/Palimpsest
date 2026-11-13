@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { narrationEngine } from '../audio/NarrationEngine';
 import { soundEngine } from '../audio/SoundEngine';
 import { atlasStore } from '../state/atlasStore';
 import {
@@ -13,6 +18,7 @@ import {
   WorldId,
 } from '../types/atlas';
 import { AtmosphereSystem } from './AtmosphereSystem';
+import { AtmosphericPostShader } from './AtmosphericPostShader';
 import { BOOK_BASE_Y, BOOK_PAGE_D, BOOK_SPREAD_W, BookAndDeskRig } from './BookAndDeskRig';
 import { createProceduralTextures, ProceduralTexturePack } from './proceduralTextures';
 import { BaseWorld } from './worlds/BaseWorld';
@@ -41,6 +47,7 @@ const _moveDir = new THREE.Vector3();
 const _camRight = new THREE.Vector3();
 const _magGoal = new THREE.Vector3();
 const _immersionStep = new THREE.Vector3();
+const _sunProj = new THREE.Vector3();
 
 function detectSoftwareGl(): boolean {
   try {
@@ -65,6 +72,8 @@ export class AtlasEngine {
   private textures: ProceduralTexturePack;
   private bookRig: BookAndDeskRig;
   private atmosphere: AtmosphereSystem;
+  private composer: EffectComposer;
+  private postPass: ShaderPass;
   private worlds: BaseWorld[];
 
   // Physical 3D Magical Magnifier prop
@@ -100,6 +109,7 @@ export class AtlasEngine {
     portal: PortalLink;
   } | null = null;
   private lastHoverCheck = 0;
+  private hasPlayedPrologue = false;
 
   // Camera transition state
   private cameraPresetActive = true;
@@ -156,7 +166,7 @@ export class AtlasEngine {
       0.1,
       80,
     );
-    this.camera.position.set(0.4, 5.8, 7.6);
+    this.camera.position.set(0.45, 5.25, 5.45);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = !this.isSoftwareGl;
@@ -164,7 +174,7 @@ export class AtlasEngine {
     this.controls.maxPolarAngle = Math.PI / 2 - 0.06;
     this.controls.minDistance = 1.4;
     this.controls.maxDistance = 15.5;
-    this.controls.target.set(0, 0.2, 0);
+    this.controls.target.set(0, 0.32, 0.32);
 
     // Cancel scripted camera transitions as soon as user grabs controls
     this.controls.addEventListener('start', () => {
@@ -220,6 +230,22 @@ export class AtlasEngine {
     if (!this.isSoftwareGl) {
       this.renderer.compile(this.scene, this.camera);
     }
+
+    // Global atmospheric post-processing pipeline (Render -> Dynamic Weather/Volumetrics -> ACES/sRGB Output)
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.postPass = new ShaderPass(AtmosphericPostShader);
+    this.composer.addPass(this.postPass);
+    this.composer.addPass(new OutputPass());
+    this.applyQualitySettings();
+    this.composer.setSize(
+      Math.max(1, container.clientWidth),
+      Math.max(1, container.clientHeight),
+    );
+    this.postPass.uniforms.uResolution.value.set(
+      Math.max(1, container.clientWidth),
+      Math.max(1, container.clientHeight),
+    );
 
     this.bindEvents();
     this.applyCameraPreset('inspection');
@@ -299,6 +325,8 @@ export class AtlasEngine {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
     this.applyQualitySettings();
+    this.composer.setSize(w, h);
+    this.postPass.uniforms.uResolution.value.set(w, h);
   };
 
   private applyQualitySettings(): void {
@@ -312,6 +340,7 @@ export class AtlasEngine {
           ? Math.min(dpr, 1.5)
           : Math.min(dpr, 2);
     this.renderer.setPixelRatio(ratio);
+    this.composer?.setPixelRatio(ratio);
   }
 
   public openBook(): void {
@@ -320,12 +349,19 @@ export class AtlasEngine {
     soundEngine.playBookOpen();
     atlasStore.setBookPhase('opening');
     this.applyCameraPreset('diorama');
+    if (!this.hasPlayedPrologue) {
+      this.hasPlayedPrologue = true;
+      narrationEngine.narratePrologueAndChapter(snap.activeWorld);
+    } else {
+      narrationEngine.narrateChapter(snap.activeWorld);
+    }
   }
 
   public closeBook(): void {
     const snap = atlasStore.getSnapshot();
     if (snap.bookPhase === 'closed') return;
     soundEngine.playPageTurn();
+    narrationEngine.stop();
     atlasStore.setBookPhase('closed');
     this.applyCameraPreset('inspection');
   }
@@ -350,6 +386,7 @@ export class AtlasEngine {
     this.pageTurnTargetWorld = targetWorld;
     this.pageTurnProgress = this.pageTurnDirection === 1 ? 0.02 : 0.98;
     atlasStore.setPageTurnState(targetWorld, this.pageTurnProgress);
+    narrationEngine.narrateChapter(targetWorld);
   }
 
   public crossPortal(targetWorld?: WorldId): void {
@@ -369,6 +406,7 @@ export class AtlasEngine {
 
     soundEngine.unlock();
     soundEngine.playPortalTransition();
+    narrationEngine.narratePortalArrival(snap.activeWorld, portal.targetWorld);
 
     this.portalTransition = {
       active: true,
@@ -393,7 +431,11 @@ export class AtlasEngine {
   public applyCameraPreset(mode: CameraMode): void {
     this.lastCameraMode = mode;
     this.cameraPresetActive = true;
-    if (mode === 'inspection') {
+    const isClosed = atlasStore.getSnapshot().bookPhase === 'closed';
+    if (isClosed && mode === 'inspection') {
+      _camPosGoal.set(0.45, 5.25, 5.45);
+      _camTargetGoal.set(0, 0.32, 0.32);
+    } else if (mode === 'inspection') {
       _camPosGoal.set(0.5, 5.9, 7.8);
       _camTargetGoal.set(0, 0.2, 0);
     } else if (mode === 'diorama') {
@@ -460,11 +502,15 @@ export class AtlasEngine {
   public connectNextStarEdge(): void {
     const snap = atlasStore.getSnapshot();
     const wState = snap.worlds[snap.activeWorld];
+    const wasComplete = wState.constellationComplete;
     const nextIdx = wState.constellationEdges.length;
     if (nextIdx < 5) {
       atlasStore.toggleConstellationEdge(snap.activeWorld, nextIdx, (nextIdx + 1) % 6);
       this.syncWorld(snap.activeWorld);
       soundEngine.playStarChime(nextIdx);
+      if (!wasComplete && atlasStore.getSnapshot().worlds[snap.activeWorld].constellationComplete) {
+        narrationEngine.narrateStoryBeat(snap.activeWorld, 'stars');
+      }
     }
   }
 
@@ -474,6 +520,12 @@ export class AtlasEngine {
     atlasStore.updateMagnifier({ x: p.x + dx, z: p.z + dz });
     const nowSecret = atlasStore.getSnapshot().activeSecret !== null;
     if (!hadSecret && nowSecret) soundEngine.playSecretReveal();
+  }
+
+  public blotActiveFolio(): void {
+    const snap = atlasStore.getSnapshot();
+    atlasStore.blotWorldStain(snap.activeWorld);
+    soundEngine.playPaperFold();
   }
 
   private updateNdc(clientX: number, clientY: number): void {
@@ -638,10 +690,14 @@ export class AtlasEngine {
         } else if (prev === starIndex) {
           activeWorld.setSelectedStarIndex(null);
         } else {
+          const wasComplete = atlasStore.getSnapshot().worlds[snap.activeWorld].constellationComplete;
           atlasStore.toggleConstellationEdge(snap.activeWorld, prev, starIndex);
           activeWorld.setSelectedStarIndex(starIndex);
           activeWorld.syncConstellationEdges(atlasStore.getSnapshot().worlds[snap.activeWorld]);
           soundEngine.playStarChime(starIndex + 2);
+          if (!wasComplete && atlasStore.getSnapshot().worlds[snap.activeWorld].constellationComplete) {
+            narrationEngine.narrateStoryBeat(snap.activeWorld, 'stars');
+          }
         }
         return;
       }
@@ -654,9 +710,12 @@ export class AtlasEngine {
       }
 
       if (data.interactionType === 'hiddenLayer') {
-        atlasStore.toggleHiddenLayer(snap.activeWorld, data.layerId);
+        const revealed = atlasStore.toggleHiddenLayer(snap.activeWorld, data.layerId);
         activeWorld.syncState(atlasStore.getSnapshot().worlds[snap.activeWorld], this.elapsed);
         soundEngine.playPaperFold();
+        if (revealed) {
+          narrationEngine.narrateStoryBeat(snap.activeWorld, 'vault');
+        }
         return;
       }
 
@@ -764,6 +823,8 @@ export class AtlasEngine {
       if (!shouldCommit) {
         // Snap back to original world
         this.pageTurnTargetWorld = atlasStore.getSnapshot().activeWorld;
+      } else {
+        narrationEngine.narrateChapter(this.pageTurnTargetWorld);
       }
     }
 
@@ -816,9 +877,10 @@ export class AtlasEngine {
       } else if (snap.activeTool === 'hiddenLayer') {
         const first = snap.worlds[snap.activeWorld].hiddenLayers[0];
         if (first) {
-          atlasStore.toggleHiddenLayer(snap.activeWorld, first.id);
+          const revealed = atlasStore.toggleHiddenLayer(snap.activeWorld, first.id);
           this.worlds[snap.activeWorld].syncState(atlasStore.getSnapshot().worlds[snap.activeWorld], this.elapsed);
           soundEngine.playPaperFold();
+          if (revealed) narrationEngine.narrateStoryBeat(snap.activeWorld, 'vault');
         }
       } else if (snap.activeTool === 'popup') {
         const first = snap.worlds[snap.activeWorld].popups[0];
@@ -857,6 +919,10 @@ export class AtlasEngine {
       if (snap.bookPhase !== 'closed') {
         atlasStore.setChronicleOpen(!snap.chronicleOpen);
       }
+    } else if (e.key.toLowerCase() === 'v') {
+      if (snap.bookPhase !== 'closed') {
+        narrationEngine.togglePlayPause(snap.activeWorld);
+      }
     } else if (e.key.toLowerCase() === 't') {
       atlasStore.setAutoTime(!snap.autoTime);
     } else if (e.code === 'Enter' && snap.bookPhase === 'open') {
@@ -878,11 +944,11 @@ export class AtlasEngine {
       this.elapsed += dt;
 
       this.stepSimulation(dt, rawDt);
-      this.renderer.render(this.scene, this.camera);
-
       if (this.isSoftwareGl) {
+        this.renderer.render(this.scene, this.camera);
         this.afterDraw(tick);
       } else {
+        this.composer.render();
         this.frameId = requestAnimationFrame(tick);
       }
     };
@@ -1096,6 +1162,44 @@ export class AtlasEngine {
       currentSnap.weather,
       currentSnap.activeWorld,
       currentSnap.bookPhase !== 'closed',
+      this.elapsed,
+    );
+
+    // 5b. Global Post-Processing Atmospheric Shader Uniforms
+    this.updatePostProcessUniforms(rawDt, currentSnap.bookPhase !== 'closed', currentSnap.activeWorld, currentSnap.weather, currentSnap.qualityTier, currentSnap.reducedMotion);
+
+    // 5c. Chronicle Staining: weather-driven edge ink-bleed progression per folio
+    const isBookOpen = this.bookOpenProgress > 0.5;
+    if (isBookOpen) {
+      const stainRate =
+        currentSnap.weather === 'thunderstorm'
+          ? 0.032
+          : currentSnap.weather === 'rain'
+            ? 0.024
+            : currentSnap.weather === 'mist'
+              ? 0.015
+              : currentSnap.weather === 'overcast'
+                ? 0.008
+                : currentSnap.weather === 'windy'
+                  ? 0.006
+                  : 0.002;
+      atlasStore.advanceWorldStainQuietly(currentSnap.activeWorld, stainRate * rawDt);
+      if (
+        currentSnap.chronicleOpen &&
+        !currentSnap.autoTime &&
+        Math.floor(this.elapsed) !== Math.floor(this.elapsed - dt)
+      ) {
+        atlasStore.notify();
+      }
+    }
+    const activeWorldState = currentSnap.worlds[currentSnap.activeWorld];
+    const activeMeta = WORLD_METADATA[currentSnap.activeWorld];
+    this.bookRig.updateChronicleStain(
+      this.elapsed,
+      activeWorldState.stainLevel,
+      currentSnap.weather,
+      currentSnap.activeWorld,
+      activeMeta.accentHex,
     );
 
     // 6. Active World Updates
@@ -1189,8 +1293,111 @@ export class AtlasEngine {
     this.controls.update();
   }
 
+  private updatePostProcessUniforms(
+    rawDt: number,
+    bookOpen: boolean,
+    activeWorld: WorldId,
+    weather: ReturnType<typeof atlasStore.getSnapshot>['weather'],
+    qualityTier: ReturnType<typeof atlasStore.getSnapshot>['qualityTier'],
+    reducedMotion: boolean,
+  ): void {
+    const u = this.postPass.uniforms;
+    const damp = 1 - Math.exp(-5.0 * rawDt);
+    const daylight = 1 - this.atmosphere.nightFactor;
+
+    u.uTime.value = this.elapsed;
+    u.uDaylight.value = daylight;
+    u.uLightning.value = this.atmosphere.currentLightning;
+    u.uReducedMotion.value = reducedMotion ? 1 : 0;
+    u.uQuality.value = qualityTier === 'high' ? 1.0 : qualityTier === 'medium' ? 0.72 : 0.45;
+
+    // Project 3D sun orbital coordinate into normalized screen UV for volumetric light shafts
+    _sunProj.copy(this.atmosphere.sunWorldPos).project(this.camera);
+    const sunInFront = _sunProj.z < 1.0 && _sunProj.z > -1.0;
+    const sx = THREE.MathUtils.clamp(_sunProj.x * 0.5 + 0.5, -0.35, 1.35);
+    const sy = THREE.MathUtils.clamp(_sunProj.y * 0.5 + 0.5, -0.35, 1.35);
+    u.uSunScreenPos.value.set(sx, sy);
+
+    const edgeAttenX = 1 - THREE.MathUtils.smoothstep(Math.abs(_sunProj.x), 0.9, 1.55);
+    const edgeAttenY = 1 - THREE.MathUtils.smoothstep(Math.abs(_sunProj.y), 0.9, 1.55);
+    const targetSunVis = bookOpen && sunInFront ? edgeAttenX * edgeAttenY : 0;
+    u.uSunVisible.value += (targetSunVis - u.uSunVisible.value) * damp;
+    u.uSunsetStrength.value += (this.atmosphere.sunsetFactor - u.uSunsetStrength.value) * damp;
+
+    // Lateral wind strength driving paper snow drift & shimmer skew
+    const targetWind =
+      weather === 'thunderstorm'
+        ? -1.15
+        : weather === 'windy'
+          ? -0.95
+          : weather === 'rain'
+            ? -0.52
+            : weather === 'mist'
+              ? -0.32
+              : weather === 'overcast'
+                ? -0.26
+                : -0.14;
+    u.uWind.value += (targetWind - u.uWind.value) * damp;
+
+    // Desert & Geothermal Heat Haze: strongest in Celestial Desert (2) by day & Ember Foundry (5)
+    let targetHaze = 0;
+    if (bookOpen) {
+      if (activeWorld === 2) {
+        const sunHeat = 0.28 + 0.72 * daylight;
+        const weatherHeat =
+          weather === 'clear'
+            ? 1.0
+            : weather === 'windy'
+              ? 0.85
+              : weather === 'mist'
+                ? 0.42
+                : weather === 'overcast'
+                  ? 0.25
+                  : 0.1;
+        targetHaze = sunHeat * weatherHeat;
+      } else if (activeWorld === 5) {
+        const forgeWeather =
+          weather === 'rain' || weather === 'thunderstorm' ? 0.38 : 0.82;
+        targetHaze = forgeWeather;
+      } else if (weather === 'clear' && daylight > 0.65) {
+        targetHaze = 0.08 * daylight;
+      }
+    }
+    u.uHeatHaze.value += (targetHaze - u.uHeatHaze.value) * damp;
+
+    // Falling Paper-Textured Snow: prominent in Frostbound Spire (3), high-altitude wisps in Clockwork Sky (6),
+    // and cool overcast/mist flurries across temperate folios (suppressed in hot Desert / Ember Foundry)
+    let targetSnow = 0;
+    if (bookOpen) {
+      if (activeWorld === 3) {
+        targetSnow =
+          weather === 'clear'
+            ? 0.68
+            : weather === 'overcast' || weather === 'mist'
+              ? 0.92
+              : 1.0;
+      } else if (activeWorld === 2 || activeWorld === 5) {
+        targetSnow = 0;
+      } else if (activeWorld === 6) {
+        targetSnow =
+          weather === 'overcast' || weather === 'mist' || weather === 'windy' ? 0.48 : 0.16;
+      } else {
+        targetSnow =
+          weather === 'mist'
+            ? 0.34
+            : weather === 'overcast'
+              ? 0.28
+              : weather === 'windy' && daylight < 0.4
+                ? 0.22
+                : 0;
+      }
+    }
+    u.uSnowStrength.value += (targetSnow - u.uSnowStrength.value) * damp;
+  }
+
   public dispose(): void {
     this.disposed = true;
+    narrationEngine.stop();
     cancelAnimationFrame(this.frameId);
     clearTimeout(this.frameId);
 
@@ -1204,6 +1411,7 @@ export class AtlasEngine {
     this.renderer.domElement.removeEventListener('webglcontextrestored', this.handleContextRestored);
 
     this.controls.dispose();
+    this.composer.dispose();
     this.textures.dispose();
     this.scene.traverse((obj) => {
       if (obj instanceof THREE.Mesh || obj instanceof THREE.Line || obj instanceof THREE.Points) {

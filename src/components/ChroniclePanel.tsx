@@ -5,11 +5,17 @@ import {
   ChevronRight,
   Compass,
   Eye,
+  Headphones,
+  Pause,
+  Play,
+  RotateCcw,
   Search,
   Sparkles,
   X,
 } from 'lucide-react';
+import { GeminiNarratorVoiceId, narrationEngine } from '../audio/NarrationEngine';
 import { MAGNIFIER_SECRETS } from '../state/atlasStore';
+import { CHRONICLE_SCRIPTS } from '../story/chronicleScripts';
 import {
   AtlasSnapshot,
   TOTAL_WORLDS,
@@ -22,6 +28,10 @@ interface ChroniclePanelProps {
   onClose: () => void;
   onSelectWorld: (world: WorldId) => void;
   onCrossPortal: () => void;
+  onBlotMargins: () => void;
+  onToggleNarration: () => void;
+  onReplayNarration: () => void;
+  onToggleAutoNarrate: () => void;
 }
 
 const WORLD_IDS: WorldId[] = Array.from(
@@ -34,13 +44,19 @@ export function ChroniclePanel({
   onClose,
   onSelectWorld,
   onCrossPortal,
+  onBlotMargins,
+  onToggleNarration,
+  onReplayNarration,
+  onToggleAutoNarrate,
 }: ChroniclePanelProps) {
   if (!snapshot.chronicleOpen || snapshot.bookPhase === 'closed') return null;
 
   const activeId = snapshot.activeWorld;
   const meta = WORLD_METADATA[activeId];
+  const script = CHRONICLE_SCRIPTS[activeId];
   const portalTargetMeta = WORLD_METADATA[meta.portal.targetWorld];
   const worldState = snapshot.worlds[activeId];
+  const personas = narrationEngine.getPersonas();
 
   const folioSecrets = MAGNIFIER_SECRETS.filter((s) => s.worldId === activeId);
   const discoveredFolioSecrets = folioSecrets.filter((s) =>
@@ -138,6 +154,76 @@ export function ChroniclePanel({
           <p className="mt-2 text-xs leading-relaxed text-[#C8BBA4]">
             {meta.narrativeBody}
           </p>
+
+          {/* Voiced Chapter Narration Bar */}
+          <div className="mt-3 rounded border border-[#D4AF6E]/25 bg-[#140F0B] p-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#D4AF6E]">
+                  <Headphones className="h-3 w-3 shrink-0" />
+                  <span>Voiced Reading &middot; {script.motif}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={onToggleNarration}
+                  className="inline-flex items-center gap-1 rounded border border-[#D4AF6E]/45 bg-[#2A1D14] px-2.5 py-1 text-[11px] font-medium text-[#E2C996] hover:bg-[#3A281B] cursor-pointer"
+                >
+                  {snapshot.narrationStatus === 'speaking' ? (
+                    <>
+                      <Pause className="h-3 w-3" />
+                      <span>Pause</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-3 w-3" />
+                      <span>
+                        {snapshot.narrationStatus === 'paused' ? 'Resume' : 'Listen'}
+                      </span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={onReplayNarration}
+                  aria-label="Replay voiced chapter reading"
+                  title="Replay voiced chapter reading"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-[#D4AF6E]/25 bg-[#211812] text-[#C8BBA4] hover:border-[#D4AF6E]/60 hover:text-[#F4ECDC] cursor-pointer"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[#D4AF6E]/12 pt-2 text-[11px]">
+              <label className="inline-flex items-center gap-1.5 text-[#C8BBA4] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={snapshot.narrationEnabled}
+                  onChange={onToggleAutoNarrate}
+                  className="accent-[#D4AF6E] cursor-pointer"
+                />
+                <span>Auto-narrate chapters on turn</span>
+              </label>
+
+              <select
+                aria-label="Narrator voice persona"
+                defaultValue={narrationEngine.getSelectedVoiceId()}
+                onChange={(e) => {
+                  narrationEngine.setSelectedVoiceId(e.target.value as GeminiNarratorVoiceId);
+                  onReplayNarration();
+                }}
+                className="max-w-[200px] rounded border border-[#D4AF6E]/25 bg-[#1B140F] px-2 py-0.5 text-[10px] text-[#E2C996] cursor-pointer"
+              >
+                {personas.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
           {/* Bespoke Paper-Geometry Assets */}
           <div className="mt-3 border-t border-[#D4AF6E]/15 pt-2.5">
@@ -240,6 +326,30 @@ export function ChroniclePanel({
                 Enter &rarr; {portalTargetMeta.roman}
               </button>
             </div>
+          </div>
+
+          {/* Archival Chronicle Staining / Margin Ink-Bleed */}
+          <div className="mt-2.5 flex items-center justify-between gap-2 rounded border border-[#D4AF6E]/18 bg-[#140F0B] px-2.5 py-2 text-[11px]">
+            <div className="min-w-0">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#D4AF6E]">
+                Chronicle Staining &middot; {Math.round(worldState.stainLevel * 100)}%
+              </div>
+              <div className="truncate text-[#A89A84]">
+                {worldState.stainLevel > 0.65
+                  ? 'Deep weather ink-bleed across folio borders'
+                  : worldState.stainLevel > 0.28
+                    ? 'Weathered ink tendrils creeping inward'
+                    : 'Subtle archival patina along page margins'}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onBlotMargins}
+              disabled={worldState.stainLevel <= 0.08}
+              className="shrink-0 whitespace-nowrap rounded border border-[#D4AF6E]/30 bg-[#211812] px-2 py-1 text-[10px] font-medium text-[#E2C996] hover:border-[#D4AF6E]/60 disabled:opacity-40 cursor-pointer"
+            >
+              Blot Margins
+            </button>
           </div>
 
           {/* Chapter Turn Controls */}

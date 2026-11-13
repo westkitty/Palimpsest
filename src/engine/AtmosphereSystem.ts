@@ -70,6 +70,9 @@ export class AtmosphereSystem {
   public onThunder?: () => void;
 
   public nightFactor = 0; // 0 = noon, 1 = midnight
+  public readonly sunWorldPos = new THREE.Vector3(0, 6, -3.8);
+  public sunsetFactor = 0;
+  public currentLightning = 0;
 
   constructor(private scene: THREE.Scene, isSoftwareGl: boolean) {
     // 1. Key Light (Sun / Moon)
@@ -362,7 +365,9 @@ export class AtmosphereSystem {
     const moonZ = -3.8;
 
     const isDay = sunY > -0.35;
-    this.sunGroup.position.set(sunX, Math.max(-2.5, sunY), sunZ);
+    const clampedSunY = Math.max(-2.5, sunY);
+    this.sunGroup.position.set(sunX, clampedSunY, sunZ);
+    this.sunWorldPos.set(sunX, clampedSunY, sunZ);
     this.sunGroup.visible = bookOpen && sunY > -1.2;
     this.sunGroup.rotation.z = elapsed * 0.25;
 
@@ -372,6 +377,22 @@ export class AtmosphereSystem {
     // Day/night blend factor (0 = midday, 1 = deep night)
     const sunElev = Math.sin(sunAngle);
     this.nightFactor = THREE.MathUtils.clamp(1 - (sunElev + 0.15) / 0.55, 0, 1);
+
+    // Volumetric light shaft horizon factor: peaks at dawn & sunset
+    const horizonBand =
+      THREE.MathUtils.smoothstep(sunElev, -0.18, 0.08) *
+      (1 - THREE.MathUtils.smoothstep(sunElev, 0.24, 0.62));
+    const shaftWeatherScale =
+      weather === 'thunderstorm'
+        ? 0.18
+        : weather === 'overcast'
+          ? 0.3
+          : weather === 'rain'
+            ? 0.38
+            : weather === 'mist'
+              ? 0.92
+              : 1.0;
+    this.sunsetFactor = bookOpen ? horizonBand * shaftWeatherScale : 0;
 
     // Key light follows active celestial body
     if (isDay) {
@@ -536,6 +557,7 @@ export class AtmosphereSystem {
       this.lightningFlash = 0;
       this.lightningLight.intensity = 0;
     }
+    this.currentLightning = this.lightningFlash;
 
     // Mist
     this.mistGroup.visible = bookOpen && weather === 'mist';

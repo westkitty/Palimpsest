@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { narrationEngine } from './audio/NarrationEngine';
 import { soundEngine } from './audio/SoundEngine';
 import { ChapterHeader } from './components/ChapterHeader';
 import { ChroniclePanel } from './components/ChroniclePanel';
 import { ClosedCoverOverlay } from './components/ClosedCoverOverlay';
 import { ControlDock } from './components/ControlDock';
 import { MagnifierReadout } from './components/MagnifierReadout';
+import { NarrationSubtitle } from './components/NarrationSubtitle';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { AtlasEngine } from './engine/AtlasEngine';
 import { atlasStore } from './state/atlasStore';
@@ -33,6 +35,7 @@ export default function App() {
         engineRef.current.dispose();
         engineRef.current = null;
       }
+      narrationEngine.stop();
       soundEngine.dispose();
     };
   }, []);
@@ -49,6 +52,29 @@ export default function App() {
     const next = !snapshot.audioMuted;
     atlasStore.setAudioMuted(next);
     soundEngine.setMuted(next);
+    if (next) {
+      narrationEngine.stop();
+    }
+  };
+
+  const handleToggleNarration = () => {
+    narrationEngine.togglePlayPause(snapshot.activeWorld);
+  };
+
+  const handleReplayNarration = () => {
+    if (snapshot.audioMuted) {
+      atlasStore.setAudioMuted(false);
+      soundEngine.setMuted(false);
+    }
+    narrationEngine.narrateChapter(snapshot.activeWorld, true);
+  };
+
+  const handleToggleAutoNarrate = () => {
+    const next = !snapshot.narrationEnabled;
+    atlasStore.setNarrationEnabled(next);
+    if (!next && snapshot.narrationStatus !== 'idle') {
+      narrationEngine.stop();
+    }
   };
 
   const handleSelectWorld = (world: WorldId) => {
@@ -78,9 +104,12 @@ export default function App() {
   };
 
   const handleToggleHiddenLayer = (layerId: string) => {
-    atlasStore.toggleHiddenLayer(snapshot.activeWorld, layerId);
+    const revealed = atlasStore.toggleHiddenLayer(snapshot.activeWorld, layerId);
     engineRef.current?.syncWorld(snapshot.activeWorld);
     soundEngine.playPaperFold();
+    if (revealed) {
+      narrationEngine.narrateStoryBeat(snapshot.activeWorld, 'vault');
+    }
   };
 
   const handleNudgeRiver = (dx: number, dz: number) => {
@@ -122,6 +151,7 @@ export default function App() {
       <ChapterHeader
         snapshot={snapshot}
         onToggleMute={handleToggleMute}
+        onToggleNarration={handleToggleNarration}
         onCloseBook={handleCloseBook}
         onToggleChronicle={() => atlasStore.setChronicleOpen(!snapshot.chronicleOpen)}
         onOpenHelp={() => setHelpOpen(true)}
@@ -133,6 +163,18 @@ export default function App() {
         onClose={() => atlasStore.setChronicleOpen(false)}
         onSelectWorld={handleSelectWorld}
         onCrossPortal={handleCrossPortal}
+        onBlotMargins={() => engineRef.current?.blotActiveFolio()}
+        onToggleNarration={handleToggleNarration}
+        onReplayNarration={handleReplayNarration}
+        onToggleAutoNarrate={handleToggleAutoNarrate}
+      />
+
+      {/* Live spoken narration subtitle & transport bar */}
+      <NarrationSubtitle
+        snapshot={snapshot}
+        onTogglePlayPause={handleToggleNarration}
+        onReplay={handleReplayNarration}
+        onStop={() => narrationEngine.stop()}
       />
 
       {/* Closed book arrival overlay */}
@@ -147,7 +189,11 @@ export default function App() {
 
       {/* Hovered 3D Portal Landmark Callout */}
       {snapshot.bookPhase === 'open' && snapshot.hoveredPortal && !snapshot.portalTransition?.active && (
-        <div className="pointer-events-none fixed bottom-28 left-1/2 z-20 -translate-x-1/2 rounded-md border border-[#D4AF6E]/55 bg-[#16100C]/95 px-4 py-2 text-center shadow-xl">
+        <div
+          className={`pointer-events-none fixed left-1/2 z-20 -translate-x-1/2 rounded-md border border-[#D4AF6E]/55 bg-[#16100C]/95 px-4 py-2 text-center shadow-xl ${
+            snapshot.hudCollapsed ? 'bottom-14' : 'bottom-32'
+          }`}
+        >
           <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#D4AF6E]">
             {snapshot.hoveredPortal.label} &rarr; {WORLD_METADATA[snapshot.hoveredPortal.targetWorld].folioCode}
           </div>

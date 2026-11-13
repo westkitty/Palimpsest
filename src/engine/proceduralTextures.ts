@@ -52,6 +52,8 @@ export interface ProceduralTexturePack {
   leatherBump: THREE.CanvasTexture;
   coverFrontColor: THREE.CanvasTexture;
   coverFrontBump: THREE.CanvasTexture;
+  coverFrontMetalness: THREE.CanvasTexture;
+  coverFrontRoughness: THREE.CanvasTexture;
   pageEdgeColor: THREE.CanvasTexture;
   paperGrainBump: THREE.CanvasTexture;
   contactShadow: THREE.CanvasTexture;
@@ -127,90 +129,249 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
   const leatherColor = finalizeColorTexture(leathC, aniso, 2, 2);
   const leatherBump = finalizeDataTexture(leathB, aniso, 2, 2);
 
-  // 3. Embossed Gold-Leaf Front Cover
+  // 3. Hand-Tooled Antiquarian Leather & 24k Gold-Leaf Embossed Front Cover
   const [covC, cCtx] = createCanvas(1024, 1400);
   const [covB, cbCtx] = createCanvas(1024, 1400);
-  cCtx.drawImage(leathC, 0, 0, 1024, 1400);
-  cbCtx.drawImage(leathB, 0, 0, 1024, 1400);
+  const [covM, cmCtx] = createCanvas(1024, 1400);
+  const [covR, crCtx] = createCanvas(1024, 1400);
 
-  const covGrad = cCtx.createRadialGradient(512, 700, 180, 512, 700, 760);
-  covGrad.addColorStop(0, 'rgba(72, 39, 27, 0.25)');
-  covGrad.addColorStop(1, 'rgba(18, 8, 5, 0.65)');
+  // Tile pebbled leather base cleanly across the 1024x1400 folio board
+  for (let tx = 0; tx < 2; tx++) {
+    for (let ty = 0; ty < 3; ty++) {
+      cCtx.drawImage(leathC, tx * 512, ty * 512, 512, 512);
+      cbCtx.drawImage(leathB, tx * 512, ty * 512, 512, 512);
+    }
+  }
+
+  // Deep burnished cordovan-walnut patina & worn edge vignetting
+  const covGrad = cCtx.createRadialGradient(512, 680, 140, 512, 700, 820);
+  covGrad.addColorStop(0, 'rgba(96, 46, 31, 0.34)');
+  covGrad.addColorStop(0.62, 'rgba(42, 18, 12, 0.38)');
+  covGrad.addColorStop(1, 'rgba(14, 6, 4, 0.78)');
   cCtx.fillStyle = covGrad;
   cCtx.fillRect(0, 0, 1024, 1400);
 
-  const drawGoldStroke = (fn: (ctx: CanvasRenderingContext2D, isBump: boolean) => void) => {
-    fn(cCtx, false);
-    fn(cbCtx, true);
+  // Spine-hinge creasing band on the left edge (X = 0..105)
+  const hingeGrad = cCtx.createLinearGradient(0, 0, 115, 0);
+  hingeGrad.addColorStop(0, 'rgba(12, 5, 3, 0.65)');
+  hingeGrad.addColorStop(0.55, 'rgba(66, 33, 21, 0.25)');
+  hingeGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  cCtx.fillStyle = hingeGrad;
+  cCtx.fillRect(0, 0, 120, 1400);
+
+  // Base leather metalness (matte ~0.04) & roughness (~0.66 with edge burnishing ~0.52)
+  cmCtx.fillStyle = 'rgb(10, 10, 10)';
+  cmCtx.fillRect(0, 0, 1024, 1400);
+  crCtx.fillStyle = 'rgb(172, 172, 172)';
+  crCtx.fillRect(0, 0, 1024, 1400);
+
+  // Blind-tooled recessed leather panel border (subtle debossed shadow in color & bump)
+  cCtx.strokeStyle = 'rgba(12, 5, 3, 0.85)';
+  cCtx.lineWidth = 14;
+  cCtx.strokeRect(54, 54, 916, 1292);
+  cbCtx.strokeStyle = '#383838';
+  cbCtx.lineWidth = 14;
+  cbCtx.strokeRect(54, 54, 916, 1292);
+
+  // Inner dark recessed central medallion tablet
+  cCtx.fillStyle = 'rgba(20, 9, 6, 0.42)';
+  cCtx.fillRect(114, 114, 796, 1172);
+
+  type FoilRole = 'color' | 'bump' | 'metal' | 'rough';
+  const drawGoldLeaf = (fn: (ctx: CanvasRenderingContext2D, role: FoilRole) => void) => {
+    fn(cCtx, 'color');
+    fn(cbCtx, 'bump');
+    fn(cmCtx, 'metal');
+    fn(crCtx, 'rough');
   };
 
-  drawGoldStroke((ctx, isBump) => {
-    ctx.strokeStyle = isBump ? '#EAEAEA' : '#D4AF6E';
-    ctx.lineWidth = 10;
-    ctx.strokeRect(64, 64, 896, 1272);
-    ctx.lineWidth = 3;
-    ctx.strokeRect(88, 88, 848, 1224);
-    ctx.strokeRect(106, 106, 812, 1188);
+  drawGoldLeaf((ctx, role) => {
+    const strokeTone =
+      role === 'color'
+        ? '#E6C478'
+        : role === 'bump'
+          ? '#F0F0F0'
+          : role === 'metal'
+            ? '#ECECEC'
+            : '#3A3A3A';
+    const brightTone =
+      role === 'color'
+        ? '#F4DC9E'
+        : role === 'bump'
+          ? '#FFFFFF'
+          : role === 'metal'
+            ? '#F6F6F6'
+            : '#2C2C2C';
 
-    const corners = [
-      [106, 106, 0],
-      [918, 106, Math.PI / 2],
-      [918, 1294, Math.PI],
-      [106, 1294, -Math.PI / 2],
+    // 1. Concentric gold fillet framing rules
+    ctx.strokeStyle = strokeTone;
+    ctx.lineWidth = 8;
+    ctx.strokeRect(72, 72, 880, 1256);
+
+    ctx.strokeStyle = brightTone;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(92, 92, 840, 1216);
+    ctx.strokeRect(114, 114, 796, 1172);
+
+    // Subtle dotted pearl beading along the outer rule
+    ctx.fillStyle = strokeTone;
+    for (let x = 132; x <= 892; x += 28) {
+      ctx.beginPath();
+      ctx.arc(x, 103, 2.6, 0, Math.PI * 2);
+      ctx.arc(x, 1297, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    for (let y = 132; y <= 1268; y += 28) {
+      ctx.beginPath();
+      ctx.arc(103, y, 2.6, 0, Math.PI * 2);
+      ctx.arc(921, y, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 2. Decorative corner filigree arches & rosette eyelets
+    const corners: [number, number, number][] = [
+      [114, 114, 0],
+      [910, 114, Math.PI / 2],
+      [910, 1286, Math.PI],
+      [114, 1286, -Math.PI / 2],
     ];
     corners.forEach(([cx, cy, ang]) => {
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(ang);
+      ctx.strokeStyle = strokeTone;
       ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.arc(0, 0, 95, 0, Math.PI / 2);
+      ctx.arc(0, 0, 118, 0, Math.PI / 2);
       ctx.stroke();
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.arc(0, 0, 62, 0, Math.PI / 2);
+      ctx.arc(0, 0, 88, 0, Math.PI / 2);
       ctx.stroke();
+      for (let k = 1; k <= 4; k++) {
+        const a = (k / 5) * (Math.PI / 2);
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * 58, Math.sin(a) * 58);
+        ctx.lineTo(Math.cos(a) * 116, Math.sin(a) * 116);
+        ctx.stroke();
+      }
       ctx.restore();
     });
 
+    // 3. Top Header Engraving Rule + Title Cartouche
+    ctx.strokeStyle = brightTone;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(190, 214);
+    ctx.lineTo(834, 214);
+    ctx.moveTo(220, 386);
+    ctx.lineTo(804, 386);
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    if (role === 'color') {
+      ctx.fillStyle = 'rgba(10, 4, 2, 0.72)';
+      ctx.font = '700 84px Georgia, serif';
+      ctx.fillText('PALIMPSEST', 515, 294);
+    }
+    ctx.fillStyle = brightTone;
+    ctx.font = '700 84px Georgia, serif';
+    ctx.fillText('PALIMPSEST', 512, 290);
+
+    ctx.fillStyle = strokeTone;
+    ctx.font = '600 28px Georgia, serif';
+    ctx.fillText('THE IMPOSSIBLE LIVING ATLAS', 512, 348);
+
+    // 4. Central Engraved Meridian Astrolabe & Compass Rose (cy = 700)
     ctx.save();
-    ctx.translate(512, 660);
-    ctx.lineWidth = 4;
-    for (const r of [250, 224, 168, 92]) {
+    ctx.translate(512, 700);
+    ctx.strokeStyle = strokeTone;
+    for (const [r, lw] of [
+      [284, 5],
+      [256, 2.5],
+      [226, 3.5],
+      [172, 2.2],
+      [112, 3],
+      [58, 2.5],
+    ] as const) {
+      ctx.lineWidth = lw;
       ctx.beginPath();
       ctx.arc(0, 0, r, 0, Math.PI * 2);
       ctx.stroke();
     }
-    for (let i = 0; i < 16; i++) {
-      const a = (i / 16) * Math.PI * 2;
-      const rIn = i % 2 === 0 ? 36 : 92;
-      const rOut = i % 2 === 0 ? 224 : 168;
+
+    // Graduated 72 meridian degree ticks
+    for (let i = 0; i < 72; i++) {
+      const a = (i / 72) * Math.PI * 2;
+      const major = i % 6 === 0;
+      const rIn = major ? 226 : 240;
+      ctx.lineWidth = major ? 3 : 1.5;
       ctx.beginPath();
       ctx.moveTo(Math.cos(a) * rIn, Math.sin(a) * rIn);
-      ctx.lineTo(Math.cos(a) * rOut, Math.sin(a) * rOut);
+      ctx.lineTo(Math.cos(a) * 256, Math.sin(a) * 256);
       ctx.stroke();
     }
-    for (const rot of [-0.45, 0.45]) {
+
+    // Interlocking celestial orbital rings
+    ctx.strokeStyle = brightTone;
+    ctx.lineWidth = 2.8;
+    for (const rot of [-0.52, 0.52]) {
       ctx.save();
       ctx.rotate(rot);
       ctx.beginPath();
-      ctx.ellipse(0, 0, 238, 86, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, 266, 98, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
+
+    // 16-ray compass rose needles
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const isCardinal = i % 4 === 0;
+      const rOut = isCardinal ? 224 : i % 2 === 0 ? 172 : 128;
+      ctx.lineWidth = isCardinal ? 3.8 : 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * 58, Math.sin(a) * 58);
+      ctx.lineTo(Math.cos(a) * rOut, Math.sin(a) * rOut);
+      ctx.stroke();
+    }
+
+    // Cardinal runes & Ten Realms Roman ring
+    const numerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+    ctx.fillStyle = brightTone;
+    ctx.font = '600 20px Georgia, serif';
+    numerals.forEach((num, idx) => {
+      const a = (idx / numerals.length) * Math.PI * 2 - Math.PI / 2;
+      ctx.save();
+      ctx.translate(Math.cos(a) * 200, Math.sin(a) * 200);
+      ctx.rotate(a + Math.PI / 2);
+      ctx.fillText(num, 0, 7);
+      ctx.restore();
+    });
     ctx.restore();
 
-    ctx.fillStyle = isBump ? '#F4F4F4' : '#E2C285';
-    ctx.textAlign = 'center';
-    ctx.font = '700 84px Georgia, serif';
-    ctx.fillText('PALIMPSEST', 512, 260);
-    ctx.font = '600 32px Georgia, serif';
-    ctx.fillText('THE IMPOSSIBLE LIVING ATLAS', 512, 318);
-    ctx.font = 'italic 26px Georgia, serif';
-    ctx.fillText('Ten Bound Realms · The Unbound Meridian', 512, 1140);
+    // 5. Lower Illuminated Colophon Banner
+    ctx.strokeStyle = strokeTone;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(210, 1068);
+    ctx.lineTo(814, 1068);
+    ctx.moveTo(270, 1218);
+    ctx.lineTo(754, 1218);
+    ctx.stroke();
+
+    ctx.fillStyle = brightTone;
+    ctx.font = '600 27px Georgia, serif';
+    ctx.fillText('FOLIO OF THE UNBOUND MERIDIAN', 512, 1126);
+    ctx.fillStyle = strokeTone;
+    ctx.font = 'italic 24px Georgia, serif';
+    ctx.fillText('Ten Folded Worlds · Bound by Master Aldous', 512, 1178);
   });
 
   const coverFrontColor = finalizeColorTexture(covC, aniso);
   const coverFrontBump = finalizeDataTexture(covB, aniso);
+  const coverFrontMetalness = finalizeDataTexture(covM, aniso);
+  const coverFrontRoughness = finalizeDataTexture(covR, aniso);
 
   // 4. Stacked Gilt Page Edges
   const [edgeC, eCtx] = createCanvas(256, 256);
@@ -260,6 +421,8 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
     leatherBump,
     coverFrontColor,
     coverFrontBump,
+    coverFrontMetalness,
+    coverFrontRoughness,
     pageEdgeColor,
     paperGrainBump,
     contactShadow,
@@ -274,6 +437,8 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
     leatherBump,
     coverFrontColor,
     coverFrontBump,
+    coverFrontMetalness,
+    coverFrontRoughness,
     pageEdgeColor,
     paperGrainBump,
     contactShadow,
