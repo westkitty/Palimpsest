@@ -18,6 +18,7 @@ export function ShortcutsModal({ open, onClose }: ShortcutsModalProps) {
     ['W A S D / Arrows', 'Navigate inside Immersion view or glide Magical Magnifier'],
     ['T', 'Pause or resume 24-hour celestial time progression'],
     ['H', 'Pin or hide the bottom menu bar (also reveals on bottom hover or tap)'],
+    ['Atelier Desk Props', 'Click Candle (light), Quill (blot ink), Wax Stamp (seal folio), Dividers (camera), Lens'],
     ['Touch / Mouse', 'Click portal gates, drag corners to turn pages, pull tabs, draw routes'],
   ];
 

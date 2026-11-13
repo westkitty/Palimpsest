@@ -535,6 +535,34 @@ export interface WorldState {
   stainLevel: number;
 }
 
+export interface HoverCallout {
+  id: string;
+  label: string;
+  category: string;
+  hint: string;
+  x: number;
+  y: number;
+}
+
+export interface MeridianQuestProgress {
+  shard1Verdant: boolean;
+  shard2Frost: boolean;
+  shard3Ember: boolean;
+  shardsCollected: number;
+  constellationsAligned: number;
+  vaultsUnsealed: number;
+  canMendMeridian: boolean;
+  mendedMeridian: boolean;
+}
+
+export interface CrossWorldInfluence {
+  riverFlowRatio: number;
+  emberHeatFactor: number;
+  totalTreesPlanted: number;
+  skyWindBoost: number;
+  constellationsAligned: number;
+}
+
 export type NarrationStatus = 'idle' | 'speaking' | 'paused';
 
 export interface AtlasSnapshot {
@@ -549,10 +577,14 @@ export interface AtlasSnapshot {
   activeTool: InteractionTool;
   audioMuted: boolean;
   narrationEnabled: boolean;
+  narratorVoiceId: string;
   narrationStatus: NarrationStatus;
   narrationCaption: string | null;
   narrationSpeakerLabel: string | null;
   narrationProgress: { line: number; total: number } | null;
+  candleLit: boolean;
+  stampedWorlds: WorldId[];
+  mendedMeridian: boolean;
   reducedMotion: boolean;
   qualityTier: QualityTier;
   hudCollapsed: boolean;
@@ -565,6 +597,7 @@ export interface AtlasSnapshot {
     portalLabel: string;
   } | null;
   hoveredPortal: PortalLink | null;
+  hoveredProp: HoverCallout | null;
   magnifierActive: boolean;
   magnifierPos: Vec2Point;
   activeSecret: MagnifierDiscovery | null;

@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import {
   CreatureState,
+  CrossWorldInfluence,
+  MeridianQuestProgress,
   PlantedTreeState,
   PortalArchStyle,
   PortalLink,
@@ -485,6 +487,8 @@ export abstract class BaseWorld {
       worldId: this.worldId,
       popupId: id,
       label,
+      category: 'Pop-Up Tab',
+      hint: 'Click or drag horizontally to fold or raise',
     };
 
     const ring = new THREE.Mesh(
@@ -569,6 +573,8 @@ export abstract class BaseWorld {
       worldId: this.worldId,
       bridgeId: id,
       label,
+      category: 'Folding Bridge',
+      hint: 'Click seal to accordion-unfold or retract span',
     };
     group.add(sealMesh);
     this.interactables.push(sealMesh);
@@ -652,6 +658,9 @@ export abstract class BaseWorld {
         interactionType: 'riverBead',
         worldId: this.worldId,
         beadIndex: idx,
+        label: `Channel Node ${idx + 1}`,
+        category: 'River Bed',
+        hint: 'Drag control bead to reshape the channel flow',
       };
       this.root.add(bead);
       this.interactables.push(bead);
@@ -837,6 +846,9 @@ export abstract class BaseWorld {
         interactionType: 'starNode',
         worldId: this.worldId,
         starIndex: index,
+        label: `Star Pin ${index + 1}`,
+        category: 'Constellation',
+        hint: 'Click star pins to weave celestial threads',
       };
       this.root.add(star);
       this.interactables.push(star);
@@ -909,6 +921,8 @@ export abstract class BaseWorld {
       worldId: this.worldId,
       creatureId: cState.id,
       label: cState.label,
+      category: 'Origami Wax Seal',
+      hint: cState.summoned ? 'Click to dismiss creature' : 'Click seal to unfold creature',
     };
     this.root.add(sealMesh);
     this.interactables.push(sealMesh);
@@ -1088,6 +1102,8 @@ export abstract class BaseWorld {
       worldId: this.worldId,
       layerId: id,
       label,
+      category: 'Subterranean Vault',
+      hint: 'Click flap to open or seal hidden chamber',
     };
 
     const tabMesh = new THREE.Mesh(
@@ -1100,6 +1116,8 @@ export abstract class BaseWorld {
       worldId: this.worldId,
       layerId: id,
       label,
+      category: 'Subterranean Vault',
+      hint: 'Click tab to lift hinged paper terrain',
     };
 
     lidPivot.add(lid, tabMesh);
@@ -1286,6 +1304,8 @@ export abstract class BaseWorld {
       targetWorld: portal.targetWorld,
       portal,
       label: portal.label,
+      category: `Portal → Folio ${WORLD_METADATA[portal.targetWorld].roman}`,
+      hint: `Click gate to cross into ${WORLD_METADATA[portal.targetWorld].title}`,
     };
     group.add(hitMesh);
 
@@ -1396,6 +1416,8 @@ export abstract class BaseWorld {
     nightFactor: number,
     weather: WeatherPreset,
     constellationToolActive: boolean,
+    influence?: CrossWorldInfluence,
+    quest?: MeridianQuestProgress,
   ): void {
     const damp = 1 - Math.exp(-8 * dt);
 
@@ -1574,7 +1596,7 @@ export abstract class BaseWorld {
       p.activating = false;
     });
 
-    this.updateWorldSpecific(dt, elapsed, nightFactor, weather);
+    this.updateWorldSpecific(dt, elapsed, nightFactor, weather, influence, quest);
   }
 
   protected abstract updateWorldSpecific(
@@ -1582,7 +1604,13 @@ export abstract class BaseWorld {
     elapsed: number,
     nightFactor: number,
     weather: WeatherPreset,
+    influence?: CrossWorldInfluence,
+    quest?: MeridianQuestProgress,
   ): void;
+
+  public dispose(): void {
+    // Subclasses with external render targets (e.g. Reflector) override to dispose cleanly
+  }
 
   public getInteractables(): THREE.Object3D[] {
     return this.interactables;

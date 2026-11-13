@@ -1,20 +1,32 @@
+import { useState } from 'react';
 import {
+  Award,
   BookOpen,
+  Camera,
   Check,
   ChevronLeft,
   ChevronRight,
   Compass,
   Eye,
+  Flame,
   Headphones,
   Pause,
   Play,
   RotateCcw,
   Search,
   Sparkles,
+  Trash2,
+  Trees,
+  Waves,
+  Wind,
   X,
 } from 'lucide-react';
 import { GeminiNarratorVoiceId, narrationEngine } from '../audio/NarrationEngine';
-import { MAGNIFIER_SECRETS } from '../state/atlasStore';
+import {
+  computeCrossWorldInfluence,
+  computeMeridianQuestProgress,
+  MAGNIFIER_SECRETS,
+} from '../state/atlasStore';
 import { CHRONICLE_SCRIPTS } from '../story/chronicleScripts';
 import {
   AtlasSnapshot,
@@ -29,6 +41,10 @@ interface ChroniclePanelProps {
   onSelectWorld: (world: WorldId) => void;
   onCrossPortal: () => void;
   onBlotMargins: () => void;
+  onStampFolio: () => void;
+  onMendMeridian: () => void;
+  onExportPostcard: () => void;
+  onResetChronicle: () => void;
   onToggleNarration: () => void;
   onReplayNarration: () => void;
   onToggleAutoNarrate: () => void;
@@ -45,10 +61,16 @@ export function ChroniclePanel({
   onSelectWorld,
   onCrossPortal,
   onBlotMargins,
+  onStampFolio,
+  onMendMeridian,
+  onExportPostcard,
+  onResetChronicle,
   onToggleNarration,
   onReplayNarration,
   onToggleAutoNarrate,
 }: ChroniclePanelProps) {
+  const [confirmReset, setConfirmReset] = useState(false);
+
   if (!snapshot.chronicleOpen || snapshot.bookPhase === 'closed') return null;
 
   const activeId = snapshot.activeWorld;
@@ -62,6 +84,10 @@ export function ChroniclePanel({
   const discoveredFolioSecrets = folioSecrets.filter((s) =>
     worldState.discoveredSecrets.includes(s.id),
   );
+
+  const quest = computeMeridianQuestProgress(snapshot.worlds, snapshot.mendedMeridian);
+  const influence = computeCrossWorldInfluence(snapshot.worlds);
+  const isStamped = snapshot.stampedWorlds.includes(activeId);
 
   const totalConstellations = snapshot.worlds.filter(
     (w) => w.constellationComplete,
@@ -209,7 +235,7 @@ export function ChroniclePanel({
 
               <select
                 aria-label="Narrator voice persona"
-                defaultValue={narrationEngine.getSelectedVoiceId()}
+                value={snapshot.narratorVoiceId}
                 onChange={(e) => {
                   narrationEngine.setSelectedVoiceId(e.target.value as GeminiNarratorVoiceId);
                   onReplayNarration();
@@ -328,28 +354,193 @@ export function ChroniclePanel({
             </div>
           </div>
 
-          {/* Archival Chronicle Staining / Margin Ink-Bleed */}
-          <div className="mt-2.5 flex items-center justify-between gap-2 rounded border border-[#D4AF6E]/18 bg-[#140F0B] px-2.5 py-2 text-[11px]">
-            <div className="min-w-0">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#D4AF6E]">
-                Chronicle Staining &middot; {Math.round(worldState.stainLevel * 100)}%
+          {/* Archival Chronicle Staining, Wax Seal Stamp & Postcard */}
+          <div className="mt-2.5 rounded border border-[#D4AF6E]/18 bg-[#140F0B] px-2.5 py-2 text-[11px]">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#D4AF6E]">
+                  Chronicle Staining &middot; {Math.round(worldState.stainLevel * 100)}%
+                </div>
+                <div className="truncate text-[#A89A84]">
+                  {worldState.stainLevel > 0.65
+                    ? 'Deep weather ink-bleed across folio borders'
+                    : worldState.stainLevel > 0.28
+                      ? 'Weathered ink tendrils creeping inward'
+                      : 'Subtle archival patina along page margins'}
+                </div>
               </div>
-              <div className="truncate text-[#A89A84]">
-                {worldState.stainLevel > 0.65
-                  ? 'Deep weather ink-bleed across folio borders'
-                  : worldState.stainLevel > 0.28
-                    ? 'Weathered ink tendrils creeping inward'
-                    : 'Subtle archival patina along page margins'}
+              <button
+                type="button"
+                onClick={onBlotMargins}
+                disabled={worldState.stainLevel <= 0.08}
+                className="shrink-0 whitespace-nowrap rounded border border-[#D4AF6E]/30 bg-[#211812] px-2 py-1 text-[10px] font-medium text-[#E2C996] hover:border-[#D4AF6E]/60 disabled:opacity-40 cursor-pointer"
+              >
+                Blot Margins
+              </button>
+            </div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-[#D4AF6E]/12 pt-2">
+              <button
+                type="button"
+                onClick={onStampFolio}
+                className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-[10px] font-medium transition-colors cursor-pointer ${
+                  isStamped
+                    ? 'border-[#B8433E]/80 bg-[#3B1815] text-[#F4ECDC]'
+                    : 'border-[#D4AF6E]/30 bg-[#211812] text-[#E2C996] hover:border-[#D4AF6E]/60'
+                }`}
+              >
+                <Award className="h-3 w-3 text-[#D4AF6E]" />
+                <span>{isStamped ? 'Wax Seal Stamped' : 'Stamp Wax Seal'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onExportPostcard}
+                className="inline-flex items-center gap-1 rounded border border-[#D4AF6E]/30 bg-[#211812] px-2 py-1 text-[10px] font-medium text-[#E2C996] hover:border-[#D4AF6E]/60 cursor-pointer"
+              >
+                <Camera className="h-3 w-3 text-[#D4AF6E]" />
+                <span>Export Postcard</span>
+              </button>
+
+              {!confirmReset ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmReset(true)}
+                  className="ml-auto inline-flex items-center gap-1 rounded border border-[#D4AF6E]/20 bg-[#1B130E] px-2 py-1 text-[10px] text-[#B8A98E] hover:border-[#B8433E]/60 hover:text-[#F4ECDC] cursor-pointer"
+                  title="Erase saved chronicle progress"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  <span>Reset</span>
+                </button>
+              ) : (
+                <div className="ml-auto flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onResetChronicle();
+                      setConfirmReset(false);
+                    }}
+                    className="rounded border border-[#B8433E]/80 bg-[#5C1F1B] px-2 py-1 text-[10px] font-semibold text-[#F4ECDC] hover:bg-[#7A2924] cursor-pointer"
+                  >
+                    Confirm Reset
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmReset(false)}
+                    className="rounded border border-[#D4AF6E]/25 bg-[#211812] px-1.5 py-1 text-[10px] text-[#C8BBA4] cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tenfold Meridian Quest Tracker */}
+          <div className="mt-2.5 rounded border border-[#D4AF6E]/28 bg-[#150F0B] p-2.5 text-[11px]">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.11em] text-[#D4AF6E]">
+                Meridian Shards Quest &middot; {quest.shardsCollected}/3
+              </span>
+              {quest.mendedMeridian && (
+                <span className="font-mono text-[10px] text-[#E2C996]">
+                  HEART RESTORED
+                </span>
+              )}
+            </div>
+
+            <div className="mt-1.5 grid grid-cols-3 gap-1.5 text-[10px]">
+              <button
+                type="button"
+                onClick={() => onSelectWorld(0)}
+                className={`rounded border px-2 py-1 text-left transition-colors cursor-pointer ${
+                  quest.shard1Verdant
+                    ? 'border-[#D4AF6E]/60 bg-[#291F14] text-[#F4ECDC]'
+                    : 'border-[#D4AF6E]/15 bg-[#120D0A] text-[#8B7D68] hover:border-[#D4AF6E]/40'
+                }`}
+              >
+                <div className="font-mono font-semibold">Shard I</div>
+                <div className="truncate">Folio I Vault</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelectWorld(3)}
+                className={`rounded border px-2 py-1 text-left transition-colors cursor-pointer ${
+                  quest.shard2Frost
+                    ? 'border-[#D4AF6E]/60 bg-[#291F14] text-[#F4ECDC]'
+                    : 'border-[#D4AF6E]/15 bg-[#120D0A] text-[#8B7D68] hover:border-[#D4AF6E]/40'
+                }`}
+              >
+                <div className="font-mono font-semibold">Shard II</div>
+                <div className="truncate">Folio IV Vault</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSelectWorld(5)}
+                className={`rounded border px-2 py-1 text-left transition-colors cursor-pointer ${
+                  quest.shard3Ember
+                    ? 'border-[#D4AF6E]/60 bg-[#291F14] text-[#F4ECDC]'
+                    : 'border-[#D4AF6E]/15 bg-[#120D0A] text-[#8B7D68] hover:border-[#D4AF6E]/40'
+                }`}
+              >
+                <div className="font-mono font-semibold">Shard III</div>
+                <div className="truncate">Folio VI Vault</div>
+              </button>
+            </div>
+
+            {quest.mendedMeridian ? (
+              <div className="mt-2 rounded border border-[#D4AF6E]/55 bg-[#2A1F14] px-2.5 py-1.5 text-[11px] text-[#F4ECDC]">
+                Tenfold Meridian Restored &mdash; The golden beacon in Folio X binds all ten worlds.
+              </div>
+            ) : quest.canMendMeridian ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeId !== 9) onSelectWorld(9);
+                  onMendMeridian();
+                }}
+                className="mt-2 w-full rounded border border-[#D4AF6E]/75 bg-[#3A2716] px-3 py-1.5 text-xs font-semibold text-[#F4ECDC] hover:bg-[#4B321C] cursor-pointer"
+              >
+                Mend the Meridian Heart (Folio X Finale)
+              </button>
+            ) : (
+              <p className="mt-1.5 text-[10px] text-[#A89A84]">
+                Unseal the hidden vaults in Folios I, IV, and VI to recover all 3 Meridian Shards and mend Folio X.
+              </p>
+            )}
+          </div>
+
+          {/* Cross-Chapter Consequences ("The Ink Remembers") */}
+          <div className="mt-2.5 rounded border border-[#D4AF6E]/18 bg-[#140F0B] px-2.5 py-2 text-[10px]">
+            <div className="mb-1.5 font-semibold uppercase tracking-[0.11em] text-[#D4AF6E]">
+              The Ink Remembers &middot; Cross-Chapter Echoes
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 text-[#C8BBA4]">
+              <div className="flex items-center gap-1.5 rounded bg-[#1B140F] px-2 py-1">
+                <Waves className="h-3 w-3 shrink-0 text-[#D4AF6E]" />
+                <span className="truncate">
+                  Valley Flow {Math.round(influence.riverFlowRatio * 100)}% &rarr; II
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 rounded bg-[#1B140F] px-2 py-1">
+                <Flame className="h-3 w-3 shrink-0 text-[#D4AF6E]" />
+                <span className="truncate">
+                  Forge Heat {Math.round(influence.emberHeatFactor * 100)}% &rarr; IV
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 rounded bg-[#1B140F] px-2 py-1">
+                <Trees className="h-3 w-3 shrink-0 text-[#D4AF6E]" />
+                <span className="truncate">
+                  {influence.totalTreesPlanted} Flora &rarr; IX Saplings
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 rounded bg-[#1B140F] px-2 py-1">
+                <Wind className="h-3 w-3 shrink-0 text-[#D4AF6E]" />
+                <span className="truncate">
+                  Sky Winds {Math.round(influence.skyWindBoost * 100)}% &rarr; II
+                </span>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={onBlotMargins}
-              disabled={worldState.stainLevel <= 0.08}
-              className="shrink-0 whitespace-nowrap rounded border border-[#D4AF6E]/30 bg-[#211812] px-2 py-1 text-[10px] font-medium text-[#E2C996] hover:border-[#D4AF6E]/60 disabled:opacity-40 cursor-pointer"
-            >
-              Blot Margins
-            </button>
           </div>
 
           {/* Chapter Turn Controls */}

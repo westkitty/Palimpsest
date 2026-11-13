@@ -317,13 +317,23 @@ export class VerdantKingdomWorld extends BaseWorld {
     dt: number,
     elapsed: number,
     _nightFactor: number,
-    _weather: WeatherPreset,
+    weather: WeatherPreset,
   ): void {
+    const millSpeed =
+      weather === 'thunderstorm'
+        ? 2.45
+        : weather === 'windy'
+          ? 2.1
+          : weather === 'rain'
+            ? 1.85
+            : 1.35;
     if (this.millWheel) {
-      this.millWheel.rotation.z -= dt * 1.35;
+      this.millWheel.rotation.z -= dt * millSpeed;
     }
+    const rainSwell = weather === 'thunderstorm' ? 1.28 : weather === 'rain' ? 1.18 : 1.0;
     this.waterfallStrips.forEach((strip, idx) => {
-      strip.position.y = 0.45 + Math.sin(elapsed * 7 + idx * 1.4) * 0.025;
+      strip.position.y = 0.45 + Math.sin(elapsed * (6 + rainSwell * 2) + idx * 1.4) * 0.025;
+      strip.scale.x = rainSwell;
       (strip.material as THREE.MeshStandardMaterial).opacity =
         0.75 + Math.sin(elapsed * 8 + idx) * 0.14;
     });

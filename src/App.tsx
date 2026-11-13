@@ -124,6 +124,32 @@ export default function App() {
     soundEngine.playWaterRipple();
   };
 
+  const handleExportPostcard = () => {
+    const dataUrl = engineRef.current?.capturePostcardDataUrl();
+    if (!dataUrl) return;
+    const roman = WORLD_METADATA[snapshot.activeWorld].roman.toLowerCase();
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = `palimpsest-folio-${roman}.png`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    atlasStore.setStatusHint(`Exported archival postcard for Folio ${WORLD_METADATA[snapshot.activeWorld].roman}.`);
+    soundEngine.playPaperFold();
+  };
+
+  const handleStampFolio = () => {
+    engineRef.current?.stampActiveFolio();
+  };
+
+  const handleMendMeridian = () => {
+    engineRef.current?.mendMeridianHeart();
+  };
+
+  const handleResetChronicle = () => {
+    engineRef.current?.resetChronicleAndSync();
+  };
+
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-[#120D0A]">
       {/* Dedicated isolated WebGL canvas container */}
@@ -154,6 +180,7 @@ export default function App() {
         onToggleNarration={handleToggleNarration}
         onCloseBook={handleCloseBook}
         onToggleChronicle={() => atlasStore.setChronicleOpen(!snapshot.chronicleOpen)}
+        onExportPostcard={handleExportPostcard}
         onOpenHelp={() => setHelpOpen(true)}
       />
 
@@ -164,6 +191,10 @@ export default function App() {
         onSelectWorld={handleSelectWorld}
         onCrossPortal={handleCrossPortal}
         onBlotMargins={() => engineRef.current?.blotActiveFolio()}
+        onStampFolio={handleStampFolio}
+        onMendMeridian={handleMendMeridian}
+        onExportPostcard={handleExportPostcard}
+        onResetChronicle={handleResetChronicle}
         onToggleNarration={handleToggleNarration}
         onReplayNarration={handleReplayNarration}
         onToggleAutoNarrate={handleToggleAutoNarrate}
@@ -185,6 +216,27 @@ export default function App() {
       {/* Secret ink discovery readout for Magical Magnifier */}
       {snapshot.bookPhase === 'open' && snapshot.magnifierActive && (
         <MagnifierReadout secret={snapshot.activeSecret} />
+      )}
+
+      {/* Diegetic 3D Hover Callout Tooltip for Desk Props & Interactive Folios */}
+      {snapshot.hoveredProp && !snapshot.hoveredPortal && !snapshot.portalTransition?.active && (
+        <div
+          style={{
+            left: `${snapshot.hoveredProp.x}px`,
+            top: `${snapshot.hoveredProp.y}px`,
+          }}
+          className="pointer-events-none fixed z-20 -translate-x-1/2 -translate-y-full rounded border border-[#D4AF6E]/45 bg-[#16100C]/94 px-2.5 py-1.5 text-center shadow-xl"
+        >
+          <div className="text-[9px] font-mono uppercase tracking-[0.12em] text-[#D4AF6E]">
+            {snapshot.hoveredProp.category}
+          </div>
+          <div className="text-xs font-medium text-[#F4ECDC]">
+            {snapshot.hoveredProp.label}
+          </div>
+          <div className="text-[10px] italic text-[#C8BBA4]">
+            {snapshot.hoveredProp.hint}
+          </div>
+        </div>
       )}
 
       {/* Hovered 3D Portal Landmark Callout */}

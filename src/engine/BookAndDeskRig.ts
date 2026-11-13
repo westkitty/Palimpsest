@@ -129,15 +129,29 @@ export class BookAndDeskRig {
   private spreadMat: THREE.MeshStandardMaterial;
   public readonly spreadMesh: THREE.Mesh;
 
-  // Animated physical page-turning leaf
+  // Animated physical page-turning leaf (double-sided recto + verso)
   private turningLeafGeo: THREE.PlaneGeometry;
+  private turningLeafBackGeo: THREE.PlaneGeometry;
   private turningLeafBasePos: Float32Array;
   private turningLeafMat: THREE.MeshStandardMaterial;
+  private turningLeafBackMat: THREE.MeshStandardMaterial;
   public readonly turningLeafMesh: THREE.Mesh;
 
   // Corner drag hitboxes for physical page turning
   public readonly cornerRightHit: THREE.Mesh;
   public readonly cornerLeftHit: THREE.Mesh;
+
+  // Interactive Atelier Desk Props
+  public readonly deskInteractables: THREE.Object3D[] = [];
+  private deskMagnifierGroup!: THREE.Group;
+  private quillPivot!: THREE.Group;
+  private stampGroup!: THREE.Group;
+  private pageStampGroup!: THREE.Group;
+  private quillDipAnim = 0;
+  private stampPressAnim = 0;
+  private deskPropsStamped = false;
+  private deskPropsCandleLit = true;
+  private deskPropsMagOnDesk = true;
 
   // Candle flame & flickering light
   private candleFlame: THREE.Mesh;
@@ -544,49 +558,112 @@ export class BookAndDeskRig {
       (this.turningLeafGeo.attributes.position as THREE.BufferAttribute).array,
     );
 
+    const configureLeafShader = (mat: THREE.MeshStandardMaterial) => {
+      mat.customProgramCacheKey = () => 'leaf-stain-v1';
+      mat.onBeforeCompile = (shader) => {
+        shader.uniforms.uStainTime = this.chronicleStainUniforms.uStainTime;
+        shader.uniforms.uStainLevel = this.chronicleStainUniforms.uStainLevel;
+        shader.uniforms.uStainActivity = this.chronicleStainUniforms.uStainActivity;
+        shader.uniforms.uStainSeed = this.chronicleStainUniforms.uStainSeed;
+        shader.uniforms.uStainInkColor = this.chronicleStainUniforms.uStainInkColor;
+        shader.uniforms.uStainEdgeGlow = this.chronicleStainUniforms.uStainEdgeGlow;
+
+        shader.fragmentShader = CHRONICLE_STAIN_GLSL_HELPERS + shader.fragmentShader;
+        shader.fragmentShader = shader.fragmentShader.replace(
+          '#include <map_fragment>',
+          `
+          #include <map_fragment>
+          diffuseColor.rgb = applyChronicleStaining(diffuseColor.rgb, vMapUv, 1.0);
+          `,
+        );
+      };
+    };
+
     this.turningLeafMat = new THREE.MeshStandardMaterial({
       map: textures.worldParchment[0],
       bumpMap: textures.paperGrainBump,
       bumpScale: 0.008,
       roughness: 0.86,
       metalness: 0.03,
-      side: THREE.DoubleSide,
+      side: THREE.FrontSide,
     });
-    this.turningLeafMat.customProgramCacheKey = () => 'leaf-stain-v1';
-    this.turningLeafMat.onBeforeCompile = (shader) => {
-      shader.uniforms.uStainTime = this.chronicleStainUniforms.uStainTime;
-      shader.uniforms.uStainLevel = this.chronicleStainUniforms.uStainLevel;
-      shader.uniforms.uStainActivity = this.chronicleStainUniforms.uStainActivity;
-      shader.uniforms.uStainSeed = this.chronicleStainUniforms.uStainSeed;
-      shader.uniforms.uStainInkColor = this.chronicleStainUniforms.uStainInkColor;
-      shader.uniforms.uStainEdgeGlow = this.chronicleStainUniforms.uStainEdgeGlow;
+    configureLeafShader(this.turningLeafMat);
 
-      shader.fragmentShader = CHRONICLE_STAIN_GLSL_HELPERS + shader.fragmentShader;
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <map_fragment>',
-        `
-        #include <map_fragment>
-        diffuseColor.rgb = applyChronicleStaining(diffuseColor.rgb, vMapUv, 1.0);
-        `,
-      );
-    };
+    // Verso (underside of the turning sheet): shares deformed position/normal attributes cleanly with mirrored U.x
+    this.turningLeafBackGeo = this.turningLeafGeo.clone();
+    this.turningLeafBackGeo.setAttribute('position', this.turningLeafGeo.attributes.position);
+    this.turningLeafBackGeo.setAttribute('normal', this.turningLeafGeo.attributes.normal);
+    const backUvAttr = this.turningLeafBackGeo.attributes.uv as THREE.BufferAttribute;
+    for (let i = 0; i < backUvAttr.count; i++) {
+      backUvAttr.setX(i, 1.0 - backUvAttr.getX(i));
+    }
+    backUvAttr.needsUpdate = true;
+
+    this.turningLeafBackMat = new THREE.MeshStandardMaterial({
+      map: textures.worldParchment[1] ?? textures.worldParchment[0],
+      bumpMap: textures.paperGrainBump,
+      bumpScale: 0.008,
+      roughness: 0.86,
+      metalness: 0.03,
+      side: THREE.BackSide,
+    });
+    configureLeafShader(this.turningLeafBackMat);
+
     this.turningLeafMesh = new THREE.Mesh(this.turningLeafGeo, this.turningLeafMat);
     this.turningLeafMesh.position.set(0, BOOK_BASE_Y + 0.012, 0);
     this.turningLeafMesh.castShadow = true;
     this.turningLeafMesh.receiveShadow = true;
     this.turningLeafMesh.visible = false;
+
+    const turningLeafBackMesh = new THREE.Mesh(this.turningLeafBackGeo, this.turningLeafBackMat);
+    turningLeafBackMesh.receiveShadow = true;
+    this.turningLeafMesh.add(turningLeafBackMesh);
+
     this.bookGroup.add(this.turningLeafMesh);
+
+    // Persistent 3D Crimson Wax Meridian Seal impressed on active folio's bottom-right corner
+    this.pageStampGroup = new THREE.Group();
+    this.pageStampGroup.position.set(3.55, BOOK_BASE_Y + 0.014, 2.25);
+    const waxDisc = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.21, 0.23, 0.024, 16),
+      new THREE.MeshStandardMaterial({
+        color: 0x9b241f,
+        roughness: 0.34,
+        metalness: 0.08,
+      }),
+    );
+    waxDisc.position.y = 0.012;
+    waxDisc.castShadow = true;
+    const waxRim = new THREE.Mesh(
+      new THREE.TorusGeometry(0.16, 0.014, 8, 20),
+      new THREE.MeshStandardMaterial({
+        color: 0xb63830,
+        roughness: 0.3,
+        metalness: 0.18,
+      }),
+    );
+    waxRim.rotation.x = Math.PI / 2;
+    waxRim.position.y = 0.025;
+    const waxStar = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.06, 0),
+      brassMat,
+    );
+    waxStar.scale.set(1, 0.32, 1);
+    waxStar.position.y = 0.026;
+    this.pageStampGroup.add(waxDisc, waxRim, waxStar);
+    this.pageStampGroup.visible = false;
+    this.bookGroup.add(this.pageStampGroup);
 
     // Page corner drag/click targets (bottom-right & bottom-left)
     const cornerHitGeo = new THREE.BoxGeometry(1.05, 0.25, 1.05);
     const hitMat = new THREE.MeshBasicMaterial({ visible: false });
     this.cornerRightHit = new THREE.Mesh(cornerHitGeo, hitMat);
     this.cornerRightHit.position.set(BOOK_PAGE_W - 0.52, BOOK_BASE_Y + 0.06, BOOK_PAGE_D / 2 - 0.52);
-    this.cornerRightHit.userData = { interactionType: 'pageCorner', direction: 1 };
+    this.cornerRightHit.userData = { interactionType: 'pageCorner', direction: 1, label: 'Next Folio Corner', category: 'Binding', hint: 'Click or drag to turn page forward' };
 
     this.cornerLeftHit = new THREE.Mesh(cornerHitGeo, hitMat);
     this.cornerLeftHit.position.set(-BOOK_PAGE_W + 0.52, BOOK_BASE_Y + 0.06, BOOK_PAGE_D / 2 - 0.52);
-    this.cornerLeftHit.userData = { interactionType: 'pageCorner', direction: -1 };
+    this.cornerLeftHit.userData = { interactionType: 'pageCorner', direction: -1, label: 'Previous Folio Corner', category: 'Binding', hint: 'Click or drag to turn page backward' };
 
     this.bookGroup.add(this.cornerRightHit, this.cornerLeftHit);
 
@@ -655,6 +732,7 @@ export class BookAndDeskRig {
     inkCollar.position.y = 0.29;
 
     // Feather quill
+    this.quillPivot = new THREE.Group();
     const quillCurve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(0, 0.25, 0),
       new THREE.Vector3(-0.18, 0.85, -0.1),
@@ -671,7 +749,22 @@ export class BookAndDeskRig {
     quillVane.position.set(-0.28, 1.12, -0.15);
     quillVane.rotation.set(-0.18, 0, 0.35);
     quillVane.scale.set(0.35, 1, 1.1);
-    inkGroup.add(inkBase, inkCollar, quillShaft, quillVane);
+    this.quillPivot.add(quillShaft, quillVane);
+    inkGroup.add(inkBase, inkCollar, this.quillPivot);
+
+    const quillHit = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.48, 0.48, 1.5, 10),
+      new THREE.MeshBasicMaterial({ visible: false }),
+    );
+    quillHit.position.set(-0.1, 0.75, -0.05);
+    quillHit.userData = {
+      interactionType: 'deskQuill',
+      label: 'Inkwell & Feather Quill',
+      category: 'Atelier Tool',
+      hint: 'Click to blot excess ink stain on active folio',
+    };
+    inkGroup.add(quillHit);
+    this.deskInteractables.push(quillHit);
     this.root.add(inkGroup);
 
     // Brass Drafting Compass Dividers (bottom-left of desk)
@@ -689,12 +782,24 @@ export class BookAndDeskRig {
     legB.position.set(0.14, 0.02, 0);
     const hinge = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.06, 12), brassMat);
     hinge.position.set(0, 0.03, -0.68);
-    dividers.add(legA, legB, hinge);
+    const dividersHit = new THREE.Mesh(
+      new THREE.BoxGeometry(0.75, 0.32, 1.7),
+      new THREE.MeshBasicMaterial({ visible: false }),
+    );
+    dividersHit.position.set(0, 0.14, -0.1);
+    dividersHit.userData = {
+      interactionType: 'deskDividers',
+      label: 'Brass Drafting Dividers',
+      category: 'Atelier Tool',
+      hint: 'Click to toggle Desk Inspection / Diorama view',
+    };
+    dividers.add(legA, legB, hinge, dividersHit);
+    this.deskInteractables.push(dividersHit);
     this.root.add(dividers);
 
     // Crimson Wax Seal Stamp (bottom-right of desk)
-    const sealStamp = new THREE.Group();
-    sealStamp.position.set(5.45, 0, 2.0);
+    this.stampGroup = new THREE.Group();
+    this.stampGroup.position.set(5.45, 0, 2.0);
     const stampHead = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.14, 16), brassMat);
     stampHead.position.y = 0.07;
     const stampHandle = new THREE.Mesh(
@@ -710,8 +815,59 @@ export class BookAndDeskRig {
       ),
       new THREE.MeshStandardMaterial({ color: 0x5c1f1a, roughness: 0.42, metalness: 0.08 }),
     );
-    sealStamp.add(stampHead, stampHandle);
-    this.root.add(sealStamp);
+    const stampHit = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.36, 0.36, 1.05, 10),
+      new THREE.MeshBasicMaterial({ visible: false }),
+    );
+    stampHit.position.y = 0.5;
+    stampHit.userData = {
+      interactionType: 'deskStamp',
+      label: 'Meridian Wax Seal Stamp',
+      category: 'Atelier Tool',
+      hint: 'Click to stamp crimson seal onto folio margin',
+    };
+    this.stampGroup.add(stampHead, stampHandle, stampHit);
+    this.deskInteractables.push(stampHit);
+    this.root.add(this.stampGroup);
+
+    // Resting Brass Magnifying Glass on right walnut desk (hidden when active tool = magnifier)
+    this.deskMagnifierGroup = new THREE.Group();
+    this.deskMagnifierGroup.position.set(5.35, 0.045, 0.15);
+    this.deskMagnifierGroup.rotation.y = -0.35;
+    const magBezel = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.036, 10, 28), brassMat);
+    magBezel.rotation.x = Math.PI / 2;
+    magBezel.castShadow = true;
+    const magGlass = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.44, 0.44, 0.02, 24),
+      new THREE.MeshPhysicalMaterial({
+        color: 0xfff5d8,
+        roughness: 0.06,
+        transparent: true,
+        opacity: 0.32,
+        clearcoat: 1.0,
+      }),
+    );
+    const magHandle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.038, 0.052, 0.68, 10),
+      new THREE.MeshStandardMaterial({ color: 0x4b2416, roughness: 0.42 }),
+    );
+    magHandle.rotation.x = Math.PI / 2;
+    magHandle.position.set(0, 0, 0.82);
+    magHandle.castShadow = true;
+    const magHit = new THREE.Mesh(
+      new THREE.BoxGeometry(1.05, 0.32, 1.65),
+      new THREE.MeshBasicMaterial({ visible: false }),
+    );
+    magHit.position.set(0, 0.12, 0.42);
+    magHit.userData = {
+      interactionType: 'deskMagnifier',
+      label: 'Brass Magnifier Lens',
+      category: 'Atelier Tool',
+      hint: 'Click to equip Magnifier and scan for secret ink',
+    };
+    this.deskMagnifierGroup.add(magBezel, magGlass, magHandle, magHit);
+    this.deskInteractables.push(magHit);
+    this.root.add(this.deskMagnifierGroup);
   }
 
   private buildCandle(x: number, z: number): { flame: THREE.Mesh; light: THREE.PointLight } {
@@ -752,7 +908,20 @@ export class BookAndDeskRig {
     const light = new THREE.PointLight(0xffa44c, 2.8, 15, 1.8);
     light.position.set(0, 1.48, 0);
 
-    candleGroup.add(saucer, stem, wax, flame, light);
+    const candleHit = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.42, 0.52, 1.55, 10),
+      new THREE.MeshBasicMaterial({ visible: false }),
+    );
+    candleHit.position.y = 0.78;
+    candleHit.userData = {
+      interactionType: 'deskCandle',
+      label: 'Atelier Tallow Candle',
+      category: 'Atelier Prop',
+      hint: 'Click to snuff or relight candle',
+    };
+    this.deskInteractables.push(candleHit);
+
+    candleGroup.add(saucer, stem, wax, flame, light, candleHit);
     this.root.add(candleGroup);
 
     return { flame, light };
@@ -778,6 +947,27 @@ export class BookAndDeskRig {
 
     this.spreadMesh.visible = this.openAmount > 0.82;
     this.claspHitMesh.visible = this.openAmount < 0.25;
+    this.pageStampGroup.visible = this.deskPropsStamped && this.openAmount > 0.85;
+  }
+
+  public setDeskPropStates(opts: {
+    magnifierOnDesk: boolean;
+    stamped: boolean;
+    candleLit: boolean;
+  }): void {
+    this.deskPropsMagOnDesk = opts.magnifierOnDesk;
+    this.deskPropsStamped = opts.stamped;
+    this.deskPropsCandleLit = opts.candleLit;
+    this.deskMagnifierGroup.visible = this.deskPropsMagOnDesk;
+    this.pageStampGroup.visible = this.deskPropsStamped && this.openAmount > 0.85;
+  }
+
+  public triggerQuillDip(): void {
+    this.quillDipAnim = 1.0;
+  }
+
+  public triggerStampPress(): void {
+    this.stampPressAnim = 1.0;
   }
 
   public setActiveWorldSpread(worldId: number): void {
@@ -866,8 +1056,8 @@ export class BookAndDeskRig {
   }
 
   /**
-   * Deforms the physical turning leaf along a curved parabolic page-turn arc.
-   * progress: 0 = flat right, 1 = flat left. direction: 1 (forward) or -1 (backward).
+   * Deforms the double-sided physical turning leaf along a curved parabolic page-turn arc.
+   * Front face carries worldTextureIndex; back verso carries backWorldTextureIndex.
    */
   public updateTurningLeaf(
     active: boolean,
@@ -876,6 +1066,7 @@ export class BookAndDeskRig {
     elapsed: number,
     weather: WeatherPreset,
     worldTextureIndex: number,
+    backWorldTextureIndex = worldTextureIndex,
   ): void {
     this.currentCornerLift += (cornerLift - this.currentCornerLift) * 0.16;
 
@@ -883,11 +1074,20 @@ export class BookAndDeskRig {
     this.turningLeafMesh.visible = showLeaf && this.openAmount > 0.9;
     if (!this.turningLeafMesh.visible) return;
 
-    const idx = Math.max(0, Math.min(this.textures.worldParchment.length - 1, worldTextureIndex));
-    const tex = this.textures.worldParchment[idx];
-    if (this.turningLeafMat.map !== tex) {
-      this.turningLeafMat.map = tex;
+    const count = this.textures.worldParchment.length;
+    const frontIdx = Math.max(0, Math.min(count - 1, worldTextureIndex));
+    const backIdx = Math.max(0, Math.min(count - 1, backWorldTextureIndex));
+
+    const frontTex = this.textures.worldParchment[frontIdx];
+    if (this.turningLeafMat.map !== frontTex) {
+      this.turningLeafMat.map = frontTex;
       this.turningLeafMat.needsUpdate = true;
+    }
+
+    const backTex = this.textures.worldParchment[backIdx];
+    if (this.turningLeafBackMat.map !== backTex) {
+      this.turningLeafBackMat.map = backTex;
+      this.turningLeafBackMat.needsUpdate = true;
     }
 
     const posAttr = this.turningLeafGeo.attributes.position as THREE.BufferAttribute;
@@ -928,7 +1128,37 @@ export class BookAndDeskRig {
     this.turningLeafGeo.computeVertexNormals();
   }
 
-  public updateCandle(elapsed: number, nightFactor: number, weather: WeatherPreset): void {
+  public updateCandle(
+    dt: number,
+    elapsed: number,
+    nightFactor: number,
+    weather: WeatherPreset,
+    candleLit = this.deskPropsCandleLit,
+  ): void {
+    this.deskPropsCandleLit = candleLit;
+    this.candleFlame.visible = candleLit;
+
+    if (this.quillDipAnim > 0) {
+      this.quillDipAnim = Math.max(0, this.quillDipAnim - dt * 2.6);
+      this.quillPivot.rotation.z = Math.sin(this.quillDipAnim * Math.PI) * 0.28;
+      this.quillPivot.position.y = -Math.sin(this.quillDipAnim * Math.PI) * 0.08;
+    } else {
+      this.quillPivot.rotation.z = 0;
+      this.quillPivot.position.y = 0;
+    }
+
+    if (this.stampPressAnim > 0) {
+      this.stampPressAnim = Math.max(0, this.stampPressAnim - dt * 3.2);
+      this.stampGroup.position.y = Math.sin(this.stampPressAnim * Math.PI) * 0.22;
+    } else {
+      this.stampGroup.position.y = 0;
+    }
+
+    if (!candleLit) {
+      this.candleLight.intensity = 0;
+      return;
+    }
+
     const stormFlicker =
       weather === 'windy' || weather === 'thunderstorm'
         ? Math.sin(elapsed * 19.0) * 0.25 + Math.cos(elapsed * 27.0) * 0.18

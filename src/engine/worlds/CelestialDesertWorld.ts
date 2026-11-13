@@ -236,17 +236,26 @@ export class CelestialDesertWorld extends BaseWorld {
     dt: number,
     elapsed: number,
     nightFactor: number,
-    _weather: WeatherPreset,
+    weather: WeatherPreset,
+    influence?: import('../../types/atlas').CrossWorldInfluence,
   ): void {
+    const heat = 0.9 + (influence?.emberHeatFactor ?? 0.2) * 0.65;
+    const stormRate = weather === 'windy' ? 1.35 : weather === 'thunderstorm' ? 1.55 : 1.0;
+
     this.orreryRings.forEach((ring, idx) => {
-      ring.rotation.x += dt * (0.35 + idx * 0.22);
-      ring.rotation.y += dt * (0.48 - idx * 0.18);
+      ring.rotation.x += dt * (0.35 + idx * 0.22) * heat * stormRate;
+      ring.rotation.y += dt * (0.48 - idx * 0.18) * heat;
     });
     if (this.orrerySun) {
-      this.orrerySun.rotation.y = elapsed * 0.9;
+      this.orrerySun.rotation.y = elapsed * 0.9 * heat;
+    }
+    const rainOasis = weather === 'rain' || weather === 'thunderstorm' ? 1 : 0;
+    if (this.riverRig) {
+      this.riverRig.material.emissiveIntensity = 0.15 + rainOasis * 0.45;
     }
     this.crystalSpires.forEach((spire, idx) => {
-      spire.position.y = 0.45 + Math.sin(elapsed * 2.1 + idx) * (0.02 + nightFactor * 0.04);
+      spire.position.y =
+        0.45 + Math.sin(elapsed * 2.1 + idx) * (0.02 + nightFactor * 0.04 + rainOasis * 0.03);
     });
   }
 }

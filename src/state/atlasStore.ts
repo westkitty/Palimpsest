@@ -2,19 +2,105 @@ import {
   AtlasSnapshot,
   BookPhase,
   CameraMode,
+  CrossWorldInfluence,
+  HoverCallout,
   INTERACTION_TOOLS,
   InteractionTool,
   MagnifierDiscovery,
+  MeridianQuestProgress,
   NarrationStatus,
   PlantedTreeState,
   PortalLink,
   QualityTier,
+  TOTAL_WORLDS,
   Vec2Point,
   WeatherPreset,
   WORLD_METADATA,
   WorldId,
   WorldState,
 } from '../types/atlas';
+
+export const ATLAS_STORAGE_KEY = 'palimpsest_atlas_save_v1';
+
+const VALID_WEATHERS = new Set<WeatherPreset>([
+  'clear',
+  'overcast',
+  'rain',
+  'thunderstorm',
+  'windy',
+  'mist',
+]);
+
+export function computeMeridianQuestProgress(
+  worlds: WorldState[],
+  mendedMeridian: boolean,
+): MeridianQuestProgress {
+  const shard1Verdant = Boolean(worlds[0]?.hiddenLayers.some((hl) => hl.revealed));
+  const shard2Frost = Boolean(worlds[3]?.hiddenLayers.some((hl) => hl.revealed));
+  const shard3Ember = Boolean(worlds[5]?.hiddenLayers.some((hl) => hl.revealed));
+  const shardsCollected =
+    (shard1Verdant ? 1 : 0) + (shard2Frost ? 1 : 0) + (shard3Ember ? 1 : 0);
+  const constellationsAligned = worlds.filter((w) => w.constellationComplete).length;
+  const vaultsUnsealed = worlds.filter((w) => w.hiddenLayers.some((hl) => hl.revealed)).length;
+
+  return {
+    shard1Verdant,
+    shard2Frost,
+    shard3Ember,
+    shardsCollected,
+    constellationsAligned,
+    vaultsUnsealed,
+    canMendMeridian: shardsCollected >= 3,
+    mendedMeridian,
+  };
+}
+
+export function computeCrossWorldInfluence(worlds: WorldState[]): CrossWorldInfluence {
+  const verdant = worlds[0];
+  let riverSpread = 0;
+  if (verdant && verdant.riverControlPoints.length >= 2) {
+    for (let i = 1; i < verdant.riverControlPoints.length; i++) {
+      const prev = verdant.riverControlPoints[i - 1];
+      const cur = verdant.riverControlPoints[i];
+      riverSpread += Math.hypot(cur.x - prev.x, cur.z - prev.z);
+    }
+  }
+  // Baseline span ~8.2 units across page -> normalized 0.6..1.75
+  const riverFlowRatio = Math.max(0.6, Math.min(1.75, riverSpread / 7.8 || 1.0));
+
+  const ember = worlds[5];
+  let emberHeatFactor = 0.12;
+  if (ember) {
+    if (ember.hiddenLayers.some((hl) => hl.revealed)) emberHeatFactor += 0.48;
+    if (ember.constellationComplete) emberHeatFactor += 0.25;
+    const avgPop =
+      ember.popups.reduce((acc, p) => acc + p.pullRatio, 0) /
+      Math.max(1, ember.popups.length);
+    emberHeatFactor += avgPop * 0.15;
+  }
+  emberHeatFactor = Math.max(0, Math.min(1, emberHeatFactor));
+
+  const totalTreesPlanted = worlds
+    .slice(0, 8)
+    .reduce((acc, w) => acc + w.plantedTrees.length, 0);
+
+  const sky = worlds[6];
+  let skyWindBoost = 1.0;
+  if (sky) {
+    if (sky.constellationComplete) skyWindBoost += 0.35;
+    if (sky.hiddenLayers.some((hl) => hl.revealed)) skyWindBoost += 0.25;
+  }
+
+  const constellationsAligned = worlds.filter((w) => w.constellationComplete).length;
+
+  return {
+    riverFlowRatio,
+    emberHeatFactor,
+    totalTreesPlanted,
+    skyWindBoost,
+    constellationsAligned,
+  };
+}
 
 function createInitialWorlds(): WorldState[] {
   return [
@@ -640,9 +726,75 @@ export const MAGNIFIER_SECRETS: MagnifierDiscovery[] = [
 
 type Listener = (snapshot: AtlasSnapshot) => void;
 
+interface PersistedAtlasSave {
+  version: number;
+  activeWorld: WorldId;
+  timeOfDay: number;
+  autoTime: boolean;
+  weather: WeatherPreset;
+  narrationEnabled: boolean;
+  narratorVoiceId: string;
+  candleLit: boolean;
+  stampedWorlds: WorldId[];
+  mendedMeridian: boolean;
+  visitedWorlds: WorldId[];
+  worlds: WorldState[];
+}
+
+function hydrateWorldState(base: WorldState, saved?: Partial<WorldState>): WorldState {
+  if (!saved) return base;
+  return {
+    ...base,
+    popups: base.popups.map((p) => {
+      const match = saved.popups?.find((sp) => sp.id === p.id);
+      return match && typeof match.pullRatio === 'number'
+        ? { ...p, pullRatio: Math.max(0, Math.min(1, match.pullRatio)) }
+        : p;
+    }),
+    riverControlPoints:
+      Array.isArray(saved.riverControlPoints) && saved.riverControlPoints.length === base.riverControlPoints.length
+        ? saved.riverControlPoints.map((pt, i) => ({
+            x: typeof pt?.x === 'number' ? pt.x : base.riverControlPoints[i].x,
+            z: typeof pt?.z === 'number' ? pt.z : base.riverControlPoints[i].z,
+          }))
+        : base.riverControlPoints,
+    bridges: base.bridges.map((b) => {
+      const match = saved.bridges?.find((sb) => sb.id === b.id);
+      return match && typeof match.unfolded === 'boolean' ? { ...b, unfolded: match.unfolded } : b;
+    }),
+    plantedTrees: Array.isArray(saved.plantedTrees)
+      ? saved.plantedTrees.slice(0, 24)
+      : base.plantedTrees,
+    shipRoutes:
+      Array.isArray(saved.shipRoutes) && saved.shipRoutes.length > 0
+        ? saved.shipRoutes
+        : base.shipRoutes,
+    constellationEdges: Array.isArray(saved.constellationEdges)
+      ? saved.constellationEdges
+      : base.constellationEdges,
+    constellationComplete: Boolean(saved.constellationComplete),
+    creatures: base.creatures.map((c) => {
+      const match = saved.creatures?.find((sc) => sc.id === c.id);
+      return match && typeof match.summoned === 'boolean' ? { ...c, summoned: match.summoned } : c;
+    }),
+    hiddenLayers: base.hiddenLayers.map((hl) => {
+      const match = saved.hiddenLayers?.find((sh) => sh.id === hl.id);
+      return match && typeof match.revealed === 'boolean' ? { ...hl, revealed: match.revealed } : hl;
+    }),
+    discoveredSecrets: Array.isArray(saved.discoveredSecrets)
+      ? saved.discoveredSecrets
+      : base.discoveredSecrets,
+    stainLevel:
+      typeof saved.stainLevel === 'number'
+        ? Math.max(0, Math.min(1, saved.stainLevel))
+        : base.stainLevel,
+  };
+}
+
 class AtlasStore {
   private state: AtlasSnapshot;
   private listeners = new Set<Listener>();
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     const prefersReduced =
@@ -652,39 +804,105 @@ class AtlasStore {
       typeof window !== 'undefined' &&
       (window.innerWidth < 768 || /Mobi|Android/i.test(navigator.userAgent));
 
+    let worlds = createInitialWorlds();
+    let activeWorld: WorldId = 0;
+    let timeOfDay = 10.2;
+    let autoTime = true;
+    let weather: WeatherPreset = 'clear';
+    let narrationEnabled = true;
+    let narratorVoiceId = 'Charon';
+    let candleLit = true;
+    let stampedWorlds: WorldId[] = [];
+    let mendedMeridian = false;
+    let visitedWorlds: WorldId[] = [0];
+
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const raw = window.localStorage.getItem(ATLAS_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as Partial<PersistedAtlasSave>;
+          if (parsed && parsed.version === 1) {
+            if (typeof parsed.activeWorld === 'number' && parsed.activeWorld >= 0 && parsed.activeWorld < TOTAL_WORLDS) {
+              activeWorld = parsed.activeWorld as WorldId;
+            }
+            if (typeof parsed.timeOfDay === 'number' && Number.isFinite(parsed.timeOfDay)) {
+              timeOfDay = ((parsed.timeOfDay % 24) + 24) % 24;
+            }
+            if (typeof parsed.autoTime === 'boolean') autoTime = parsed.autoTime;
+            if (parsed.weather && VALID_WEATHERS.has(parsed.weather)) weather = parsed.weather;
+            if (typeof parsed.narrationEnabled === 'boolean') narrationEnabled = parsed.narrationEnabled;
+            if (typeof parsed.narratorVoiceId === 'string' && parsed.narratorVoiceId) {
+              narratorVoiceId = parsed.narratorVoiceId;
+            }
+            if (typeof parsed.candleLit === 'boolean') candleLit = parsed.candleLit;
+            if (Array.isArray(parsed.stampedWorlds)) {
+              stampedWorlds = parsed.stampedWorlds.filter(
+                (w): w is WorldId => typeof w === 'number' && w >= 0 && w < TOTAL_WORLDS,
+              );
+            }
+            if (typeof parsed.mendedMeridian === 'boolean') mendedMeridian = parsed.mendedMeridian;
+            if (Array.isArray(parsed.visitedWorlds) && parsed.visitedWorlds.length > 0) {
+              visitedWorlds = parsed.visitedWorlds.filter(
+                (w): w is WorldId => typeof w === 'number' && w >= 0 && w < TOTAL_WORLDS,
+              );
+              if (!visitedWorlds.includes(activeWorld)) visitedWorlds.push(activeWorld);
+            }
+            if (Array.isArray(parsed.worlds)) {
+              worlds = worlds.map((baseW, idx) => hydrateWorldState(baseW, parsed.worlds?.[idx]));
+            }
+          }
+        }
+      }
+    } catch {
+      // Ignore storage parsing errors cleanly
+    }
+
     this.state = {
       bookPhase: 'closed',
-      activeWorld: 0,
+      activeWorld,
       turningToWorld: null,
       turnProgress: 0,
-      timeOfDay: 10.2,
-      autoTime: true,
-      weather: 'clear',
+      timeOfDay,
+      autoTime,
+      weather,
       cameraMode: 'inspection',
       activeTool: 'explore',
       audioMuted: false,
-      narrationEnabled: true,
+      narrationEnabled,
+      narratorVoiceId,
       narrationStatus: 'idle',
       narrationCaption: null,
       narrationSpeakerLabel: null,
       narrationProgress: null,
+      candleLit,
+      stampedWorlds,
+      mendedMeridian,
       reducedMotion: Boolean(prefersReduced),
       qualityTier: isMobile ? 'medium' : 'high',
       hudCollapsed: true,
       chronicleOpen: false,
       portalTransition: null,
       hoveredPortal: null,
+      hoveredProp: null,
       magnifierActive: false,
       magnifierPos: { x: 0, z: 0 },
       activeSecret: null,
       statusHint: 'Click the brass clasp or press Space to unseal the living atlas.',
-      visitedWorlds: [0],
-      worlds: createInitialWorlds(),
+      visitedWorlds,
+      worlds,
     };
   }
 
   public getSnapshot(): AtlasSnapshot {
     return this.state;
+  }
+
+  public getMeridianQuestProgress(): MeridianQuestProgress {
+    return computeMeridianQuestProgress(this.state.worlds, this.state.mendedMeridian);
+  }
+
+  public getCrossWorldInfluence(): CrossWorldInfluence {
+    return computeCrossWorldInfluence(this.state.worlds);
   }
 
   public subscribe(listener: Listener): () => void {
@@ -694,16 +912,55 @@ class AtlasStore {
     };
   }
 
-  private emit(): void {
+  private scheduleSave(immediate = false): void {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    const writeNow = () => {
+      try {
+        const payload: PersistedAtlasSave = {
+          version: 1,
+          activeWorld: this.state.activeWorld,
+          timeOfDay: this.state.timeOfDay,
+          autoTime: this.state.autoTime,
+          weather: this.state.weather,
+          narrationEnabled: this.state.narrationEnabled,
+          narratorVoiceId: this.state.narratorVoiceId,
+          candleLit: this.state.candleLit,
+          stampedWorlds: this.state.stampedWorlds,
+          mendedMeridian: this.state.mendedMeridian,
+          visitedWorlds: this.state.visitedWorlds,
+          worlds: this.state.worlds,
+        };
+        window.localStorage.setItem(ATLAS_STORAGE_KEY, JSON.stringify(payload));
+      } catch {
+        // Non-fatal if storage quota exceeded or disabled
+      }
+    };
+
+    if (this.saveTimer !== null) {
+      globalThis.clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
+    if (immediate) {
+      writeNow();
+    } else {
+      this.saveTimer = globalThis.setTimeout(writeNow, 420);
+    }
+  }
+
+  private emit(persist = true): void {
     this.state = { ...this.state };
     this.listeners.forEach((l) => l(this.state));
+    if (persist) {
+      this.scheduleSave(false);
+    }
   }
 
   public setBookPhase(phase: BookPhase): void {
     if (this.state.bookPhase === phase) return;
     this.state.bookPhase = phase;
     if (phase === 'opening') {
-      this.state.statusHint = 'Unfolding Folio I — Chapter I: Departure from the Hearth...';
+      const meta = WORLD_METADATA[this.state.activeWorld];
+      this.state.statusHint = `Unfolding Folio ${meta.roman} — ${meta.chapterTitle}...`;
     } else if (phase === 'open') {
       this.state.cameraMode = 'diorama';
       this.state.statusHint = WORLD_METADATA[this.state.activeWorld].storyBeatCue;
@@ -711,9 +968,10 @@ class AtlasStore {
       this.state.cameraMode = 'inspection';
       this.state.magnifierActive = false;
       this.state.chronicleOpen = false;
+      this.state.hoveredProp = null;
       this.state.statusHint = 'Click the brass clasp or press Space to unseal the living atlas.';
     }
-    this.emit();
+    this.emit(false);
   }
 
   public setActiveWorld(world: WorldId): void {
@@ -877,9 +1135,88 @@ class AtlasStore {
     this.emit();
   }
 
+  public setHoveredProp(prop: HoverCallout | null): void {
+    const prev = this.state.hoveredProp;
+    if (
+      prev?.id === prop?.id &&
+      Math.abs((prev?.x ?? 0) - (prop?.x ?? 0)) < 2 &&
+      Math.abs((prev?.y ?? 0) - (prop?.y ?? 0)) < 2
+    ) {
+      return;
+    }
+    this.state.hoveredProp = prop;
+    this.emit(false);
+  }
+
+  public toggleCandle(): boolean {
+    this.state.candleLit = !this.state.candleLit;
+    this.state.statusHint = this.state.candleLit
+      ? 'Atelier tallow candle lit — warm amber shadows cast across the vellum.'
+      : 'Atelier candle snuffed — ambient twilight cools the desk.';
+    this.emit(true);
+    return this.state.candleLit;
+  }
+
+  public stampWorld(worldId: WorldId): boolean {
+    const already = this.state.stampedWorlds.includes(worldId);
+    if (!already) {
+      this.state.stampedWorlds = [...this.state.stampedWorlds, worldId];
+    }
+    this.state.statusHint = already
+      ? `Folio ${WORLD_METADATA[worldId].roman} bears Aldous’s crimson Meridian wax seal.`
+      : `Stamped Folio ${WORLD_METADATA[worldId].roman} with the crimson Meridian seal.`;
+    this.scheduleSave(true);
+    this.emit(false);
+    return !already;
+  }
+
+  public mendMeridian(): boolean {
+    const quest = this.getMeridianQuestProgress();
+    if (!quest.canMendMeridian) {
+      this.state.statusHint = `Recover all 3 Meridian Shards (Folios I, IV, VI) before uniting the Heart (${quest.shardsCollected}/3).`;
+      this.emit(false);
+      return false;
+    }
+    this.state.mendedMeridian = true;
+    this.state.statusHint =
+      'The Tenfold Meridian Heart is whole! All ten folios resonate as one continuous world.';
+    this.scheduleSave(true);
+    this.emit(false);
+    return true;
+  }
+
+  public resetChronicle(): void {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(ATLAS_STORAGE_KEY);
+      }
+    } catch {
+      // Ignore storage removal errors
+    }
+    this.state.worlds = createInitialWorlds();
+    this.state.visitedWorlds = [0];
+    this.state.activeWorld = 0;
+    this.state.stampedWorlds = [];
+    this.state.mendedMeridian = false;
+    this.state.candleLit = true;
+    this.state.timeOfDay = 10.2;
+    this.state.autoTime = true;
+    this.state.weather = 'clear';
+    this.state.activeSecret = null;
+    this.state.hoveredProp = null;
+    this.state.statusHint = 'Chronicle bound fresh — Folio I awaits at dawn.';
+    this.scheduleSave(true);
+    this.emit(false);
+  }
+
+  public setNarratorVoiceId(voiceId: string): void {
+    this.state.narratorVoiceId = voiceId;
+    this.emit(true);
+  }
+
   public setStatusHint(hint: string): void {
     this.state.statusHint = hint;
-    this.emit();
+    this.emit(false);
   }
 
   public updatePopupRatio(worldId: WorldId, popupId: string, ratio: number): void {

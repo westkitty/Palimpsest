@@ -48,6 +48,9 @@ const _camRight = new THREE.Vector3();
 const _magGoal = new THREE.Vector3();
 const _immersionStep = new THREE.Vector3();
 const _sunProj = new THREE.Vector3();
+const _camForward = new THREE.Vector3();
+const _hoverWorldPos = new THREE.Vector3();
+const _hoverProjPos = new THREE.Vector3();
 
 function detectSoftwareGl(): boolean {
   try {
@@ -109,6 +112,11 @@ export class AtlasEngine {
     portal: PortalLink;
   } | null = null;
   private lastHoverCheck = 0;
+  private hoveredHighlight: {
+    mesh: THREE.Mesh;
+    origHex: number;
+    origIntensity: number;
+  } | null = null;
   private hasPlayedPrologue = false;
 
   // Camera transition state
@@ -204,7 +212,7 @@ export class AtlasEngine {
       new EmberFoundryWorld(bump, shadow),
       new ClockworkSkyWorld(bump, shadow),
       new WhisperingMyceliumWorld(bump, shadow),
-      new GlassArchipelagoWorld(bump, shadow),
+      new GlassArchipelagoWorld(bump, shadow, this.isSoftwareGl),
       new MeridianHeartWorld(bump, shadow),
     ];
 
@@ -528,6 +536,149 @@ export class AtlasEngine {
     soundEngine.playPaperFold();
   }
 
+  public toggleCandle(): void {
+    const lit = atlasStore.toggleCandle();
+    soundEngine.playCandleToggle(lit);
+  }
+
+  public stampActiveFolio(): void {
+    const snap = atlasStore.getSnapshot();
+    if (snap.bookPhase !== 'open') return;
+    this.bookRig.triggerStampPress();
+    atlasStore.stampWorld(snap.activeWorld);
+    soundEngine.playWaxStamp();
+  }
+
+  public mendMeridianHeart(): boolean {
+    const mended = atlasStore.mendMeridian();
+    if (!mended) {
+      soundEngine.playPaperFold();
+      return false;
+    }
+    soundEngine.playMeridianFinale();
+    const snap = atlasStore.getSnapshot();
+    if (snap.activeWorld !== 9) {
+      this.turnToWorld(9);
+    }
+    narrationEngine.narrateMeridianFinale();
+    return true;
+  }
+
+  public resetChronicleAndSync(): void {
+    narrationEngine.stop();
+    atlasStore.resetChronicle();
+    const snap = atlasStore.getSnapshot();
+    this.worlds.forEach((w, idx) => w.syncState(snap.worlds[idx], this.elapsed));
+    this.syncWorld(snap.activeWorld);
+    this.bookRig.setActiveWorldSpread(snap.activeWorld);
+    soundEngine.playBookOpen();
+  }
+
+  /**
+   * Renders a fresh synchronized frame and composites an antiquarian parchment
+   * keepsake postcard PNG with Folio title, biome, weather patina, and optional wax seal.
+   */
+  public capturePostcardDataUrl(): string | null {
+    if (this.disposed) return null;
+    if (this.isSoftwareGl) {
+      this.renderer.render(this.scene, this.camera);
+    } else {
+      this.composer.render();
+    }
+
+    const srcCanvas = this.renderer.domElement;
+    const cardW = 1600;
+    const cardH = 1040;
+    const card = document.createElement('canvas');
+    card.width = cardW;
+    card.height = cardH;
+    const ctx = card.getContext('2d');
+    if (!ctx) return null;
+
+    const snap = atlasStore.getSnapshot();
+    const meta = WORLD_METADATA[snap.activeWorld];
+    const isStamped = snap.stampedWorlds.includes(snap.activeWorld);
+
+    // Aged parchment matting
+    const bgGrad = ctx.createLinearGradient(0, 0, cardW, cardH);
+    bgGrad.addColorStop(0, '#efe2c7');
+    bgGrad.addColorStop(1, '#dec89f');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, cardW, cardH);
+
+    // Gilded & sepia border hairlines
+    ctx.strokeStyle = '#705331';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(26, 26, cardW - 52, cardH - 52);
+    ctx.strokeStyle = '#c59d52';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(36, 36, cardW - 72, cardH - 72);
+
+    // Center-cropped WebGL canvas aperture
+    const viewX = 60;
+    const viewY = 58;
+    const viewW = cardW - 120;
+    const viewH = cardH - 224;
+    const srcAspect = srcCanvas.width / Math.max(1, srcCanvas.height);
+    const dstAspect = viewW / viewH;
+    let sx = 0;
+    let sy = 0;
+    let sw = srcCanvas.width;
+    let sh = srcCanvas.height;
+    if (srcAspect > dstAspect) {
+      sw = Math.floor(srcCanvas.height * dstAspect);
+      sx = Math.floor((srcCanvas.width - sw) / 2);
+    } else {
+      sh = Math.floor(srcCanvas.width / dstAspect);
+      sy = Math.floor((srcCanvas.height - sh) / 2);
+    }
+
+    ctx.fillStyle = '#120d0a';
+    ctx.fillRect(viewX, viewY, viewW, viewH);
+    ctx.drawImage(srcCanvas, sx, sy, sw, sh, viewX, viewY, viewW, viewH);
+    ctx.strokeStyle = '#8b6c3e';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(viewX, viewY, viewW, viewH);
+
+    // Keepsake typography band
+    ctx.fillStyle = '#2d1e14';
+    ctx.font = 'bold 42px Georgia, "Times New Roman", serif';
+    ctx.fillText(`PALIMPSEST · FOLIO ${meta.roman}: ${meta.title.toUpperCase()}`, 64, cardH - 108);
+
+    ctx.fillStyle = '#5e442c';
+    ctx.font = 'italic 24px Georgia, "Times New Roman", serif';
+    ctx.fillText(`${meta.biome} — "${meta.narrativeLead}"`, 64, cardH - 66);
+
+    const weatherLabel = snap.weather.charAt(0).toUpperCase() + snap.weather.slice(1);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#735538';
+    ctx.font = '20px monospace';
+    ctx.fillText(
+      `ATELIER ARCHIVE · ${weatherLabel.toUpperCase()}${snap.mendedMeridian ? ' · MERIDIAN RESTORED' : ''}`,
+      cardW - 64,
+      cardH - 66,
+    );
+
+    if (isStamped) {
+      const cx = cardW - 140;
+      const cy = cardH - 122;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 34, 0, Math.PI * 2);
+      ctx.fillStyle = '#8d211b';
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = '#d4af6e';
+      ctx.stroke();
+      ctx.fillStyle = '#f4ecdc';
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 14px Georgia, serif';
+      ctx.fillText(meta.roman, cx, cy + 5);
+    }
+
+    ctx.textAlign = 'left';
+    return card.toDataURL('image/png');
+  }
+
   private updateNdc(clientX: number, clientY: number): void {
     const rect = this.renderer.domElement.getBoundingClientRect();
     _ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
@@ -553,6 +704,38 @@ export class AtlasEngine {
     const snap = atlasStore.getSnapshot();
     this.updateNdc(e.clientX, e.clientY);
     _raycaster.setFromCamera(_ndc, this.camera);
+
+    // 0. Check Interactive Atelier Desk Props (accessible in both closed & open atelier inspection)
+    const deskHits = _raycaster.intersectObjects(this.bookRig.deskInteractables, false);
+    if (deskHits.length > 0) {
+      const dData = deskHits[0].object.userData;
+      if (dData.interactionType === 'deskCandle') {
+        this.toggleCandle();
+        return;
+      }
+      if (dData.interactionType === 'deskQuill' && snap.bookPhase === 'open') {
+        this.bookRig.triggerQuillDip();
+        this.blotActiveFolio();
+        return;
+      }
+      if (dData.interactionType === 'deskStamp' && snap.bookPhase === 'open') {
+        this.stampActiveFolio();
+        return;
+      }
+      if (dData.interactionType === 'deskDividers') {
+        const nextMode: CameraMode =
+          snap.cameraMode === 'diorama' ? 'inspection' : 'diorama';
+        atlasStore.setCameraMode(nextMode);
+        this.applyCameraPreset(nextMode);
+        soundEngine.playPaperFold();
+        return;
+      }
+      if (dData.interactionType === 'deskMagnifier' && snap.bookPhase === 'open') {
+        atlasStore.setActiveTool(snap.activeTool === 'magnifier' ? 'explore' : 'magnifier');
+        soundEngine.playPaperFold();
+        return;
+      }
+    }
 
     // 1. If book is closed, clicking the book/clasp opens it
     if (snap.bookPhase === 'closed') {
@@ -723,12 +906,60 @@ export class AtlasEngine {
         this.crossPortal(data.targetWorld as WorldId);
         return;
       }
+
+      if (data.interactionType === 'meridianCore') {
+        this.mendMeridianHeart();
+        return;
+      }
     }
   };
 
+  private clearHoverHighlight(): void {
+    if (!this.hoveredHighlight) return;
+    const mat = this.hoveredHighlight.mesh.material;
+    if (mat instanceof THREE.MeshStandardMaterial) {
+      mat.emissive.setHex(this.hoveredHighlight.origHex);
+      mat.emissiveIntensity = this.hoveredHighlight.origIntensity;
+    }
+    this.hoveredHighlight = null;
+  }
+
+  private applyHoverHighlight(obj: THREE.Object3D): void {
+    this.clearHoverHighlight();
+    if (obj instanceof THREE.Mesh && obj.visible && obj.material instanceof THREE.MeshStandardMaterial) {
+      this.hoveredHighlight = {
+        mesh: obj,
+        origHex: obj.material.emissive.getHex(),
+        origIntensity: obj.material.emissiveIntensity,
+      };
+      obj.material.emissive.setHex(0xd4af6e);
+      obj.material.emissiveIntensity = Math.max(0.55, obj.material.emissiveIntensity + 0.42);
+      return;
+    }
+    // For invisible hitboxes grouped with prop geometry, glow first standard child sibling cleanly
+    const parent = obj.parent;
+    if (!parent) return;
+    for (const child of parent.children) {
+      if (
+        child !== obj &&
+        child instanceof THREE.Mesh &&
+        child.visible &&
+        child.material instanceof THREE.MeshStandardMaterial
+      ) {
+        this.hoveredHighlight = {
+          mesh: child,
+          origHex: child.material.emissive.getHex(),
+          origIntensity: child.material.emissiveIntensity,
+        };
+        child.material.emissive.setHex(0xd4af6e);
+        child.material.emissiveIntensity = Math.max(0.45, child.material.emissiveIntensity + 0.35);
+        break;
+      }
+    }
+  }
+
   private onPointerMove = (e: PointerEvent) => {
     const snap = atlasStore.getSnapshot();
-    if (snap.bookPhase !== 'open') return;
 
     // Physical Page Turn Drag
     if (this.pageTurnDragging && this.pageTurnActive) {
@@ -780,7 +1011,7 @@ export class AtlasEngine {
     }
 
     // Magical Magnifier Hover / Drag
-    if (snap.activeTool === 'magnifier' && (this.draggingMagnifier || e.buttons === 0)) {
+    if (snap.bookPhase === 'open' && snap.activeTool === 'magnifier' && (this.draggingMagnifier || e.buttons === 0)) {
       const pt = this.getSpreadIntersection(e.clientX, e.clientY);
       if (pt) {
         const hadSecret = atlasStore.getSnapshot().activeSecret !== null;
@@ -791,23 +1022,99 @@ export class AtlasEngine {
       return;
     }
 
-    // Subtle corner lift hover feedback & throttled portal landmark hover detection
+    // If cursor is over overlay HTML controls/panels rather than the WebGL canvas, clear 3D hover callouts
+    if (e.target !== this.renderer.domElement) {
+      this.cornerHoverLift = 0;
+      if (this.hoveredHighlight || snap.hoveredProp || snap.hoveredPortal) {
+        this.clearHoverHighlight();
+        this.worlds[snap.activeWorld].setPortalHovered(null);
+        atlasStore.setHoveredPortal(null);
+        atlasStore.setHoveredProp(null);
+        this.renderer.domElement.style.cursor = 'default';
+      }
+      return;
+    }
+
+    // Throttled diegetic hover raycast across desk props, folio corners & 3D world interactables
     this.updateNdc(e.clientX, e.clientY);
     _raycaster.setFromCamera(_ndc, this.camera);
-    const cornerHits = _raycaster.intersectObjects([this.bookRig.cornerRightHit], false);
+
+    const isOpen = snap.bookPhase === 'open';
+    const cornerHits = isOpen
+      ? _raycaster.intersectObjects([this.bookRig.cornerRightHit], false)
+      : [];
     this.cornerHoverLift = cornerHits.length > 0 ? 1 : 0;
 
     const now = performance.now();
     if (now - this.lastHoverCheck > 45 && !this.portalTransition?.active && !this.pageTurnActive) {
       this.lastHoverCheck = now;
+
+      let chosen: THREE.Object3D | null = null;
       const activeWorld = this.worlds[snap.activeWorld];
-      const portalHits = _raycaster.intersectObjects(activeWorld.getPortalInteractables(), false);
-      const hitPortal =
-        portalHits.length > 0 ? ((portalHits[0].object.userData.portal as PortalLink) ?? null) : null;
-      activeWorld.setPortalHovered(hitPortal?.id ?? null);
-      atlasStore.setHoveredPortal(hitPortal);
-      this.renderer.domElement.style.cursor =
-        hitPortal || cornerHits.length > 0 ? 'pointer' : 'default';
+
+      if (isOpen) {
+        const worldHits = _raycaster.intersectObjects(activeWorld.getInteractables(), false);
+        if (worldHits.length > 0) {
+          chosen = worldHits[0].object;
+        }
+      }
+
+      if (!chosen) {
+        const deskHits = _raycaster.intersectObjects(this.bookRig.deskInteractables, false);
+        const visibleDeskHit = deskHits.find((h) => {
+          const t = h.object.userData.interactionType;
+          if (!isOpen && (t === 'deskQuill' || t === 'deskStamp' || t === 'deskMagnifier')) {
+            return false;
+          }
+          if (t === 'deskMagnifier' && snap.magnifierActive) return false;
+          return true;
+        });
+        if (visibleDeskHit) chosen = visibleDeskHit.object;
+      }
+
+      if (!chosen && isOpen && cornerHits.length > 0) {
+        chosen = cornerHits[0].object;
+      }
+
+      if (chosen) {
+        const ud = chosen.userData;
+        const portal =
+          ud.interactionType === 'portalLandmark' ? ((ud.portal as PortalLink) ?? null) : null;
+        activeWorld.setPortalHovered(portal?.id ?? null);
+        atlasStore.setHoveredPortal(portal);
+
+        this.applyHoverHighlight(chosen);
+
+        chosen.getWorldPosition(_hoverWorldPos);
+        _hoverProjPos.copy(_hoverWorldPos).project(this.camera);
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        const px = THREE.MathUtils.clamp(
+          rect.left + (_hoverProjPos.x * 0.5 + 0.5) * rect.width,
+          120,
+          Math.max(120, rect.width - 120),
+        );
+        const py = THREE.MathUtils.clamp(
+          rect.top + (-_hoverProjPos.y * 0.5 + 0.5) * rect.height - 28,
+          78,
+          Math.max(78, rect.height - 108),
+        );
+
+        atlasStore.setHoveredProp({
+          id: `${ud.interactionType}-${ud.label ?? ''}`,
+          label: String(ud.label ?? 'Artifact'),
+          category: String(ud.category ?? 'Living Atlas'),
+          hint: String(ud.hint ?? 'Click to interact'),
+          x: px,
+          y: py,
+        });
+        this.renderer.domElement.style.cursor = 'pointer';
+      } else {
+        this.clearHoverHighlight();
+        activeWorld.setPortalHovered(null);
+        atlasStore.setHoveredPortal(null);
+        atlasStore.setHoveredProp(null);
+        this.renderer.domElement.style.cursor = 'default';
+      }
     }
   };
 
@@ -1097,7 +1404,7 @@ export class AtlasEngine {
         }
       }
 
-      // Fold outgoing world down as page turns across spine, unfold incoming world
+      // Fold outgoing world smoothly down with cosine hinge coupling as double-sided leaf turns across spine
       this.worlds.forEach((w, idx) => {
         if (this.bookOpenProgress < 0.35) {
           w.setFoldFactor(0);
@@ -1109,9 +1416,11 @@ export class AtlasEngine {
         } else {
           const dist = this.pageTurnDirection === 1 ? this.pageTurnProgress : 1 - this.pageTurnProgress;
           if (idx === snap.activeWorld && this.pageTurnTargetWorld !== snap.activeWorld) {
-            w.setFoldFactor(Math.max(0, 1 - dist * 1.9) * openPop);
+            const outNorm = Math.min(1, dist / 0.52);
+            w.setFoldFactor((0.5 + 0.5 * Math.cos(outNorm * Math.PI)) * openPop);
           } else if (idx === this.pageTurnTargetWorld) {
-            w.setFoldFactor(Math.max(0, (dist - 0.48) * 1.92) * openPop);
+            const inNorm = Math.max(0, Math.min(1, (dist - 0.48) / 0.52));
+            w.setFoldFactor((0.5 - 0.5 * Math.cos(inNorm * Math.PI)) * openPop);
           } else {
             w.setFoldFactor(0);
           }
@@ -1126,13 +1435,25 @@ export class AtlasEngine {
             : snap.activeWorld,
       );
 
+      const frontLeafIdx = this.pageTurnActive
+        ? this.pageTurnDirection === 1
+          ? snap.activeWorld
+          : this.pageTurnTargetWorld
+        : snap.activeWorld;
+      const backLeafIdx = this.pageTurnActive
+        ? this.pageTurnDirection === 1
+          ? this.pageTurnTargetWorld
+          : snap.activeWorld
+        : snap.activeWorld;
+
       this.bookRig.updateTurningLeaf(
         this.pageTurnActive,
         this.pageTurnProgress,
         this.cornerHoverLift,
         this.elapsed,
         snap.weather,
-        snap.activeWorld,
+        frontLeafIdx,
+        backLeafIdx,
       );
       this.bookRig.updatePortalRing(false, 0, 0, 0, '#D4AF6E');
     }
@@ -1145,7 +1466,7 @@ export class AtlasEngine {
       }
     }
 
-    // 5. Atmosphere, Sun/Moon, Weather & Candle Flicker
+    // 5. Atmosphere, Sun/Moon, Weather, Dynamic Environment Reflections & Candle Flicker
     const currentSnap = atlasStore.getSnapshot();
     const activeAmbientHex = WORLD_METADATA[currentSnap.activeWorld].ambientHex;
     this.atmosphere.update(
@@ -1157,19 +1478,60 @@ export class AtlasEngine {
       this.bookOpenProgress > 0.5,
       activeAmbientHex,
     );
-    this.bookRig.updateCandle(this.elapsed, this.atmosphere.nightFactor, currentSnap.weather);
+
+    const weatherEnvDim =
+      currentSnap.weather === 'thunderstorm'
+        ? 0.55
+        : currentSnap.weather === 'overcast'
+          ? 0.72
+          : currentSnap.weather === 'rain'
+            ? 0.75
+            : currentSnap.weather === 'mist'
+              ? 0.8
+              : 1.0;
+    this.scene.environmentIntensity =
+      (0.46 +
+        (1 - this.atmosphere.nightFactor) * 0.56 +
+        this.atmosphere.sunsetFactor * 0.16) *
+        weatherEnvDim +
+      (currentSnap.candleLit ? 0.08 : 0);
+
+    const isBookOpen = this.bookOpenProgress > 0.5;
+    this.bookRig.setDeskPropStates({
+      magnifierOnDesk: !(currentSnap.bookPhase === 'open' && currentSnap.magnifierActive),
+      stamped: currentSnap.stampedWorlds.includes(currentSnap.activeWorld),
+      candleLit: currentSnap.candleLit,
+    });
+    this.bookRig.updateCandle(
+      rawDt,
+      this.elapsed,
+      this.atmosphere.nightFactor,
+      currentSnap.weather,
+      currentSnap.candleLit,
+    );
+
     soundEngine.updateAtmosphere(
       currentSnap.weather,
       currentSnap.activeWorld,
       currentSnap.bookPhase !== 'closed',
       this.elapsed,
     );
+    this.camera.getWorldDirection(_camForward);
+    soundEngine.updateSpatialAudio(
+      this.camera.position,
+      _camForward,
+      this.camera.up,
+      currentSnap.activeWorld,
+      isBookOpen,
+      this.elapsed,
+      currentSnap.weather,
+      currentSnap.candleLit,
+    );
 
     // 5b. Global Post-Processing Atmospheric Shader Uniforms
     this.updatePostProcessUniforms(rawDt, currentSnap.bookPhase !== 'closed', currentSnap.activeWorld, currentSnap.weather, currentSnap.qualityTier, currentSnap.reducedMotion);
 
     // 5c. Chronicle Staining: weather-driven edge ink-bleed progression per folio
-    const isBookOpen = this.bookOpenProgress > 0.5;
     if (isBookOpen) {
       const stainRate =
         currentSnap.weather === 'thunderstorm'
@@ -1202,7 +1564,9 @@ export class AtlasEngine {
       activeMeta.accentHex,
     );
 
-    // 6. Active World Updates
+    // 6. Active World Updates with Cross-Chapter Consequences & Meridian Quest State
+    const crossInfluence = atlasStore.getCrossWorldInfluence();
+    const meridianQuest = atlasStore.getMeridianQuestProgress();
     this.worlds.forEach((w) => {
       if (w.root.visible) {
         w.update(
@@ -1211,6 +1575,8 @@ export class AtlasEngine {
           this.atmosphere.nightFactor,
           currentSnap.weather,
           currentSnap.activeTool === 'constellation',
+          crossInfluence,
+          meridianQuest,
         );
       }
     });
@@ -1410,6 +1776,8 @@ export class AtlasEngine {
     this.renderer.domElement.removeEventListener('webglcontextlost', this.handleContextLost);
     this.renderer.domElement.removeEventListener('webglcontextrestored', this.handleContextRestored);
 
+    this.clearHoverHighlight();
+    this.worlds.forEach((w) => w.dispose());
     this.controls.dispose();
     this.composer.dispose();
     this.textures.dispose();

@@ -1,5 +1,11 @@
 import * as THREE from 'three';
-import { WeatherPreset, WorldState } from '../../types/atlas';
+import { Reflector } from 'three/addons/objects/Reflector.js';
+import {
+  CrossWorldInfluence,
+  MeridianQuestProgress,
+  WeatherPreset,
+  WorldState,
+} from '../../types/atlas';
 import { BaseWorld } from './BaseWorld';
 
 /**
@@ -162,12 +168,33 @@ export class WhisperingMyceliumWorld extends BaseWorld {
 export class GlassArchipelagoWorld extends BaseWorld {
   private sundialNeedle: THREE.Mesh | null = null;
   private prismSpires: THREE.Mesh[] = [];
+  private reflector: Reflector | null = null;
+  private echoSaplings: THREE.Group[] = [];
 
-  constructor(paperBump: THREE.Texture, contactShadowTex: THREE.Texture) {
+  constructor(
+    paperBump: THREE.Texture,
+    contactShadowTex: THREE.Texture,
+    private isSoftwareGl = false,
+  ) {
     super(8, paperBump, contactShadowTex);
   }
 
   public build(state: WorldState): void {
+    // True Planar Mirror Lagoon (guarded against software WebGL) beneath translucent glass glaze
+    if (!this.isSoftwareGl) {
+      const mirrorGeo = new THREE.PlaneGeometry(7.8, 5.0);
+      this.reflector = new Reflector(mirrorGeo, {
+        clipBias: 0.003,
+        textureWidth: 512,
+        textureHeight: 512,
+        color: 0x5d7aa0,
+        multisample: 2,
+      });
+      this.reflector.rotation.x = -Math.PI / 2;
+      this.reflector.position.y = 0.011;
+      this.root.add(this.reflector);
+    }
+
     // Reflective Silver-Blue Lagoon Sheet
     const lagoon = new THREE.Mesh(
       new THREE.PlaneGeometry(7.8, 5.0),
@@ -177,7 +204,8 @@ export class GlassArchipelagoWorld extends BaseWorld {
         metalness: 0.25,
         clearcoat: 1.0,
         transparent: true,
-        opacity: 0.85,
+        opacity: this.isSoftwareGl ? 0.85 : 0.44,
+        depthWrite: this.isSoftwareGl,
         polygonOffset: true,
         polygonOffsetFactor: -1,
       }),
@@ -203,6 +231,17 @@ export class GlassArchipelagoWorld extends BaseWorld {
       m.receiveShadow = true;
       m.castShadow = true;
       this.root.add(m);
+    });
+
+    // 12 Perimeter Echo Saplings: cross-world botanical resonance from trees planted in Folios I-VIII
+    const echoAngles = [0.25, 0.78, 1.32, 1.85, 2.38, 2.9, 3.45, 3.98, 4.52, 5.05, 5.55, 6.02];
+    echoAngles.forEach((ang, idx) => {
+      const sap = this.createPaperTree(idx % 2 === 0 ? 'prism' : 'crystal', 0.62);
+      const rad = idx % 2 === 0 ? 3.25 : 2.35;
+      sap.position.set(Math.cos(ang) * rad, 0.02, Math.sin(ang) * Math.min(2.15, rad * 0.68));
+      sap.visible = false;
+      this.root.add(sap);
+      this.echoSaplings.push(sap);
     });
 
     // Pop-Up 1: Crystal Prism Pavilion
@@ -309,13 +348,36 @@ export class GlassArchipelagoWorld extends BaseWorld {
     this.syncState(state, 0);
   }
 
-  protected updateWorldSpecific(dt: number, elapsed: number): void {
+  protected updateWorldSpecific(
+    dt: number,
+    elapsed: number,
+    _nightFactor: number,
+    _weather: WeatherPreset,
+    influence?: CrossWorldInfluence,
+  ): void {
     if (this.sundialNeedle) {
       this.sundialNeedle.rotation.y += dt * 0.35;
     }
     this.prismSpires.forEach((sp, idx) => {
       sp.rotation.y = elapsed * 0.25 + idx;
     });
+
+    const targetEchoes = Math.min(
+      this.echoSaplings.length,
+      Math.floor((influence?.totalTreesPlanted ?? 0) / 2),
+    );
+    this.echoSaplings.forEach((sap, idx) => {
+      const active = idx < targetEchoes;
+      sap.visible = active;
+      if (active) {
+        sap.rotation.y = elapsed * 0.22 + idx * 0.6;
+      }
+    });
+  }
+
+  public override dispose(): void {
+    this.reflector?.dispose();
+    this.reflector = null;
   }
 }
 
@@ -325,6 +387,9 @@ export class GlassArchipelagoWorld extends BaseWorld {
 export class MeridianHeartWorld extends BaseWorld {
   private grandRings: THREE.Mesh[] = [];
   private coreOrb: THREE.Mesh | null = null;
+  private shardMeshes: THREE.Mesh[] = [];
+  private beaconShaft: THREE.Mesh | null = null;
+  private mandalaHalo: THREE.Mesh | null = null;
 
   constructor(paperBump: THREE.Texture, contactShadowTex: THREE.Texture) {
     super(9, paperBump, contactShadowTex);
@@ -384,6 +449,67 @@ export class MeridianHeartWorld extends BaseWorld {
     this.coreOrb = new THREE.Mesh(new THREE.OctahedronGeometry(0.18, 1), orbMat);
     this.coreOrb.position.y = 1.05;
     astroPivot.add(this.coreOrb);
+
+    // 3 Orbiting Meridian Shards (Verdant Emerald, Boreal Sapphire, Ignis Amber)
+    const shardColors = [0x65e8c2, 0x7aeaff, 0xff8a3d];
+    shardColors.forEach((col) => {
+      const sMat = new THREE.MeshStandardMaterial({
+        color: col,
+        emissive: col,
+        emissiveIntensity: 0.95,
+        roughness: 0.18,
+        metalness: 0.3,
+      });
+      const shard = new THREE.Mesh(new THREE.OctahedronGeometry(0.085, 0), sMat);
+      shard.visible = false;
+      astroPivot.add(shard);
+      this.shardMeshes.push(shard);
+    });
+
+    // Golden Meridian Finale Light Column & Halo (ignited when Mend the Meridian completes)
+    this.beaconShaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.36, 4.4, 16, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: 0xffe48c,
+        transparent: true,
+        opacity: 0.0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    this.beaconShaft.position.y = 2.25;
+    this.beaconShaft.visible = false;
+    astroPivot.add(this.beaconShaft);
+
+    this.mandalaHalo = new THREE.Mesh(
+      new THREE.TorusGeometry(0.92, 0.025, 10, 42),
+      new THREE.MeshBasicMaterial({
+        color: 0xffdf7a,
+        transparent: true,
+        opacity: 0,
+      }),
+    );
+    this.mandalaHalo.rotation.x = Math.PI / 2;
+    this.mandalaHalo.position.y = 1.05;
+    this.mandalaHalo.visible = false;
+    astroPivot.add(this.mandalaHalo);
+
+    // Clickable hitbox for uniting the Meridian Heart directly on the 3D Astrolabe
+    const meridianHit = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.72, 0.72, 1.55, 12),
+      new THREE.MeshBasicMaterial({ visible: false }),
+    );
+    meridianHit.position.y = 0.88;
+    meridianHit.userData = {
+      interactionType: 'meridianCore',
+      worldId: this.worldId,
+      label: 'Grand Meridian Core',
+      category: 'Final Binding',
+      hint: 'Click with all 3 Vault Shards recovered to mend the atlas',
+    };
+    astroPivot.add(meridianHit);
+    this.interactables.push(meridianHit);
 
     this.root.add(astroPopup);
     const astroState = state.popups.find((p) => p.id === 'heart-astrolabe')!;
@@ -461,15 +587,75 @@ export class MeridianHeartWorld extends BaseWorld {
     this.syncState(state, 0);
   }
 
-  protected updateWorldSpecific(dt: number, elapsed: number, nightFactor: number): void {
-    this.grandRings.forEach((ring, idx) => {
-      ring.rotation.x += dt * (0.4 + idx * 0.22);
-      ring.rotation.y -= dt * (0.55 - idx * 0.12);
+  protected updateWorldSpecific(
+    dt: number,
+    elapsed: number,
+    nightFactor: number,
+    _weather: WeatherPreset,
+    _influence?: CrossWorldInfluence,
+    quest?: MeridianQuestProgress,
+  ): void {
+    const mended = Boolean(quest?.mendedMeridian);
+    const shardsActive = [
+      Boolean(quest?.shard1Verdant),
+      Boolean(quest?.shard2Frost),
+      Boolean(quest?.shard3Ember),
+    ];
+
+    this.shardMeshes.forEach((shard, idx) => {
+      const unlocked = shardsActive[idx] || mended;
+      shard.visible = unlocked;
+      if (unlocked) {
+        const ang = elapsed * (mended ? 1.85 : 1.05) + (idx * Math.PI * 2) / 3;
+        const rad = mended ? 0.42 : 0.78;
+        shard.position.set(
+          Math.cos(ang) * rad,
+          1.05 + Math.sin(elapsed * 2.4 + idx) * (mended ? 0.08 : 0.14),
+          Math.sin(ang) * rad,
+        );
+        shard.rotation.y = elapsed * 2.2 + idx;
+        shard.rotation.x = elapsed * 1.4;
+      }
     });
+
+    if (mended) {
+      // Harmonically synchronized meridian orbital alignment
+      this.grandRings.forEach((ring, idx) => {
+        ring.rotation.y = elapsed * (0.9 + idx * 0.2);
+        ring.rotation.x = Math.sin(elapsed * 0.8 + idx * 0.4) * 0.36;
+        ring.rotation.z = idx * 0.22;
+      });
+    } else {
+      this.grandRings.forEach((ring, idx) => {
+        ring.rotation.x += dt * (0.4 + idx * 0.22);
+        ring.rotation.y -= dt * (0.55 - idx * 0.12);
+      });
+    }
+
     if (this.coreOrb) {
-      this.coreOrb.rotation.y = elapsed * 1.1;
-      (this.coreOrb.material as THREE.MeshStandardMaterial).emissiveIntensity =
-        0.85 + nightFactor * 1.2 + Math.sin(elapsed * 3) * 0.15;
+      this.coreOrb.rotation.y = elapsed * (mended ? 2.1 : 1.1);
+      this.coreOrb.scale.setScalar(mended ? 1.35 + Math.sin(elapsed * 4) * 0.12 : 1.0);
+      (this.coreOrb.material as THREE.MeshStandardMaterial).emissiveIntensity = mended
+        ? 1.9 + Math.sin(elapsed * 3.5) * 0.35
+        : 0.85 + nightFactor * 1.2 + Math.sin(elapsed * 3) * 0.15;
+    }
+
+    if (this.beaconShaft) {
+      this.beaconShaft.visible = mended;
+      if (mended) {
+        this.beaconShaft.rotation.y = elapsed * 0.6;
+        (this.beaconShaft.material as THREE.MeshBasicMaterial).opacity =
+          0.26 + Math.sin(elapsed * 3) * 0.08;
+      }
+    }
+
+    if (this.mandalaHalo) {
+      this.mandalaHalo.visible = mended;
+      if (mended) {
+        const s = 1 + Math.sin(elapsed * 2.5) * 0.06;
+        this.mandalaHalo.scale.setScalar(s);
+        (this.mandalaHalo.material as THREE.MeshBasicMaterial).opacity = 0.72;
+      }
     }
   }
 }

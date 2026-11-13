@@ -145,6 +145,17 @@ function isQuotaError(err: unknown): { is429: boolean; message: string; retryAft
   };
 }
 
+interface MultiSpeakerTurn {
+  speaker: string;
+  text: string;
+  style?: string;
+}
+
+interface MultiSpeakerVoiceDef {
+  speaker: string;
+  voiceName: string;
+}
+
 async function synthesizeWithGemini(
   ai: GoogleGenAI,
   text: string,
@@ -183,6 +194,49 @@ async function synthesizeWithGemini(
   return Buffer.from(base64Audio, 'base64');
 }
 
+async function synthesizeMultiSpeakerWithGemini(
+  ai: GoogleGenAI,
+  speakers: MultiSpeakerVoiceDef[],
+  turns: MultiSpeakerTurn[],
+): Promise<Buffer> {
+  const response = await ai.models.generateContent({
+    model: 'gemini-3.8-flash-tts',
+    contents: [
+      {
+        role: 'user',
+        parts: turns.map((turn) => ({
+          text: `${turn.speaker}: ${turn.text}`,
+          speechMetadata: {
+            speaker: turn.speaker,
+            ...(turn.style ? { style: turn.style } : {}),
+          },
+        })),
+      },
+    ],
+    config: {
+      responseModalities: ['AUDIO'],
+      speechConfig: {
+        multiSpeakerVoiceConfig: {
+          speakerVoiceConfigs: speakers.slice(0, 2).map((sp) => ({
+            speaker: sp.speaker,
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: sp.voiceName,
+              },
+            },
+          })),
+        },
+      },
+    },
+  });
+
+  const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  if (!base64Audio) {
+    throw new Error('No multi-speaker audio data returned by voice synthesizer.');
+  }
+  return Buffer.from(base64Audio, 'base64');
+}
+
 async function createServer(): Promise<void> {
   ensureDiskCacheDir();
   const app = express();
@@ -198,11 +252,54 @@ async function createServer(): Promise<void> {
       available: hasKey,
       cachedClips: wavCache.size,
       cooldownSeconds: getCooldownSecondsRemaining(),
+      supportsMultiSpeaker: true,
     });
   });
 
   app.post('/api/narration/tts', async (req: Request, res: Response) => {
     try {
+      const rawSpeakers = Array.isArray(req.body?.speakers) ? req.body.speakers : null;
+      const rawTurns = Array.isArray(req.body?.turns) ? req.body.turns : null;
+
+      let isMultiSpeaker = false;
+      let validSpeakers: MultiSpeakerVoiceDef[] = [];
+      let validTurns: MultiSpeakerTurn[] = [];
+
+      if (rawSpeakers && rawTurns && rawSpeakers.length === 2 && rawTurns.length >= 2) {
+        validSpeakers = rawSpeakers
+          .map((sp: unknown) => {
+            const rec = sp as { speaker?: unknown; voiceName?: unknown };
+            const speaker = typeof rec?.speaker === 'string' ? rec.speaker.trim().slice(0, 32) : '';
+            const voiceRaw = typeof rec?.voiceName === 'string' ? rec.voiceName.trim() : 'Charon';
+            return {
+              speaker,
+              voiceName: ALLOWED_VOICES.has(voiceRaw) ? voiceRaw : 'Charon',
+            };
+          })
+          .filter((sp: MultiSpeakerVoiceDef) => Boolean(sp.speaker));
+
+        const speakerNames = new Set(validSpeakers.map((s) => s.speaker));
+        validTurns = rawTurns
+          .map((t: unknown) => {
+            const rec = t as { speaker?: unknown; text?: unknown; style?: unknown };
+            const speaker = typeof rec?.speaker === 'string' ? rec.speaker.trim().slice(0, 32) : '';
+            const text = typeof rec?.text === 'string' ? rec.text.trim().slice(0, 600) : '';
+            const style =
+              typeof rec?.style === 'string' && rec.style.trim()
+                ? rec.style.trim().slice(0, 140)
+                : undefined;
+            return { speaker, text, style };
+          })
+          .filter(
+            (t: MultiSpeakerTurn) =>
+              Boolean(t.speaker) && Boolean(t.text) && speakerNames.has(t.speaker),
+          );
+
+        if (validSpeakers.length === 2 && validTurns.length >= 2) {
+          isMultiSpeaker = true;
+        }
+      }
+
       const rawText = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
       const rawVoice = typeof req.body?.voiceName === 'string' ? req.body.voiceName.trim() : 'Charon';
       const rawStyle =
@@ -210,13 +307,17 @@ async function createServer(): Promise<void> {
           ? req.body.style.trim().slice(0, 180)
           : 'Warm, resonant antiquarian storyteller in a candlelit study, measured and evocative';
 
-      if (!rawText || rawText.length > 1400) {
+      if (!isMultiSpeaker && (!rawText || rawText.length > 1400)) {
         res.status(400).json({ error: 'Narration text must be between 1 and 1400 characters.' });
         return;
       }
 
       const voiceName = ALLOWED_VOICES.has(rawVoice) ? rawVoice : 'Charon';
-      const cacheKey = `${voiceName}::${rawStyle}::${rawText}`;
+      const cacheKey = isMultiSpeaker
+        ? `multi::${validSpeakers.map((s) => `${s.speaker}=${s.voiceName}`).join('|')}::${validTurns
+            .map((t) => `${t.speaker}:${t.style ?? ''}:${t.text}`)
+            .join('\n')}`
+        : `${voiceName}::${rawStyle}::${rawText}`;
 
       const cached = readCachedWav(cacheKey);
       if (cached) {
@@ -252,7 +353,11 @@ async function createServer(): Promise<void> {
       }
 
       recentUpstreamTimestamps.push(Date.now());
-      const synthPromise = synthesizeWithGemini(ai, rawText, voiceName, rawStyle)
+      const synthPromise = (
+        isMultiSpeaker
+          ? synthesizeMultiSpeakerWithGemini(ai, validSpeakers, validTurns)
+          : synthesizeWithGemini(ai, rawText, voiceName, rawStyle)
+      )
         .then((wavBuffer) => {
           writeCachedWav(cacheKey, wavBuffer);
           return wavBuffer;

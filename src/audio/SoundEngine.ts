@@ -13,6 +13,32 @@ export interface WeatherAcousticProfile {
   rainGain: number;
 }
 
+export const LANDMARK_POSITIONS: Record<WorldId, [number, number, number]> = {
+  0: [2.05, 0.55, -0.85],   // Verdant Kingdom millwheel & crags
+  1: [-2.3, 1.55, -1.25],   // Forgotten Harbor Pharos lighthouse
+  2: [-2.1, 1.12, -0.95],   // Celestial Desert astral brass orrery
+  3: [-2.2, 1.15, -1.15],   // Frostbound Spire frozen belfry bell
+  4: [-2.1, 0.72, -1.05],   // Sunken Athenaeum echoing marble rotunda
+  5: [2.15, 0.68, -0.95],   // Ember Foundry bellows & anvil forge
+  6: [-2.15, 1.18, -1.0],   // Clockwork Sky grand windmill
+  7: [-2.1, 0.75, -1.05],   // Whispering Mycelium toadstool chime canopy
+  8: [-2.1, 0.85, -1.0],    // Glass Archipelago crystal prism pavilion
+  9: [-1.95, 1.15, -0.85],  // Meridian Heart grand astrolabe
+};
+
+const LANDMARK_TONE_HZ: Record<WorldId, number> = {
+  0: 196.0,   // G3 pastoral woodwind/mill resonance
+  1: 146.83,  // D3 harbor foghorn/swell hum
+  2: 261.63,  // C4 brass orrery harmonic
+  3: 329.63,  // E4 frozen bell shimmer
+  4: 174.61,  // F3 sunken abyssal resonance
+  5: 110.0,   // A2 forge bellows & crucible pulse
+  6: 293.66,  // D4 windmill clockwork ticking harmonic
+  7: 246.94,  // B3 bioluminescent hollow hum
+  8: 392.0,   // G4 crystal prism chime
+  9: 220.0,   // A3 grand astrolabe drone
+};
+
 export function computeWeatherAcousticProfile(
   weather: WeatherPreset,
   world: WorldId,
@@ -152,6 +178,16 @@ export class SoundEngine {
   private rainFilter: BiquadFilterNode | null = null;
   private rainGain: GainNode | null = null;
 
+  // Spatialized 3D landmark & desk candle foley nodes
+  private landmarkPanner: PannerNode | null = null;
+  private landmarkOsc: OscillatorNode | null = null;
+  private landmarkFilter: BiquadFilterNode | null = null;
+  private landmarkGain: GainNode | null = null;
+
+  private candlePanner: PannerNode | null = null;
+  private candleFilter: BiquadFilterNode | null = null;
+  private candleGain: GainNode | null = null;
+
   private muted = false;
   private started = false;
 
@@ -283,6 +319,67 @@ export class SoundEngine {
     this.rainFilter.connect(this.rainGain);
     this.rainGain.connect(this.ambientGain);
     rainSrc.start();
+
+    // 5. Spatialized 3D Landmark Acoustic Anchor (HRTF Panner)
+    if (typeof this.ctx.createPanner === 'function') {
+      this.landmarkPanner = this.ctx.createPanner();
+      this.landmarkPanner.panningModel = 'HRTF';
+      this.landmarkPanner.distanceModel = 'inverse';
+      this.landmarkPanner.refDistance = 2.5;
+      this.landmarkPanner.maxDistance = 22;
+      this.landmarkPanner.rolloffFactor = 1.15;
+
+      this.landmarkOsc = this.ctx.createOscillator();
+      this.landmarkOsc.type = 'triangle';
+      this.landmarkOsc.frequency.value = LANDMARK_TONE_HZ[0];
+
+      this.landmarkFilter = this.ctx.createBiquadFilter();
+      this.landmarkFilter.type = 'lowpass';
+      this.landmarkFilter.frequency.value = 540;
+      this.landmarkFilter.Q.value = 2.2;
+
+      this.landmarkGain = this.ctx.createGain();
+      this.landmarkGain.gain.value = 0.0;
+
+      this.landmarkOsc.connect(this.landmarkFilter);
+      this.landmarkFilter.connect(this.landmarkGain);
+      this.landmarkGain.connect(this.landmarkPanner);
+      this.landmarkPanner.connect(this.ambientGain);
+      this.landmarkOsc.start();
+
+      // 6. Fixed Atelier Candle Flame Crinkle (x=5.35, y=1.32, z=-2.55)
+      this.candlePanner = this.ctx.createPanner();
+      this.candlePanner.panningModel = 'HRTF';
+      this.candlePanner.distanceModel = 'inverse';
+      this.candlePanner.refDistance = 2.2;
+      this.candlePanner.maxDistance = 18;
+      this.candlePanner.rolloffFactor = 1.25;
+      if (this.candlePanner.positionX) {
+        this.candlePanner.positionX.value = 5.35;
+        this.candlePanner.positionY.value = 1.32;
+        this.candlePanner.positionZ.value = -2.55;
+      } else {
+        this.candlePanner.setPosition(5.35, 1.32, -2.55);
+      }
+
+      const candleSrc = this.ctx.createBufferSource();
+      candleSrc.buffer = this.noiseBuffer;
+      candleSrc.loop = true;
+
+      this.candleFilter = this.ctx.createBiquadFilter();
+      this.candleFilter.type = 'bandpass';
+      this.candleFilter.frequency.value = 2650;
+      this.candleFilter.Q.value = 4.0;
+
+      this.candleGain = this.ctx.createGain();
+      this.candleGain.gain.value = 0.02;
+
+      candleSrc.connect(this.candleFilter);
+      this.candleFilter.connect(this.candleGain);
+      this.candleGain.connect(this.candlePanner);
+      this.candlePanner.connect(this.ambientGain);
+      candleSrc.start();
+    }
   }
 
   public updateAtmosphere(
@@ -329,6 +426,82 @@ export class SoundEngine {
 
     this.rainFilter.frequency.setTargetAtTime(p.rainFreq, now, 0.35);
     this.rainGain.gain.setTargetAtTime(p.rainGain, now, 0.35);
+  }
+
+  public updateSpatialAudio(
+    camPos: { x: number; y: number; z: number },
+    camForward: { x: number; y: number; z: number },
+    camUp: { x: number; y: number; z: number },
+    world: WorldId,
+    isOpen: boolean,
+    elapsed: number,
+    weather: WeatherPreset,
+    candleLit: boolean,
+  ): void {
+    if (!this.ctx || !this.started) return;
+    const now = this.ctx.currentTime;
+    const listener = this.ctx.listener;
+
+    if (listener) {
+      if (listener.positionX) {
+        listener.positionX.setTargetAtTime(camPos.x, now, 0.05);
+        listener.positionY.setTargetAtTime(camPos.y, now, 0.05);
+        listener.positionZ.setTargetAtTime(camPos.z, now, 0.05);
+        listener.forwardX.setTargetAtTime(camForward.x, now, 0.05);
+        listener.forwardY.setTargetAtTime(camForward.y, now, 0.05);
+        listener.forwardZ.setTargetAtTime(camForward.z, now, 0.05);
+        listener.upX.setTargetAtTime(camUp.x, now, 0.05);
+        listener.upY.setTargetAtTime(camUp.y, now, 0.05);
+        listener.upZ.setTargetAtTime(camUp.z, now, 0.05);
+      } else {
+        listener.setPosition(camPos.x, camPos.y, camPos.z);
+        listener.setOrientation(
+          camForward.x,
+          camForward.y,
+          camForward.z,
+          camUp.x,
+          camUp.y,
+          camUp.z,
+        );
+      }
+    }
+
+    if (this.landmarkPanner && this.landmarkOsc && this.landmarkFilter && this.landmarkGain) {
+      const [lx, ly, lz] = LANDMARK_POSITIONS[world];
+      if (this.landmarkPanner.positionX) {
+        this.landmarkPanner.positionX.setTargetAtTime(lx, now, 0.25);
+        this.landmarkPanner.positionY.setTargetAtTime(ly, now, 0.25);
+        this.landmarkPanner.positionZ.setTargetAtTime(lz, now, 0.25);
+      } else {
+        this.landmarkPanner.setPosition(lx, ly, lz);
+      }
+
+      const baseHz = LANDMARK_TONE_HZ[world];
+      const shimmer = Math.sin(elapsed * (world === 5 ? 3.2 : 1.4)) * 2.5;
+      this.landmarkOsc.frequency.setTargetAtTime(baseHz + shimmer, now, 0.35);
+
+      const cutoff =
+        weather === 'windy' || weather === 'thunderstorm' ? 760 : 480;
+      this.landmarkFilter.frequency.setTargetAtTime(cutoff, now, 0.35);
+
+      const pulse = 0.72 + 0.28 * Math.sin(elapsed * (world === 5 ? 2.8 : 1.2));
+      const gain = isOpen ? 0.048 * pulse : 0.0;
+      this.landmarkGain.gain.setTargetAtTime(gain, now, 0.3);
+    }
+
+    if (this.candleGain && this.candleFilter) {
+      const gust =
+        weather === 'windy' || weather === 'thunderstorm'
+          ? 0.015 * (0.5 + 0.5 * Math.sin(elapsed * 9.5))
+          : 0.004 * Math.sin(elapsed * 4.2);
+      const targetCandleGain = candleLit ? Math.max(0.01, 0.026 + gust) : 0;
+      this.candleGain.gain.setTargetAtTime(targetCandleGain, now, 0.15);
+      this.candleFilter.frequency.setTargetAtTime(
+        2450 + Math.sin(elapsed * 6.7) * 320,
+        now,
+        0.15,
+      );
+    }
   }
 
   public playBookOpen(): void {
@@ -405,6 +578,44 @@ export class SoundEngine {
   public playNarrationCue(): void {
     this.unlock();
     this.playChime([392.0, 587.33], 0.08);
+  }
+
+  public playWaxStamp(): void {
+    this.unlock();
+    if (!this.ctx || !this.masterGain) return;
+    const now = this.ctx.currentTime;
+    const thud = this.ctx.createOscillator();
+    const thudGain = this.ctx.createGain();
+    thud.type = 'sine';
+    thud.frequency.setValueAtTime(165, now);
+    thud.frequency.exponentialRampToValueAtTime(52, now + 0.11);
+    thudGain.gain.setValueAtTime(0.32, now);
+    thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+    thud.connect(thudGain);
+    thudGain.connect(this.masterGain);
+    thud.start(now);
+    thud.stop(now + 0.15);
+
+    this.playPaperRustle(0.14, 720, 0.18);
+    this.playChime([587.33, 880.0], 0.1);
+  }
+
+  public playCandleToggle(lit: boolean): void {
+    this.unlock();
+    if (!this.ctx || !this.masterGain) return;
+    if (lit) {
+      this.playPaperRustle(0.18, 2200, 0.18);
+      this.playChime([659.25, 987.77], 0.09);
+    } else {
+      // Soft airy exhale snuff sound
+      this.playPaperRustle(0.32, 950, 0.24);
+    }
+  }
+
+  public playMeridianFinale(): void {
+    this.unlock();
+    this.playChime([261.63, 329.63, 392.0, 493.88, 587.33, 1046.5], 0.16);
+    this.playPaperRustle(0.55, 1100, 0.16);
   }
 
   public playPortalTransition(): void {
@@ -498,6 +709,14 @@ export class SoundEngine {
         // ignore
       }
       this.rumbleSubOsc = null;
+    }
+    if (this.landmarkOsc) {
+      try {
+        this.landmarkOsc.stop();
+      } catch {
+        // ignore
+      }
+      this.landmarkOsc = null;
     }
     if (this.ctx) {
       this.ctx.close().catch(() => {});

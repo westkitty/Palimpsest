@@ -1,4 +1,9 @@
-import { ATLAS_PROLOGUE, CHRONICLE_SCRIPTS } from '../story/chronicleScripts';
+import {
+  ATLAS_PROLOGUE,
+  CHRONICLE_SCRIPTS,
+  DialogueTurn,
+  MERIDIAN_FINALE_DIALOGUE,
+} from '../story/chronicleScripts';
 import { atlasStore } from '../state/atlasStore';
 import { WorldId } from '../types/atlas';
 import { soundEngine } from './SoundEngine';
@@ -48,8 +53,13 @@ export const NARRATOR_PERSONAS: NarratorPersona[] = [
 interface QueuedNarrationBlock {
   text: string;
   lines: string[];
+  lineSpeakers?: string[];
   label: string;
   worldId: WorldId;
+  multiSpeaker?: {
+    speakers: { speaker: string; voiceName: string }[];
+    turns: DialogueTurn[];
+  };
 }
 
 /**
@@ -82,7 +92,10 @@ export class NarrationEngine {
   private subLineCursor = 0;
   private active = false;
   private paused = false;
-  private selectedVoiceId: GeminiNarratorVoiceId = 'Charon';
+  private selectedVoiceId: GeminiNarratorVoiceId =
+    (NARRATOR_PERSONAS.some((p) => p.id === atlasStore.getSnapshot().narratorVoiceId)
+      ? (atlasStore.getSnapshot().narratorVoiceId as GeminiNarratorVoiceId)
+      : 'Charon');
   private playbackToken = 0;
 
   private activeAudio: HTMLAudioElement | null = null;
@@ -90,7 +103,7 @@ export class NarrationEngine {
   private abortController: AbortController | null = null;
   private rateLimitCooldownUntil = 0;
 
-  // In-memory Blob URL cache keyed by `${voiceId}::${text}` + deduped in-flight fetches
+  // In-memory Blob URL cache keyed by persona/dialogue signature + deduped in-flight fetches
   private clipUrlCache = new Map<string, string>();
   private inFlightClips = new Map<string, Promise<string | null>>();
 
@@ -105,6 +118,7 @@ export class NarrationEngine {
   public setSelectedVoiceId(voiceId: GeminiNarratorVoiceId): void {
     if (NARRATOR_PERSONAS.some((p) => p.id === voiceId)) {
       this.selectedVoiceId = voiceId;
+      atlasStore.setNarratorVoiceId(voiceId);
     }
   }
 
@@ -173,12 +187,63 @@ export class NarrationEngine {
     const snap = atlasStore.getSnapshot();
     if (snap.audioMuted || !snap.narrationEnabled) return;
     const script = CHRONICLE_SCRIPTS[worldId];
+
+    if (kind === 'vault' && script.vaultDialogue.length >= 2) {
+      const turns = script.vaultDialogue;
+      const speakers = this.extractPairSpeakers(turns);
+      this.playQueue(
+        [
+          {
+            text: turns.map((t) => `${t.speaker}: ${t.text}`).join(' '),
+            lines: turns.map((t) => t.text),
+            lineSpeakers: turns.map((t) => `${t.speaker} · Vault Discovery · Folio ${this.romanOf(worldId)}`),
+            label: `Vault Unsealed · Folio ${this.romanOf(worldId)}`,
+            worldId,
+            multiSpeaker: { speakers, turns },
+          },
+        ],
+        false,
+      );
+      return;
+    }
+
     const text = kind === 'vault' ? script.vaultLine : script.constellationLine;
     const label =
       kind === 'vault'
         ? `Vault Unsealed · Folio ${this.romanOf(worldId)}`
         : `Constellation Aligned · Folio ${this.romanOf(worldId)}`;
     this.playQueue([{ text, lines: [text], label, worldId }], false);
+  }
+
+  public narrateMeridianFinale(): void {
+    const snap = atlasStore.getSnapshot();
+    if (snap.audioMuted) return;
+    const turns = MERIDIAN_FINALE_DIALOGUE;
+    const speakers = this.extractPairSpeakers(turns);
+    this.playQueue(
+      [
+        {
+          text: turns.map((t) => `${t.speaker}: ${t.text}`).join(' '),
+          lines: turns.map((t) => t.text),
+          lineSpeakers: turns.map((t) => `${t.speaker} · The Restored Meridian`),
+          label: 'The Final Binding · Folio X',
+          worldId: 9,
+          multiSpeaker: { speakers, turns },
+        },
+      ],
+      true,
+    );
+  }
+
+  private extractPairSpeakers(turns: DialogueTurn[]): { speaker: string; voiceName: string }[] {
+    const seen = new Map<string, string>();
+    for (const t of turns) {
+      if (!seen.has(t.speaker)) {
+        seen.set(t.speaker, t.voiceName);
+      }
+      if (seen.size === 2) break;
+    }
+    return Array.from(seen.entries()).map(([speaker, voiceName]) => ({ speaker, voiceName }));
   }
 
   public togglePlayPause(activeWorld: WorldId): void {
@@ -304,7 +369,7 @@ export class NarrationEngine {
     atlasStore.setNarrationState(
       'speaking',
       item.lines[0] ?? item.text,
-      item.label,
+      item.lineSpeakers?.[0] ?? item.label,
       this.computeProgress(this.cursor, 0),
     );
 
@@ -313,7 +378,7 @@ export class NarrationEngine {
       return;
     }
 
-    const clipUrl = await this.fetchOrGetClipUrl(item.text);
+    const clipUrl = await this.fetchOrGetClipUrl(item);
     if (token !== this.playbackToken || !this.active || this.paused) return;
 
     if (!clipUrl) {
@@ -341,7 +406,7 @@ export class NarrationEngine {
         atlasStore.setNarrationState(
           'speaking',
           item.lines[nextSub] ?? item.text,
-          item.label,
+          item.lineSpeakers?.[nextSub] ?? item.label,
           this.computeProgress(this.cursor, nextSub),
         );
       }
@@ -372,9 +437,13 @@ export class NarrationEngine {
     }
   }
 
-  private fetchOrGetClipUrl(text: string): Promise<string | null> {
+  private fetchOrGetClipUrl(item: QueuedNarrationBlock): Promise<string | null> {
     const persona = this.getCurrentPersona();
-    const cacheKey = `${persona.id}::${text}`;
+    const isMulti = Boolean(item.multiSpeaker && item.multiSpeaker.speakers.length === 2);
+    const cacheKey = isMulti
+      ? `multi::${item.multiSpeaker!.speakers.map((s) => `${s.speaker}=${s.voiceName}`).join('|')}::${item.text}`
+      : `${persona.id}::${item.text}`;
+
     const cached = this.clipUrlCache.get(cacheKey);
     if (cached) return Promise.resolve(cached);
 
@@ -391,14 +460,25 @@ export class NarrationEngine {
 
     const task = (async (): Promise<string | null> => {
       try {
+        const payload = isMulti
+          ? {
+              speakers: item.multiSpeaker!.speakers,
+              turns: item.multiSpeaker!.turns.map((t) => ({
+                speaker: t.speaker,
+                text: t.text,
+                style: t.style,
+              })),
+            }
+          : {
+              text: item.text,
+              voiceName: persona.id,
+              style: persona.style,
+            };
+
         const res = await fetch('/api/narration/tts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text,
-            voiceName: persona.id,
-            style: persona.style,
-          }),
+          body: JSON.stringify(payload),
           signal: controller.signal,
         });
         if (res.status === 204 || res.status === 429) {
@@ -407,9 +487,9 @@ export class NarrationEngine {
           let retrySec = Number.isFinite(parsedHeader) && parsedHeader > 0 ? parsedHeader : 25;
           if (res.status === 429) {
             try {
-              const payload = (await res.json()) as { retryAfterSeconds?: number };
-              if (typeof payload.retryAfterSeconds === 'number' && payload.retryAfterSeconds > 0) {
-                retrySec = payload.retryAfterSeconds;
+              const errBody = (await res.json()) as { retryAfterSeconds?: number };
+              if (typeof errBody.retryAfterSeconds === 'number' && errBody.retryAfterSeconds > 0) {
+                retrySec = errBody.retryAfterSeconds;
               }
             } catch {
               // Ignore non-JSON body
@@ -459,7 +539,7 @@ export class NarrationEngine {
         atlasStore.setNarrationState(
           'speaking',
           block.lines[this.subLineCursor] ?? block.text,
-          block.label,
+          block.lineSpeakers?.[this.subLineCursor] ?? block.label,
           this.computeProgress(this.cursor, this.subLineCursor),
         );
         this.scheduleCaptionLineStep(token);

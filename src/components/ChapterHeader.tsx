@@ -1,4 +1,4 @@
-import { BookOpen, Headphones, HelpCircle, Pause, ScrollText, Volume2, VolumeX } from 'lucide-react';
+import { BookOpen, Camera, Headphones, HelpCircle, Pause, ScrollText, Volume2, VolumeX } from 'lucide-react';
 import { WORLD_METADATA, AtlasSnapshot } from '../types/atlas';
 
 interface ChapterHeaderProps {
@@ -7,6 +7,7 @@ interface ChapterHeaderProps {
   onToggleNarration: () => void;
   onCloseBook: () => void;
   onToggleChronicle: () => void;
+  onExportPostcard: () => void;
   onOpenHelp: () => void;
 }
 
@@ -23,6 +24,7 @@ export function ChapterHeader({
   onToggleNarration,
   onCloseBook,
   onToggleChronicle,
+  onExportPostcard,
   onOpenHelp,
 }: ChapterHeaderProps) {
   const meta = WORLD_METADATA[snapshot.activeWorld];
@@ -104,6 +106,15 @@ export function ChapterHeader({
             >
               <ScrollText className="h-3.5 w-3.5 text-[#D4AF6E]" />
               <span>Chronicle</span>
+            </button>
+            <button
+              type="button"
+              onClick={onExportPostcard}
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-md border border-[#D4AF6E]/25 bg-[#16100C]/92 px-2.5 py-1.5 text-xs font-medium text-[#E9DEC8] transition-colors hover:border-[#D4AF6E]/55 hover:text-[#F4ECDC] focus-visible:outline-2 focus-visible:outline-[#D4AF6E] whitespace-nowrap shrink-0 cursor-pointer"
+              title="Export gilded archival postcard PNG of active folio"
+            >
+              <Camera className="h-3.5 w-3.5 text-[#D4AF6E]" />
+              <span>Postcard</span>
             </button>
             <button
               type="button"

@@ -299,35 +299,41 @@ export class ForgottenHarborWorld extends BaseWorld {
     elapsed: number,
     nightFactor: number,
     weather: WeatherPreset,
+    influence?: import('../../types/atlas').CrossWorldInfluence,
   ): void {
-    // Rotating lighthouse beacon
+    const flowScale = influence?.riverFlowRatio ?? 1.0;
+    const skyWind = influence?.skyWindBoost ?? 1.0;
+
+    // Rotating lighthouse beacon (accelerates during tempests)
     if (this.lighthouseBeam) {
-      this.lighthouseBeam.rotation.y += dt * 0.9;
+      const beamRate = weather === 'thunderstorm' ? 1.55 : weather === 'mist' ? 0.6 : 0.9;
+      this.lighthouseBeam.rotation.y += dt * beamRate;
       const beamMat = this.lighthouseBeam.material as THREE.MeshBasicMaterial;
-      beamMat.opacity = 0.06 + nightFactor * 0.32;
+      beamMat.opacity = 0.06 + nightFactor * 0.34 + (weather === 'mist' ? 0.08 : 0);
     }
 
-    // Fluttering harbor flags in wind
+    // Fluttering harbor flags boosted by local weather & Clockwork Sky trade winds
     const windMult =
-      weather === 'windy' ? 2.4 : weather === 'thunderstorm' ? 2.8 : 1.0;
+      (weather === 'windy' ? 2.4 : weather === 'thunderstorm' ? 2.8 : 1.0) * skyWind;
     this.harborFlags.forEach((flag, idx) => {
       flag.rotation.y = Math.sin(elapsed * 6.5 * windMult + idx) * 0.25;
     });
 
-    // Gently undulating paper ocean waves
+    // Gently undulating paper ocean waves fed by Verdant Valley river flow
     if (this.oceanGeo && this.oceanBaseZ) {
       const pos = this.oceanGeo.attributes.position as THREE.BufferAttribute;
-      const amp =
+      const baseAmp =
         weather === 'thunderstorm'
           ? 0.055
           : weather === 'windy'
             ? 0.042
             : 0.022;
+      const amp = baseAmp * (0.75 + 0.32 * flowScale);
       for (let i = 0; i < pos.count; i++) {
         const bx = this.oceanBaseZ[i * 3];
         const bz = this.oceanBaseZ[i * 3 + 2];
         const y =
-          Math.sin(bx * 1.6 + elapsed * 2.1) * amp +
+          Math.sin(bx * 1.6 + elapsed * 2.1 * skyWind) * amp +
           Math.cos(bz * 2.1 - elapsed * 1.6) * amp * 0.7;
         pos.setY(i, y);
       }

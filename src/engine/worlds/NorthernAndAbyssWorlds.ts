@@ -175,12 +175,25 @@ export class FrostboundSpireWorld extends BaseWorld {
     this.syncState(state, 0);
   }
 
-  protected updateWorldSpecific(_dt: number, elapsed: number, nightFactor: number): void {
+  protected updateWorldSpecific(
+    _dt: number,
+    elapsed: number,
+    nightFactor: number,
+    weather: WeatherPreset,
+    influence?: import('../../types/atlas').CrossWorldInfluence,
+  ): void {
+    const galeSwing =
+      weather === 'thunderstorm' ? 2.1 : weather === 'windy' ? 1.8 : 1.0;
     if (this.bellGroup) {
-      this.bellGroup.rotation.z = Math.sin(elapsed * 2.2) * (0.12 + nightFactor * 0.25);
+      this.bellGroup.rotation.z =
+        Math.sin(elapsed * 2.2 * galeSwing) * (0.12 + nightFactor * 0.22) * galeSwing;
     }
+    const foundryHeat = influence?.emberHeatFactor ?? 0.12;
     this.iceFalls.forEach((f, idx) => {
-      (f.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.25 + nightFactor * 0.75 + Math.sin(elapsed * 3 + idx) * 0.08;
+      const mat = f.material as THREE.MeshStandardMaterial;
+      mat.emissiveIntensity =
+        0.25 + nightFactor * 0.75 + foundryHeat * 0.6 + Math.sin(elapsed * (3 + foundryHeat * 4) + idx) * 0.1;
+      f.scale.x = 1 + foundryHeat * 0.35;
     });
   }
 }
@@ -473,12 +486,21 @@ export class EmberFoundryWorld extends BaseWorld {
     this.syncState(state, 0);
   }
 
-  protected updateWorldSpecific(dt: number, elapsed: number, nightFactor: number): void {
+  protected updateWorldSpecific(
+    dt: number,
+    elapsed: number,
+    nightFactor: number,
+    weather: WeatherPreset,
+  ): void {
+    const bellowsWind =
+      weather === 'windy' ? 1.55 : weather === 'thunderstorm' ? 1.8 : weather === 'rain' ? 0.78 : 1.0;
     if (this.anvilWheel) {
-      this.anvilWheel.rotation.x += dt * 1.4;
+      this.anvilWheel.rotation.x += dt * 1.4 * bellowsWind;
     }
     if (this.magmaGlow) {
-      this.magmaGlow.emissiveIntensity = 0.8 + nightFactor * 0.9 + Math.sin(elapsed * 4) * 0.18;
+      this.magmaGlow.emissiveIntensity =
+        (0.8 + nightFactor * 0.9 + Math.sin(elapsed * 4 * bellowsWind) * 0.2) *
+        (weather === 'rain' ? 0.88 : 1.0 + (bellowsWind - 1) * 0.25);
     }
   }
 }
@@ -628,8 +650,16 @@ export class ClockworkSkyWorld extends BaseWorld {
     this.syncState(state, 0);
   }
 
-  protected updateWorldSpecific(dt: number, elapsed: number, _nightFactor: number, weather: WeatherPreset): void {
-    const windSpeed = weather === 'windy' ? 3.2 : weather === 'thunderstorm' ? 3.8 : 1.5;
+  protected updateWorldSpecific(
+    dt: number,
+    elapsed: number,
+    _nightFactor: number,
+    weather: WeatherPreset,
+    influence?: import('../../types/atlas').CrossWorldInfluence,
+  ): void {
+    const skyBoost = influence?.skyWindBoost ?? 1.0;
+    const windSpeed =
+      (weather === 'windy' ? 3.2 : weather === 'thunderstorm' ? 3.8 : 1.5) * skyBoost;
     if (this.windmillBlades) {
       this.windmillBlades.rotation.z -= dt * windSpeed;
     }

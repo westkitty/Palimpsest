@@ -1,5 +1,12 @@
 import { WorldId } from '../types/atlas';
 
+export interface DialogueTurn {
+  speaker: 'Aldous' | 'Lyra' | 'Pip';
+  voiceName: 'Charon' | 'Kore' | 'Puck';
+  style: string;
+  text: string;
+}
+
 export interface ChapterScript {
   id: WorldId;
   motif: string;
@@ -7,11 +14,27 @@ export interface ChapterScript {
   vaultLine: string;
   constellationLine: string;
   portalLine: string;
+  vaultDialogue: DialogueTurn[];
 }
 
 export const ATLAS_PROLOGUE: string[] = [
   'Before the ink dried, Master Cartographer Aldous bound ten folded realms along a single bronze meridian.',
   'When the binding fractured, his compass shattered into shards scattered across sea, sand, glacier, and sky—and only a turning hand can mend the ring.',
+];
+
+export const MERIDIAN_FINALE_DIALOGUE: DialogueTurn[] = [
+  {
+    speaker: 'Aldous',
+    voiceName: 'Charon',
+    style: 'Warm, deeply moved elder cartographer in quiet triumph',
+    text: 'All three bronze shards are home. Hear how the fourth ring locks into resonance—every harbor, glacier, and sky island answers the same pulse once more.',
+  },
+  {
+    speaker: 'Lyra',
+    voiceName: 'Kore',
+    style: 'Luminous, awestruck archivist smiling beside the golden beacon',
+    text: 'The binding holds, Master Aldous! The meridian light reaches back to Folio One—proof that the paper worlds remember every hand that mended them.',
+  },
 ];
 
 export const CHRONICLE_SCRIPTS: Record<WorldId, ChapterScript> = {
@@ -29,6 +52,20 @@ export const CHRONICLE_SCRIPTS: Record<WorldId, ChapterScript> = {
       'The Sylvan Crown ignites above the pines, illuminating the water-trail toward the Forgotten Harbor.',
     portalLine:
       'Aldous steps through the Valley Weir Gate as green ridges unfold into sea cliffs.',
+    vaultDialogue: [
+      {
+        speaker: 'Pip',
+        voiceName: 'Puck',
+        style: 'Breathless, delighted apprentice spotting treasure in the moss',
+        text: 'Master Aldous, look beneath the roots! The bronze needle is still humming warm against the parchment.',
+      },
+      {
+        speaker: 'Aldous',
+        voiceName: 'Charon',
+        style: 'Gentle, knowing elder cartographer',
+        text: 'Shard One of Three, Pip. Guard it well—only two more remain in the northern frost and the basalt forge.',
+      },
+    ],
   },
   1: {
     id: 1,
@@ -44,6 +81,20 @@ export const CHRONICLE_SCRIPTS: Record<WorldId, ChapterScript> = {
       'The Mariner’s Anchor locks overhead, clearing the reef course toward the Seaward Horizon Gate.',
     portalLine:
       'Crossing the Seaward Horizon Gate, salt spray dries into warm saffron pleats.',
+    vaultDialogue: [
+      {
+        speaker: 'Lyra',
+        voiceName: 'Kore',
+        style: 'Crisp, intrigued maritime archivist reading brass markings',
+        text: 'The sea-cave astrolabe still keeps perfect time, Aldous—and every degree points straight past the eastern dunes.',
+      },
+      {
+        speaker: 'Aldous',
+        voiceName: 'Charon',
+        style: 'Steady, seasoned navigator',
+        text: 'Then set the galleons eastward, Lyra. The river from Chapter One still feeds this bay beneath the folds.',
+      },
+    ],
   },
   2: {
     id: 2,
@@ -59,6 +110,20 @@ export const CHRONICLE_SCRIPTS: Record<WorldId, ChapterScript> = {
       'The Astral Phoenix catches fire across the desert sky, locking the polar bearing upon the Sun-Gate.',
     portalLine:
       'Solar rings turn through the Sun-Gate, bleaching desert ochre into pale northern frost.',
+    vaultDialogue: [
+      {
+        speaker: 'Lyra',
+        voiceName: 'Kore',
+        style: 'Wonder-filled tone as starlight refracts in crystal',
+        text: 'This underground cistern mirrors a sky of snow—not desert sands. The Sun-Gate really bends north to the glacier.',
+      },
+      {
+        speaker: 'Aldous',
+        voiceName: 'Charon',
+        style: 'Thoughtful, measured elder tone',
+        text: 'Hold your cloak close. Beyond the Starlight Sun-Gate, ink itself turns to hoarfrost.',
+      },
+    ],
   },
   3: {
     id: 3,
@@ -74,6 +139,20 @@ export const CHRONICLE_SCRIPTS: Record<WorldId, ChapterScript> = {
       'Ursa Borealis rings the frozen belfry bell once, cracking the ice shelf wide open.',
     portalLine:
       'Through the Boreal Ice-Arch, crystalline ledges plunge beneath luminous ocean tides.',
+    vaultDialogue: [
+      {
+        speaker: 'Pip',
+        voiceName: 'Puck',
+        style: 'Excited, shivering apprentice uncovering frost-bound brass',
+        text: 'The permafrost cracked clean in half! The second Meridian Shard was sealed inside the glacier all along!',
+      },
+      {
+        speaker: 'Aldous',
+        voiceName: 'Charon',
+        style: 'Resolute, warm baritone cutting through wind',
+        text: 'Two shards recovered, one remaining in the fire beneath the sea. Follow the stairs down toward the Athenaeum.',
+      },
+    ],
   },
   4: {
     id: 4,
@@ -89,6 +168,20 @@ export const CHRONICLE_SCRIPTS: Record<WorldId, ChapterScript> = {
       'Bioluminescent kelp-lamps trace the Trench Serpent, illuminating the Abyssal Trench Gate.',
     portalLine:
       'Descending through the Abyssal Trench Gate, cool sea-green stone fractures into hot basalt.',
+    vaultDialogue: [
+      {
+        speaker: 'Lyra',
+        voiceName: 'Kore',
+        style: 'Scholarly awe inside a quiet underwater hall',
+        text: 'Every drowned folio survived inside these copper tubes—even your forge blueprints for tempering the compass ring.',
+      },
+      {
+        speaker: 'Aldous',
+        voiceName: 'Charon',
+        style: 'Low, reflective storyteller',
+        text: 'I sank my own library to keep those blueprints safe. Now let the bathysphere carry them down to the basalt.',
+      },
+    ],
   },
   5: {
     id: 5,
@@ -104,6 +197,20 @@ export const CHRONICLE_SCRIPTS: Record<WorldId, ChapterScript> = {
       'Sparks answer the Anvil stars above the caldera, cooling the compass needles to singing tension.',
     portalLine:
       'Riding the Thermal Updraft Gate, heavy basalt folds lightward into open sky.',
+    vaultDialogue: [
+      {
+        speaker: 'Aldous',
+        voiceName: 'Charon',
+        style: 'Commanding craftsman over forge embers',
+        text: 'There lies Shard Three, cooled in living amber—even the northern glacier four chapters back will feel this foundry’s warmth.',
+      },
+      {
+        speaker: 'Pip',
+        voiceName: 'Puck',
+        style: 'Amazed apprentice watching sparks rise skyward',
+        text: 'The gears weigh almost nothing now! Look how the updraft pulls our parchment straight toward the clouds!',
+      },
+    ],
   },
   6: {
     id: 6,
@@ -119,6 +226,20 @@ export const CHRONICLE_SCRIPTS: Record<WorldId, ChapterScript> = {
       'Trade winds steady along the Sky Loom, balancing the airship for its descent through the clouds.',
     portalLine:
       'Stepping through the Cloud-Anchor Gate, wind-swept islands curl down into indigo twilight.',
+    vaultDialogue: [
+      {
+        speaker: 'Lyra',
+        voiceName: 'Kore',
+        style: 'Bright, wind-swept curiosity',
+        text: 'Every sail up here drives the wind across the Harbor behind us—and look beneath the cloud hatch, braided roots descend into indigo.',
+      },
+      {
+        speaker: 'Aldous',
+        voiceName: 'Charon',
+        style: 'Calm elder storyteller',
+        text: 'The Whispering Mycelium catches every thought that ever blew off this deck. Climb down softly, Lyra.',
+      },
+    ],
   },
   7: {
     id: 7,
@@ -134,6 +255,20 @@ export const CHRONICLE_SCRIPTS: Record<WorldId, ChapterScript> = {
       'Lantern moths trace the Spore Weaver overhead, waking the Heartwood Mirror Arch.',
     portalLine:
       'Through the Heartwood Mirror Arch, glowing spores sharpen into crystal reflections.',
+    vaultDialogue: [
+      {
+        speaker: 'Lyra',
+        voiceName: 'Kore',
+        style: 'Hushed, tender discovery in twilight shadow',
+        text: 'You wrote a vow in the root-crypt before closing the book: never to let a reader lose their way between torn folios.',
+      },
+      {
+        speaker: 'Aldous',
+        voiceName: 'Charon',
+        style: 'Warm, confessional cadence',
+        text: 'A map is only half ink, Lyra. The other half is keeping faith across the fold.',
+      },
+    ],
   },
   8: {
     id: 8,
@@ -149,6 +284,20 @@ export const CHRONICLE_SCRIPTS: Record<WorldId, ChapterScript> = {
       'Every crystal spire rings in tune with the Specular Crown, uniting all eight bearings.',
     portalLine:
       'Following the golden beam through the Refraction Crown Gate, the final sanctum unfolds.',
+    vaultDialogue: [
+      {
+        speaker: 'Pip',
+        voiceName: 'Puck',
+        style: 'Stunned wonder gazing into mirror water',
+        text: 'Look into the lagoon! Every pine and crystal sapling we planted across the earlier chapters is blooming here in glass!',
+      },
+      {
+        speaker: 'Aldous',
+        voiceName: 'Charon',
+        style: 'Reverent certainty',
+        text: 'Palimpsest forgets nothing. Step through the Refraction Crown Gate—the Meridian Heart waits on the tenth page.',
+      },
+    ],
   },
   9: {
     id: 9,
@@ -164,5 +313,19 @@ export const CHRONICLE_SCRIPTS: Record<WorldId, ChapterScript> = {
       'All ten constellations resonate together—the Impossible Living Atlas is whole once more.',
     portalLine:
       'Passing through the Unbound Meridian Gate, the golden rings unwind back into dawn over Chapter One.',
+    vaultDialogue: [
+      {
+        speaker: 'Lyra',
+        voiceName: 'Kore',
+        style: 'Hushed, triumphant archival cadence',
+        text: 'The mandala chambers are unlocked at last—only the central Astrolabe awaits the three shards to mend the Heart.',
+      },
+      {
+        speaker: 'Aldous',
+        voiceName: 'Charon',
+        style: 'Deep, luminous warmth',
+        text: 'Set the shards into the brass cradle whenever you are ready, companion.',
+      },
+    ],
   },
 };
