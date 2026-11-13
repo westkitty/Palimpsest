@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { WorldId } from '../types/atlas';
+import { TOTAL_WORLDS, WORLD_METADATA, WorldId } from '../types/atlas';
 
 function createCanvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
   const canvas = document.createElement('canvas');
@@ -55,8 +55,8 @@ export interface ProceduralTexturePack {
   pageEdgeColor: THREE.CanvasTexture;
   paperGrainBump: THREE.CanvasTexture;
   contactShadow: THREE.CanvasTexture;
-  worldParchment: [THREE.CanvasTexture, THREE.CanvasTexture, THREE.CanvasTexture];
-  worldSecretInk: [THREE.CanvasTexture, THREE.CanvasTexture, THREE.CanvasTexture];
+  worldParchment: THREE.CanvasTexture[];
+  worldSecretInk: THREE.CanvasTexture[];
   dispose: () => void;
 }
 
@@ -82,7 +82,6 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
     wbCtx.fillStyle = `rgb(${g},${g},${g})`;
     wbCtx.fillRect(0, y, 512, 1);
   }
-  // Plank seams
   for (let p = 1; p < 4; p++) {
     const py = p * 128;
     wCtx.fillStyle = 'rgba(12, 7, 4, 0.75)';
@@ -90,7 +89,6 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
     wbCtx.fillStyle = '#202020';
     wbCtx.fillRect(0, py - 1, 512, 3);
   }
-  // Subtle organic grain streaks
   for (let i = 0; i < 420; i++) {
     const x = Math.random() * 512;
     const y = Math.random() * 512;
@@ -135,7 +133,6 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
   cCtx.drawImage(leathC, 0, 0, 1024, 1400);
   cbCtx.drawImage(leathB, 0, 0, 1024, 1400);
 
-  // Subtle dark burnished vignette
   const covGrad = cCtx.createRadialGradient(512, 700, 180, 512, 700, 760);
   covGrad.addColorStop(0, 'rgba(72, 39, 27, 0.25)');
   covGrad.addColorStop(1, 'rgba(18, 8, 5, 0.65)');
@@ -155,7 +152,6 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
     ctx.strokeRect(88, 88, 848, 1224);
     ctx.strokeRect(106, 106, 812, 1188);
 
-    // Corner filigree arcs
     const corners = [
       [106, 106, 0],
       [918, 106, Math.PI / 2],
@@ -176,7 +172,6 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
       ctx.restore();
     });
 
-    // Central Astrolabe & Compass Rose
     ctx.save();
     ctx.translate(512, 660);
     ctx.lineWidth = 4;
@@ -185,7 +180,6 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
       ctx.arc(0, 0, r, 0, Math.PI * 2);
       ctx.stroke();
     }
-    // 16 compass rays
     for (let i = 0; i < 16; i++) {
       const a = (i / 16) * Math.PI * 2;
       const rIn = i % 2 === 0 ? 36 : 92;
@@ -195,7 +189,6 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
       ctx.lineTo(Math.cos(a) * rOut, Math.sin(a) * rOut);
       ctx.stroke();
     }
-    // Tilted orbital ellipses
     for (const rot of [-0.45, 0.45]) {
       ctx.save();
       ctx.rotate(rot);
@@ -206,7 +199,6 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
     }
     ctx.restore();
 
-    // Cover Title & Subtitle
     ctx.fillStyle = isBump ? '#F4F4F4' : '#E2C285';
     ctx.textAlign = 'center';
     ctx.font = '700 84px Georgia, serif';
@@ -214,7 +206,7 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
     ctx.font = '600 32px Georgia, serif';
     ctx.fillText('THE IMPOSSIBLE LIVING ATLAS', 512, 318);
     ctx.font = 'italic 26px Georgia, serif';
-    ctx.fillText('Tome I · Three Folded Realms', 512, 1140);
+    ctx.fillText('Ten Bound Realms · The Unbound Meridian', 512, 1140);
   });
 
   const coverFrontColor = finalizeColorTexture(covC, aniso);
@@ -252,18 +244,14 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
   csCtx.fillRect(0, 0, 256, 256);
   const contactShadow = finalizeColorTexture(csC, aniso);
 
-  // 7. World Parchment Maps + Secret UV-revealed Ink Layers
-  const worldParchment: [THREE.CanvasTexture, THREE.CanvasTexture, THREE.CanvasTexture] = [
-    buildWorldParchment(0, aniso),
-    buildWorldParchment(1, aniso),
-    buildWorldParchment(2, aniso),
-  ];
-
-  const worldSecretInk: [THREE.CanvasTexture, THREE.CanvasTexture, THREE.CanvasTexture] = [
-    buildWorldSecretInk(0, aniso),
-    buildWorldSecretInk(1, aniso),
-    buildWorldSecretInk(2, aniso),
-  ];
+  // 7. 10 Unique World Parchment Maps + Secret Ink Layers
+  const worldParchment: THREE.CanvasTexture[] = [];
+  const worldSecretInk: THREE.CanvasTexture[] = [];
+  for (let i = 0; i < TOTAL_WORLDS; i++) {
+    const wId = i as WorldId;
+    worldParchment.push(buildWorldParchment(wId, aniso));
+    worldSecretInk.push(buildWorldSecretInk(wId, aniso));
+  }
 
   allTextures.push(
     walnutColor,
@@ -297,168 +285,156 @@ export function createProceduralTextures(maxAnisotropy: number): ProceduralTextu
   };
 }
 
+const WORLD_PALETTES: Record<
+  WorldId,
+  { inner: string; mid: string; edge: string; wash: string; line: string; text: string }
+> = {
+  0: { inner: '#F3EBD8', mid: '#E7DABF', edge: '#D3C09E', wash: 'rgba(104, 148, 86, 0.28)', line: 'rgba(86, 70, 44, 0.24)', text: 'rgba(66, 44, 24, 0.78)' },
+  1: { inner: '#EFE9DB', mid: '#DFE0D2', edge: '#C6C0AE', wash: 'rgba(62, 114, 142, 0.24)', line: 'rgba(54, 92, 114, 0.24)', text: 'rgba(42, 58, 72, 0.8)' },
+  2: { inner: '#F5E7CC', mid: '#E9D3AD', edge: '#D1B384', wash: 'rgba(196, 140, 62, 0.26)', line: 'rgba(145, 102, 46, 0.28)', text: 'rgba(88, 56, 24, 0.82)' },
+  3: { inner: '#EFF4F8', mid: '#DCE6EE', edge: '#BCCAD8', wash: 'rgba(116, 168, 206, 0.26)', line: 'rgba(72, 106, 134, 0.26)', text: 'rgba(44, 68, 92, 0.82)' },
+  4: { inner: '#DCEAE7', mid: '#C1D8D6', edge: '#9BB8BA', wash: 'rgba(46, 134, 132, 0.28)', line: 'rgba(38, 92, 96, 0.28)', text: 'rgba(26, 62, 68, 0.84)' },
+  5: { inner: '#E9DDD2', mid: '#D4BFAF', edge: '#B49582', wash: 'rgba(198, 88, 46, 0.26)', line: 'rgba(122, 54, 34, 0.28)', text: 'rgba(74, 32, 22, 0.85)' },
+  6: { inner: '#F4F0E6', mid: '#E3DEC9', edge: '#C7BEA5', wash: 'rgba(182, 152, 88, 0.22)', line: 'rgba(104, 88, 62, 0.25)', text: 'rgba(66, 54, 36, 0.8)' },
+  7: { inner: '#DFD6E8', mid: '#C5B8D4', edge: '#A392B8', wash: 'rgba(106, 78, 156, 0.26)', line: 'rgba(74, 52, 112, 0.28)', text: 'rgba(48, 30, 74, 0.84)' },
+  8: { inner: '#F0ECF4', mid: '#DFD8EA', edge: '#C3B7D4', wash: 'rgba(146, 128, 198, 0.24)', line: 'rgba(98, 86, 140, 0.26)', text: 'rgba(58, 48, 86, 0.82)' },
+  9: { inner: '#F4E9CF', mid: '#E5CFA2', edge: '#C9AA70', wash: 'rgba(212, 175, 110, 0.30)', line: 'rgba(136, 98, 38, 0.32)', text: 'rgba(78, 52, 18, 0.88)' },
+};
+
 function buildWorldParchment(worldId: WorldId, anisotropy: number): THREE.CanvasTexture {
-  const [canvas, ctx] = createCanvas(1536, 1024);
+  const W = 1024;
+  const H = 682;
+  const [canvas, ctx] = createCanvas(W, H);
+  const pal = WORLD_PALETTES[worldId];
 
-  // Warm aged ivory parchment base
-  const baseGrad = ctx.createRadialGradient(768, 512, 120, 768, 512, 920);
-  if (worldId === 0) {
-    baseGrad.addColorStop(0, '#F3EBD8');
-    baseGrad.addColorStop(0.75, '#E7DABF');
-    baseGrad.addColorStop(1, '#D3C09E');
-  } else if (worldId === 1) {
-    baseGrad.addColorStop(0, '#EFE9DB');
-    baseGrad.addColorStop(0.75, '#DFE0D2');
-    baseGrad.addColorStop(1, '#C6C0AE');
-  } else {
-    baseGrad.addColorStop(0, '#F5E7CC');
-    baseGrad.addColorStop(0.75, '#E9D3AD');
-    baseGrad.addColorStop(1, '#D1B384');
-  }
+  const baseGrad = ctx.createRadialGradient(W / 2, H / 2, 80, W / 2, H / 2, 620);
+  baseGrad.addColorStop(0, pal.inner);
+  baseGrad.addColorStop(0.74, pal.mid);
+  baseGrad.addColorStop(1, pal.edge);
   ctx.fillStyle = baseGrad;
-  ctx.fillRect(0, 0, 1536, 1024);
+  ctx.fillRect(0, 0, W, H);
 
-  // Paper fiber mottling
-  for (let i = 0; i < 4500; i++) {
-    ctx.fillStyle = Math.random() > 0.5 ? 'rgba(130, 96, 54, 0.045)' : 'rgba(255, 250, 238, 0.06)';
-    ctx.fillRect(Math.random() * 1536, Math.random() * 1024, 3 + Math.random() * 8, 2);
+  for (let i = 0; i < 2400; i++) {
+    ctx.fillStyle = Math.random() > 0.5 ? 'rgba(120, 88, 48, 0.04)' : 'rgba(255, 252, 244, 0.05)';
+    ctx.fillRect(Math.random() * W, Math.random() * H, 2 + Math.random() * 6, 1.5);
   }
 
-  // Spine crease shadow down the middle
-  const spineGrad = ctx.createLinearGradient(738, 0, 798, 0);
-  spineGrad.addColorStop(0, 'rgba(62, 40, 20, 0)');
-  spineGrad.addColorStop(0.5, 'rgba(42, 26, 12, 0.34)');
-  spineGrad.addColorStop(1, 'rgba(62, 40, 20, 0)');
+  // Spine fold shadow
+  const spineGrad = ctx.createLinearGradient(W / 2 - 22, 0, W / 2 + 22, 0);
+  spineGrad.addColorStop(0, 'rgba(42, 26, 12, 0)');
+  spineGrad.addColorStop(0.5, 'rgba(32, 20, 10, 0.36)');
+  spineGrad.addColorStop(1, 'rgba(42, 26, 12, 0)');
   ctx.fillStyle = spineGrad;
-  ctx.fillRect(738, 0, 60, 1024);
+  ctx.fillRect(W / 2 - 22, 0, 44, H);
 
-  // Metallic gold-leaf & ink borders around both pages
-  const drawPageFrame = (ox: number, w: number) => {
+  // Gilt page borders
+  const drawFrame = (ox: number, w: number) => {
     ctx.strokeStyle = '#B8924E';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(ox + 26, 26, w - 52, 972);
-    ctx.strokeStyle = 'rgba(72, 48, 28, 0.55)';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(ox + 38, 38, w - 76, 948);
-  };
-  drawPageFrame(0, 758);
-  drawPageFrame(778, 758);
-
-  // World-specific watercolor & ink cartography
-  if (worldId === 0) {
-    // Verdant Kingdom: soft moss & meadow washes + contour lines + village roads
-    const meadow = ctx.createRadialGradient(540, 520, 40, 540, 520, 420);
-    meadow.addColorStop(0, 'rgba(122, 158, 92, 0.35)');
-    meadow.addColorStop(1, 'rgba(122, 158, 92, 0)');
-    ctx.fillStyle = meadow;
-    ctx.fillRect(0, 0, 1536, 1024);
-
-    const grove = ctx.createRadialGradient(1080, 420, 30, 1080, 420, 360);
-    grove.addColorStop(0, 'rgba(92, 134, 78, 0.32)');
-    grove.addColorStop(1, 'rgba(92, 134, 78, 0)');
-    ctx.fillStyle = grove;
-    ctx.fillRect(0, 0, 1536, 1024);
-
-    // Topographic ink contour loops
-    ctx.strokeStyle = 'rgba(90, 72, 48, 0.22)';
-    ctx.lineWidth = 1.4;
-    for (let r = 60; r <= 260; r += 38) {
-      ctx.beginPath();
-      ctx.ellipse(380, 350, r * 1.25, r * 0.85, 0.2, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-  } else if (worldId === 1) {
-    // Forgotten Harbor: maritime rhumb lines & bathymetry rings
-    ctx.strokeStyle = 'rgba(54, 92, 114, 0.22)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(ox + 18, 18, w - 36, H - 36);
+    ctx.strokeStyle = pal.line;
     ctx.lineWidth = 1.2;
-    for (let i = 0; i < 16; i++) {
-      const a = (i / 16) * Math.PI * 2;
+    ctx.strokeRect(ox + 26, 26, w - 52, H - 52);
+  };
+  drawFrame(0, W / 2 - 6);
+  drawFrame(W / 2 + 6, W / 2 - 6);
+
+  // World-specific watercolor wash & cartographic geometry
+  const washGrad = ctx.createRadialGradient(W * 0.35, H * 0.5, 20, W * 0.35, H * 0.5, 320);
+  washGrad.addColorStop(0, pal.wash);
+  washGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = washGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = pal.line;
+  ctx.lineWidth = 1.2;
+
+  if (worldId % 3 === 0) {
+    // Topographic contours & compass rings
+    for (let r = 42; r <= 200; r += 32) {
       ctx.beginPath();
-      ctx.moveTo(1060, 620);
-      ctx.lineTo(1060 + Math.cos(a) * 900, 620 + Math.sin(a) * 900);
+      ctx.ellipse(W * 0.28, H * 0.42, r * 1.25, r * 0.85, 0.25, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(W * 0.72, H * 0.58, r * 1.1, r * 0.75, -0.2, 0, Math.PI * 2);
       ctx.stroke();
     }
-    for (const r of [90, 160, 240, 340]) {
+  } else if (worldId % 3 === 1) {
+    // Maritime rhumb lines & concentric survey rings
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
       ctx.beginPath();
-      ctx.arc(1060, 620, r, 0, Math.PI * 2);
+      ctx.moveTo(W * 0.68, H * 0.54);
+      ctx.lineTo(W * 0.68 + Math.cos(a) * 600, H * 0.54 + Math.sin(a) * 600);
+      ctx.stroke();
+    }
+    for (const r of [60, 120, 190, 260]) {
+      ctx.beginPath();
+      ctx.arc(W * 0.68, H * 0.54, r, 0, Math.PI * 2);
       ctx.stroke();
     }
   } else {
-    // Celestial Desert: astronomical meridian circles & dune contour hatching
-    ctx.strokeStyle = 'rgba(145, 102, 46, 0.28)';
-    ctx.lineWidth = 1.5;
-    for (const r of [120, 210, 310, 420]) {
+    // Celestial meridian circles & mandala axes
+    for (const r of [80, 150, 225, 300]) {
       ctx.beginPath();
-      ctx.arc(768, 512, r, 0, Math.PI * 2);
+      ctx.arc(W / 2, H / 2, r, 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.beginPath();
-    ctx.moveTo(60, 512);
-    ctx.lineTo(1476, 512);
+    ctx.moveTo(40, H / 2);
+    ctx.lineTo(W - 40, H / 2);
     ctx.stroke();
   }
 
-  // Subtle corner folio calligraphy
-  ctx.fillStyle = 'rgba(66, 44, 24, 0.72)';
-  ctx.font = '600 22px Georgia, serif';
+  // Folio title & chapter engraving
+  const meta = WORLD_METADATA[worldId];
+  ctx.fillStyle = pal.text;
+  ctx.font = '600 15px Georgia, serif';
   ctx.textAlign = 'left';
-  const titles = [
-    'FOLIO I · THE VERDANT KINGDOM',
-    'FOLIO II · THE FORGOTTEN HARBOR',
-    'FOLIO III · THE CELESTIAL DESERT',
-  ];
-  ctx.fillText(titles[worldId], 56, 72);
+  ctx.fillText(`FOLIO ${meta.roman} · ${meta.title.toUpperCase()}`, 38, 48);
+  ctx.font = 'italic 13px Georgia, serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(meta.chapterTitle, W - 38, 48);
 
   return finalizeColorTexture(canvas, anisotropy);
 }
 
 function buildWorldSecretInk(worldId: WorldId, anisotropy: number): THREE.CanvasTexture {
-  const [canvas, ctx] = createCanvas(1536, 1024);
-  ctx.clearRect(0, 0, 1536, 1024);
+  const W = 1024;
+  const H = 682;
+  const [canvas, ctx] = createCanvas(W, H);
+  ctx.clearRect(0, 0, W, H);
 
-  // Luminous golden-cyan alchemical ink only visible inside the Magical Magnifier shader
-  ctx.strokeStyle = 'rgba(244, 206, 118, 0.92)';
-  ctx.fillStyle = 'rgba(244, 206, 118, 0.92)';
-  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = 'rgba(246, 212, 124, 0.94)';
+  ctx.fillStyle = 'rgba(246, 212, 124, 0.94)';
+  ctx.lineWidth = 2;
 
-  // Fine astrological survey grid
   ctx.save();
-  ctx.globalAlpha = 0.38;
-  for (let x = 96; x < 1440; x += 96) {
+  ctx.globalAlpha = 0.35;
+  for (let x = 64; x < W - 40; x += 64) {
     ctx.beginPath();
-    ctx.moveTo(x, 60);
-    ctx.lineTo(x, 964);
+    ctx.moveTo(x, 40);
+    ctx.lineTo(x, H - 40);
     ctx.stroke();
   }
-  for (let y = 96; y < 960; y += 96) {
+  for (let y = 64; y < H - 40; y += 64) {
     ctx.beginPath();
-    ctx.moveTo(60, y);
-    ctx.lineTo(1476, y);
+    ctx.moveTo(40, y);
+    ctx.lineTo(W - 40, y);
     ctx.stroke();
   }
   ctx.restore();
 
-  // Secret coordinate rings & calligraphy notes at secret positions
-  const spots =
-    worldId === 0
-      ? [
-          { px: 430, py: 700, label: 'MYCELIUM NEXUS · VII' },
-          { px: 1110, py: 380, label: 'MILLWRIGHT CIPHER · IV' },
-        ]
-      : worldId === 1
-        ? [
-            { px: 400, py: 350, label: 'FATHOM XIV · SUNKEN ASTROLABE' },
-            { px: 1100, py: 690, label: 'SECRET COVE CHANNEL' },
-          ]
-        : [
-            { px: 470, py: 340, label: 'ZENITH EQUATION · VII' },
-            { px: 1120, py: 700, label: 'OASIS MIRAGE AQUEDUCT' },
-          ];
+  const meta = WORLD_METADATA[worldId];
+  const spots = [
+    { px: 280, py: 460, label: `SHARD ${meta.roman}-A` },
+    { px: 740, py: 245, label: `CIPHER ${meta.roman}-B` },
+  ];
 
   spots.forEach(({ px, py, label }) => {
     ctx.save();
     ctx.translate(px, py);
-    for (const r of [24, 52, 84]) {
+    for (const r of [18, 38, 60]) {
       ctx.beginPath();
       ctx.arc(0, 0, r, 0, Math.PI * 2);
       ctx.stroke();
@@ -466,13 +442,13 @@ function buildWorldSecretInk(worldId: WorldId, anisotropy: number): THREE.Canvas
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2;
       ctx.beginPath();
-      ctx.moveTo(Math.cos(a) * 24, Math.sin(a) * 24);
-      ctx.lineTo(Math.cos(a) * 96, Math.sin(a) * 96);
+      ctx.moveTo(Math.cos(a) * 18, Math.sin(a) * 18);
+      ctx.lineTo(Math.cos(a) * 68, Math.sin(a) * 68);
       ctx.stroke();
     }
-    ctx.font = 'italic 600 22px Georgia, serif';
+    ctx.font = 'italic 600 16px Georgia, serif';
     ctx.textAlign = 'center';
-    ctx.fillText(label, 0, 122);
+    ctx.fillText(label, 0, 86);
     ctx.restore();
   });
 

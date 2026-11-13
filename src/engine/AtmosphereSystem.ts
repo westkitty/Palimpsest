@@ -347,6 +347,7 @@ export class AtmosphereSystem {
     weather: WeatherPreset,
     quality: QualityTier,
     bookOpen: boolean,
+    biomeHex?: string,
   ): void {
     // 1. Sun & Moon Orbital Arc
     // 6:00 = sunrise (angle 0), 12:00 = zenith (PI/2), 18:00 = sunset (PI)
@@ -388,6 +389,11 @@ export class AtmosphereSystem {
     } else {
       const t = THREE.MathUtils.clamp((sunElev + 0.45) / 0.35, 0, 1);
       _colA.copy(SKY_NIGHT).lerp(timeOfDay < 12 ? SKY_DAWN : SKY_DUSK, t);
+    }
+
+    if (biomeHex && bookOpen) {
+      _colB.set(biomeHex);
+      _colA.lerp(_colB, 0.26 * (1 - this.nightFactor * 0.45));
     }
 
     // Weather atmospheric tint

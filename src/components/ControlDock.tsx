@@ -33,6 +33,7 @@ import {
   INTERACTION_TOOLS,
   InteractionTool,
   QualityTier,
+  TOTAL_WORLDS,
   WORLD_METADATA,
   WeatherPreset,
   WorldId,
@@ -60,6 +61,7 @@ interface ControlDockProps {
   onNudgeMagnifier: (dx: number, dz: number) => void;
   onNudgeImmersion: (dx: number, dz: number) => void;
   onNudgeRiver: (dx: number, dz: number) => void;
+  onCrossPortal: () => void;
 }
 
 const TOOL_ICONS: Record<InteractionTool, typeof Compass> = {
@@ -99,6 +101,8 @@ export function ControlDock(props: ControlDockProps) {
   if (snapshot.bookPhase === 'closed') return null;
 
   const activeWorldState = snapshot.worlds[snapshot.activeWorld];
+  const activeMeta = WORLD_METADATA[snapshot.activeWorld];
+  const portalTargetMeta = WORLD_METADATA[activeMeta.portal.targetWorld];
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-3 z-20 flex flex-col items-center px-3 sm:bottom-4">
@@ -126,44 +130,49 @@ export function ControlDock(props: ControlDockProps) {
         <div className="pointer-events-auto w-full max-w-[min(960px,96vw)] rounded-lg border border-[#D4AF6E]/28 bg-[#16100C]/94 px-3 py-2.5 shadow-2xl sm:px-4">
           {/* Top Slim Row: Folio Turning + Section Tabs + Camera Presets */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#D4AF6E]/15 pb-2">
-            {/* World Folio Switcher */}
-            <div className="flex items-center gap-1">
+            {/* World Folio Switcher (Folios I–X) */}
+            <div className="flex items-center gap-1 max-w-full">
               <button
                 type="button"
                 onClick={() =>
-                  props.onSelectWorld(((snapshot.activeWorld + 2) % 3) as WorldId)
+                  props.onSelectWorld(
+                    ((snapshot.activeWorld + TOTAL_WORLDS - 1) % TOTAL_WORLDS) as WorldId,
+                  )
                 }
                 aria-label="Turn to previous folio"
-                className="inline-flex h-7 w-7 items-center justify-center rounded border border-[#D4AF6E]/25 bg-[#211812] text-[#E2C996] hover:border-[#D4AF6E]/55 cursor-pointer"
-                title="Previous world ([)"
+                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-[#D4AF6E]/25 bg-[#211812] text-[#E2C996] hover:border-[#D4AF6E]/55 cursor-pointer"
+                title="Previous folio ([)"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
               </button>
-              {([0, 1, 2] as WorldId[]).map((wId) => {
-                const active = snapshot.activeWorld === wId;
-                return (
-                  <button
-                    key={wId}
-                    type="button"
-                    onClick={() => props.onSelectWorld(wId)}
-                    className={`h-7 rounded px-2.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                      active
-                        ? 'border border-[#D4AF6E]/60 bg-[#B8433E] text-[#FAF4E8]'
-                        : 'border border-[#D4AF6E]/15 bg-[#211812] text-[#C8BBA4] hover:text-[#F4ECDC]'
-                    }`}
-                  >
-                    {WORLD_METADATA[wId].roman}
-                  </button>
-                );
-              })}
+              <div className="atlas-scroll flex items-center gap-1 overflow-x-auto max-w-[230px] sm:max-w-[340px]">
+                {Array.from({ length: TOTAL_WORLDS }, (_, idx) => idx as WorldId).map((wId) => {
+                  const active = snapshot.activeWorld === wId;
+                  return (
+                    <button
+                      key={wId}
+                      type="button"
+                      onClick={() => props.onSelectWorld(wId)}
+                      title={`${WORLD_METADATA[wId].folioCode}: ${WORLD_METADATA[wId].title}`}
+                      className={`h-7 rounded px-2 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        active
+                          ? 'border border-[#D4AF6E]/60 bg-[#B8433E] text-[#FAF4E8]'
+                          : 'border border-[#D4AF6E]/15 bg-[#211812] text-[#C8BBA4] hover:text-[#F4ECDC]'
+                      }`}
+                    >
+                      {WORLD_METADATA[wId].roman}
+                    </button>
+                  );
+                })}
+              </div>
               <button
                 type="button"
                 onClick={() =>
-                  props.onSelectWorld(((snapshot.activeWorld + 1) % 3) as WorldId)
+                  props.onSelectWorld(((snapshot.activeWorld + 1) % TOTAL_WORLDS) as WorldId)
                 }
                 aria-label="Turn to next folio"
-                className="inline-flex h-7 w-7 items-center justify-center rounded border border-[#D4AF6E]/25 bg-[#211812] text-[#E2C996] hover:border-[#D4AF6E]/55 cursor-pointer"
-                title="Next world (])"
+                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-[#D4AF6E]/25 bg-[#211812] text-[#E2C996] hover:border-[#D4AF6E]/55 cursor-pointer"
+                title="Next folio (])"
               >
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
@@ -249,6 +258,18 @@ export function ControlDock(props: ControlDockProps) {
                 <span className="truncate max-w-full sm:max-w-[54%]">{snapshot.statusHint}</span>
 
                 <div className="flex flex-wrap items-center gap-1.5">
+                  {(snapshot.activeTool === 'explore' || snapshot.activeTool === 'pageTurn') && (
+                    <button
+                      type="button"
+                      onClick={props.onCrossPortal}
+                      disabled={Boolean(snapshot.portalTransition?.active)}
+                      title={`${activeMeta.portal.label}: ${activeMeta.portal.description} (Enter)`}
+                      className="rounded border border-[#D4AF6E]/55 bg-[#2A1D14] px-2.5 py-0.5 text-[11px] font-medium text-[#E2C996] hover:bg-[#3A281B] disabled:opacity-50 whitespace-nowrap shrink-0 cursor-pointer"
+                    >
+                      Cross {activeMeta.portal.label} &rarr; Folio {portalTargetMeta.roman}
+                    </button>
+                  )}
+
                   {snapshot.activeTool === 'popup' &&
                     activeWorldState.popups.map((p) => (
                       <button

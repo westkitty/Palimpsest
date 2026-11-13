@@ -6,16 +6,18 @@ import {
   InteractionTool,
   MagnifierDiscovery,
   PlantedTreeState,
+  PortalLink,
   QualityTier,
   Vec2Point,
   WeatherPreset,
+  WORLD_METADATA,
   WorldId,
   WorldState,
 } from '../types/atlas';
 
-function createInitialWorlds(): [WorldState, WorldState, WorldState] {
+function createInitialWorlds(): WorldState[] {
   return [
-    // World 0: The Verdant Kingdom
+    // 0: The Verdant Kingdom
     {
       id: 0,
       popups: [
@@ -55,12 +57,10 @@ function createInitialWorlds(): [WorldState, WorldState, WorldState] {
         { id: 'k-owl', sealId: 'seal-k-owl', kind: 'owl', label: 'Clockwork Owl', summoned: false },
         { id: 'k-fox', sealId: 'seal-k-fox', kind: 'fox', label: 'Lantern Fox', summoned: false },
       ],
-      hiddenLayers: [
-        { id: 'k-grotto', label: 'Root Sanctuary Vault', revealed: false },
-      ],
+      hiddenLayers: [{ id: 'k-grotto', label: 'Root Sanctuary Vault', revealed: false }],
       discoveredSecrets: [],
     },
-    // World 1: The Forgotten Harbor
+    // 1: The Forgotten Harbor
     {
       id: 1,
       popups: [
@@ -108,12 +108,10 @@ function createInitialWorlds(): [WorldState, WorldState, WorldState] {
         { id: 'h-whale', sealId: 'seal-h-whale', kind: 'whale', label: 'Leviathan Fin', summoned: false },
         { id: 'h-crab', sealId: 'seal-h-crab', kind: 'crab', label: 'Pier Hermit', summoned: false },
       ],
-      hiddenLayers: [
-        { id: 'h-cove', label: "Smuggler's Sea Cave", revealed: false },
-      ],
+      hiddenLayers: [{ id: 'h-cove', label: "Smuggler's Sea Cave", revealed: false }],
       discoveredSecrets: [],
     },
-    // World 2: The Celestial Desert
+    // 2: The Celestial Desert
     {
       id: 2,
       popups: [
@@ -153,65 +151,479 @@ function createInitialWorlds(): [WorldState, WorldState, WorldState] {
         { id: 'd-phoenix', sealId: 'seal-d-phoenix', kind: 'phoenix', label: 'Star Phoenix', summoned: false },
         { id: 'd-fennec', sealId: 'seal-d-fennec', kind: 'fennec', label: 'Dune Fennec', summoned: false },
       ],
-      hiddenLayers: [
-        { id: 'd-vault', label: 'Sunken Crystal Vault', revealed: false },
+      hiddenLayers: [{ id: 'd-vault', label: 'Sunken Crystal Vault', revealed: false }],
+      discoveredSecrets: [],
+    },
+    // 3: The Frostbound Spire
+    {
+      id: 3,
+      popups: [
+        { id: 'frost-belfry', label: 'Icebound Belfry Spire', pullRatio: 1 },
+        { id: 'frost-glacier', label: 'Glacial Arch & Falls', pullRatio: 1 },
       ],
+      riverControlPoints: [
+        { x: -3.3, z: -1.6 },
+        { x: -1.4, z: -0.5 },
+        { x: 0.2, z: 0.2 },
+        { x: 1.9, z: 1.1 },
+        { x: 3.4, z: 1.9 },
+      ],
+      bridges: [
+        { id: 'frost-crevasse', label: 'Crevasse Ice Span', unfolded: false },
+        { id: 'frost-bellway', label: 'Belfry Causeway', unfolded: true },
+      ],
+      plantedTrees: [
+        { id: 'seed-f-1', x: -2.8, z: 1.4, species: 'icepine', scale: 1.0, rotation: 0.2, plantedAt: -10 },
+      ],
+      shipRoutes: [
+        {
+          shipId: 'frost-sled',
+          points: [
+            { x: -2.6, z: -1.2 },
+            { x: -0.9, z: -0.2 },
+            { x: 1.1, z: 0.8 },
+            { x: 2.8, z: 1.6 },
+          ],
+        },
+      ],
+      constellationEdges: [],
+      constellationComplete: false,
+      creatures: [
+        { id: 'f-wolf', sealId: 'seal-f-wolf', kind: 'wolf', label: 'Snow Wolf', summoned: true },
+        { id: 'f-owl', sealId: 'seal-f-owl', kind: 'owl', label: 'Boreal Owl', summoned: false },
+        { id: 'f-moth', sealId: 'seal-f-moth', kind: 'moth', label: 'Frost Moth', summoned: false },
+      ],
+      hiddenLayers: [{ id: 'f-cavern', label: 'Permafrost Ice Cavern', revealed: false }],
+      discoveredSecrets: [],
+    },
+    // 4: The Sunken Athenaeum
+    {
+      id: 4,
+      popups: [
+        { id: 'abyss-rotunda', label: 'Sunken Dome Rotunda', pullRatio: 1 },
+        { id: 'abyss-colonnade', label: 'Coral Arch Colonnade', pullRatio: 1 },
+      ],
+      riverControlPoints: [
+        { x: -3.4, z: 0.9 },
+        { x: -1.5, z: -0.3 },
+        { x: 0.3, z: -0.9 },
+        { x: 2.0, z: 0.1 },
+        { x: 3.4, z: 1.2 },
+      ],
+      bridges: [
+        { id: 'abyss-arch-1', label: 'Tidal Reading Span', unfolded: false },
+        { id: 'abyss-arch-2', label: 'Scriptorium Bridge', unfolded: true },
+      ],
+      plantedTrees: [
+        { id: 'seed-a-1', x: -2.3, z: 1.6, species: 'coral', scale: 1.0, rotation: 0.4, plantedAt: -10 },
+        { id: 'seed-a-2', x: 2.4, z: -1.5, species: 'coral', scale: 0.9, rotation: 1.1, plantedAt: -10 },
+      ],
+      shipRoutes: [
+        {
+          shipId: 'abyss-bathysphere',
+          points: [
+            { x: -2.7, z: 0.7 },
+            { x: -0.8, z: -0.3 },
+            { x: 1.2, z: -0.4 },
+            { x: 2.8, z: 0.9 },
+          ],
+        },
+      ],
+      constellationEdges: [],
+      constellationComplete: false,
+      creatures: [
+        { id: 'a-manta', sealId: 'seal-a-manta', kind: 'manta', label: 'Paper Manta', summoned: true },
+        { id: 'a-jelly', sealId: 'seal-a-jelly', kind: 'jellyfish', label: 'Lantern Jelly', summoned: false },
+        { id: 'a-serpent', sealId: 'seal-a-serpent', kind: 'serpent', label: 'Archive Wyrm', summoned: false },
+      ],
+      hiddenLayers: [{ id: 'a-vault', label: 'Drowned Scroll Vault', revealed: false }],
+      discoveredSecrets: [],
+    },
+    // 5: The Ember Foundry
+    {
+      id: 5,
+      popups: [
+        { id: 'ember-volcano', label: 'Caldera Magma Cascade', pullRatio: 1 },
+        { id: 'ember-forge', label: 'Bellows & Hammer Mill', pullRatio: 1 },
+      ],
+      riverControlPoints: [
+        { x: -2.8, z: -1.5 },
+        { x: -1.0, z: -0.8 },
+        { x: 0.6, z: 0.3 },
+        { x: 2.1, z: 1.2 },
+        { x: 3.4, z: 2.0 },
+      ],
+      bridges: [
+        { id: 'ember-span-1', label: 'Obsidian Drawbridge', unfolded: false },
+        { id: 'ember-span-2', label: 'Anvil Gantry', unfolded: true },
+      ],
+      plantedTrees: [
+        { id: 'seed-e-1', x: -2.5, z: 1.5, species: 'emberfern', scale: 1.0, rotation: 0.7, plantedAt: -10 },
+      ],
+      shipRoutes: [
+        {
+          shipId: 'ember-barge',
+          points: [
+            { x: -2.2, z: -1.2 },
+            { x: -0.5, z: -0.4 },
+            { x: 1.2, z: 0.7 },
+            { x: 2.9, z: 1.7 },
+          ],
+        },
+      ],
+      constellationEdges: [],
+      constellationComplete: false,
+      creatures: [
+        { id: 'e-salamander', sealId: 'seal-e-salamander', kind: 'salamander', label: 'Cinder Salamander', summoned: true },
+        { id: 'e-beetle', sealId: 'seal-e-beetle', kind: 'beetle', label: 'Brass Anvil Beetle', summoned: false },
+        { id: 'e-phoenix', sealId: 'seal-e-phoenix', kind: 'phoenix', label: 'Spark Phoenix', summoned: false },
+      ],
+      hiddenLayers: [{ id: 'e-crucible', label: 'Magma Crucible Vault', revealed: false }],
+      discoveredSecrets: [],
+    },
+    // 6: The Clockwork Sky
+    {
+      id: 6,
+      popups: [
+        { id: 'sky-windmill', label: 'Grand Windmill Spire', pullRatio: 1 },
+        { id: 'sky-mooring', label: 'Airship Mooring Mast', pullRatio: 1 },
+      ],
+      riverControlPoints: [
+        { x: -3.4, z: -0.8 },
+        { x: -1.4, z: -1.2 },
+        { x: 0.3, z: -0.1 },
+        { x: 1.9, z: 0.9 },
+        { x: 3.4, z: 0.5 },
+      ],
+      bridges: [
+        { id: 'sky-span-1', label: 'Gale Rope Span', unfolded: false },
+        { id: 'sky-span-2', label: 'Cloud-Walk Arch', unfolded: true },
+      ],
+      plantedTrees: [
+        { id: 'seed-s-1', x: -2.3, z: 1.3, species: 'skybloom', scale: 1.0, rotation: 0.5, plantedAt: -10 },
+      ],
+      shipRoutes: [
+        {
+          shipId: 'sky-dirigible',
+          points: [
+            { x: -2.8, z: -0.7 },
+            { x: -0.7, z: -1.0 },
+            { x: 1.3, z: 0.4 },
+            { x: 2.9, z: 0.6 },
+          ],
+        },
+      ],
+      constellationEdges: [],
+      constellationComplete: false,
+      creatures: [
+        { id: 's-hawk', sealId: 'seal-s-hawk', kind: 'hawk', label: 'Gale Sky-Hawk', summoned: true },
+        { id: 's-finch', sealId: 'seal-s-finch', kind: 'finch', label: 'Clockwork Finch', summoned: false },
+        { id: 's-moth', sealId: 'seal-s-moth', kind: 'moth', label: 'Aether Moth', summoned: false },
+      ],
+      hiddenLayers: [{ id: 's-engine', label: 'Cloud-Core Engine', revealed: false }],
+      discoveredSecrets: [],
+    },
+    // 7: The Whispering Mycelium
+    {
+      id: 7,
+      popups: [
+        { id: 'mycel-canopy', label: 'Giant Toadstool Crown', pullRatio: 1 },
+        { id: 'mycel-pagoda', label: 'Spore Lantern Pagoda', pullRatio: 1 },
+      ],
+      riverControlPoints: [
+        { x: -3.1, z: 1.6 },
+        { x: -1.2, z: 0.6 },
+        { x: 0.4, z: -0.3 },
+        { x: 2.0, z: -1.0 },
+        { x: 3.4, z: -1.6 },
+      ],
+      bridges: [
+        { id: 'mycel-span-1', label: 'Cap-Rim Crossing', unfolded: false },
+        { id: 'mycel-span-2', label: 'Pagoda Root Bridge', unfolded: true },
+      ],
+      plantedTrees: [
+        { id: 'seed-m-1', x: -2.4, z: -1.4, species: 'mushroom', scale: 1.1, rotation: 0.3, plantedAt: -10 },
+        { id: 'seed-m-2', x: 2.2, z: 1.3, species: 'mushroom', scale: 0.95, rotation: 1.5, plantedAt: -10 },
+      ],
+      shipRoutes: [
+        {
+          shipId: 'mycel-gondola',
+          points: [
+            { x: -2.6, z: 1.3 },
+            { x: -0.7, z: 0.4 },
+            { x: 1.2, z: -0.6 },
+            { x: 2.8, z: -1.3 },
+          ],
+        },
+      ],
+      constellationEdges: [],
+      constellationComplete: false,
+      creatures: [
+        { id: 'm-stag', sealId: 'seal-m-stag', kind: 'stag', label: 'Spore Hart', summoned: true },
+        { id: 'm-moth', sealId: 'seal-m-moth', kind: 'moth', label: 'Umbral Luna Moth', summoned: false },
+        { id: 'm-fox', sealId: 'seal-m-fox', kind: 'fox', label: 'Mycelial Fox', summoned: false },
+      ],
+      hiddenLayers: [{ id: 'm-crypt', label: 'Ancient Heartwood Crypt', revealed: false }],
+      discoveredSecrets: [],
+    },
+    // 8: The Glass Archipelago
+    {
+      id: 8,
+      popups: [
+        { id: 'glass-pavilion', label: 'Crystal Prism Pavilion', pullRatio: 1 },
+        { id: 'glass-sundial', label: 'Mirror Sundial Court', pullRatio: 1 },
+      ],
+      riverControlPoints: [
+        { x: -3.3, z: -1.2 },
+        { x: -1.3, z: -0.2 },
+        { x: 0.2, z: 0.8 },
+        { x: 1.8, z: 0.2 },
+        { x: 3.4, z: -0.9 },
+      ],
+      bridges: [
+        { id: 'glass-span-1', label: 'Prism Causeway', unfolded: false },
+        { id: 'glass-span-2', label: 'Lagoon Mirror Span', unfolded: true },
+      ],
+      plantedTrees: [
+        { id: 'seed-g-1', x: -2.6, z: 1.5, species: 'prism', scale: 1.0, rotation: 0.8, plantedAt: -10 },
+      ],
+      shipRoutes: [
+        {
+          shipId: 'glass-catamaran',
+          points: [
+            { x: -2.8, z: -1.0 },
+            { x: -0.9, z: 0.1 },
+            { x: 1.1, z: 0.5 },
+            { x: 2.9, z: -0.6 },
+          ],
+        },
+      ],
+      constellationEdges: [],
+      constellationComplete: false,
+      creatures: [
+        { id: 'g-heron', sealId: 'seal-g-heron', kind: 'heron', label: 'Crystal Heron', summoned: true },
+        { id: 'g-turtle', sealId: 'seal-g-turtle', kind: 'turtle', label: 'Prism Terrapin', summoned: false },
+        { id: 'g-fox', sealId: 'seal-g-fox', kind: 'fox', label: 'Moonlight Vixen', summoned: false },
+      ],
+      hiddenLayers: [{ id: 'g-grotto', label: 'Mirror-Glass Grotto', revealed: false }],
+      discoveredSecrets: [],
+    },
+    // 9: The Meridian Heart
+    {
+      id: 9,
+      popups: [
+        { id: 'heart-astrolabe', label: 'Grand Meridian Astrolabe', pullRatio: 1 },
+        { id: 'heart-sanctum', label: "Chronicler's Sanctum", pullRatio: 1 },
+      ],
+      riverControlPoints: [
+        { x: -3.2, z: 1.2 },
+        { x: -1.3, z: 1.5 },
+        { x: 0.1, z: 0.4 },
+        { x: 1.6, z: -1.2 },
+        { x: 3.2, z: -1.4 },
+      ],
+      bridges: [
+        { id: 'heart-span-1', label: 'Golden Spine Bridge', unfolded: false },
+        { id: 'heart-span-2', label: 'Zenith Walk', unfolded: true },
+      ],
+      plantedTrees: [
+        { id: 'seed-z-1', x: -2.5, z: -1.5, species: 'goldlotus', scale: 1.05, rotation: 0.2, plantedAt: -10 },
+        { id: 'seed-z-2', x: 2.5, z: 1.4, species: 'goldlotus', scale: 1.05, rotation: 1.4, plantedAt: -10 },
+      ],
+      shipRoutes: [
+        {
+          shipId: 'heart-barge',
+          points: [
+            { x: -2.7, z: 1.0 },
+            { x: -0.6, z: 1.3 },
+            { x: 1.2, z: -0.7 },
+            { x: 2.8, z: -1.1 },
+          ],
+        },
+      ],
+      constellationEdges: [],
+      constellationComplete: false,
+      creatures: [
+        { id: 'z-gryphon', sealId: 'seal-z-gryphon', kind: 'gryphon', label: 'Golden Gryphon', summoned: true },
+        { id: 'z-owl', sealId: 'seal-z-owl', kind: 'owl', label: 'Astral Archivist', summoned: false },
+        { id: 'z-stag', sealId: 'seal-z-stag', kind: 'stag', label: 'Meridian Hart', summoned: false },
+      ],
+      hiddenLayers: [{ id: 'z-chamber', label: "Architect's Final Chamber", revealed: false }],
       discoveredSecrets: [],
     },
   ];
 }
 
 export const MAGNIFIER_SECRETS: MagnifierDiscovery[] = [
-  // World 0
+  // 0
   {
     worldId: 0,
     id: 'k-secret-root',
-    title: 'Cartographer’s Marginalia · Sylvan Roots',
-    inscription: '“Beneath the folded ridge, the silver mycelium remembers every rainstorm since the First Binding.”',
+    title: 'Journal I · The Broken Meridian',
+    inscription: '“I left the first compass shard under the mossy ridge. Follow the river where paper oaks remember spring.”',
     x: -1.75,
     z: 1.2,
   },
   {
     worldId: 0,
     id: 'k-secret-mill',
-    title: 'Millwright Cipher',
-    inscription: '“Turn the waterwheel at dusk when lanterns wake; seven sparks mark the ancient crossing.”',
+    title: 'Journal I · Millwright’s Cipher',
+    inscription: '“The millwheel turns nine times before the harbor bell answers from Folio II.”',
     x: 1.8,
     z: -0.8,
   },
-  // World 1
+  // 1
   {
     worldId: 1,
     id: 'h-secret-tide',
-    title: 'Admiralty Sounding Note',
-    inscription: '“Fathom XIV off Pharos Point: a brass astrolabe still ticks beneath the smuggler’s cove.”',
+    title: 'Journal II · Fathom XIV',
+    inscription: '“Beneath Pharos Point sleeps a brass astrolabe; its needle points not north, but toward the Orrery dunes.”',
     x: -1.9,
     z: -1.0,
   },
   {
     worldId: 1,
     id: 'h-secret-fleet',
-    title: 'Harbor Master’s Seal',
-    inscription: '“Origami keels never sink in paper storms; chart their wakes between the twin beacons.”',
+    title: 'Journal II · Harbor Master’s Log',
+    inscription: '“Folded keels survive every paper tempest—steer between the twin beacons to find the southern desert.”',
     x: 1.75,
     z: 1.1,
   },
-  // World 2
+  // 2
   {
     worldId: 2,
     id: 'd-secret-orrery',
-    title: 'Astronomer’s Ephemeris',
-    inscription: '“When the seventh zenith star is threaded, the brass rings align with the buried crystal chamber.”',
+    title: 'Journal III · Ephemeris of Brass',
+    inscription: '“The desert stars spell a northward ascent toward ice and frozen bells.”',
     x: -1.5,
     z: -1.1,
   },
   {
     worldId: 2,
     id: 'd-secret-oasis',
-    title: 'Mirage Aqueduct Rubric',
-    inscription: '“Ink water drawn across folded dunes awakens crystalline palms that sing in starlight.”',
+    title: 'Journal III · Mirage Rubric',
+    inscription: '“Draw water across dry creases and crystalline blooms will mark the buried staircase.”',
     x: 1.85,
     z: 1.2,
+  },
+  // 3
+  {
+    worldId: 3,
+    id: 'f-secret-bell',
+    title: 'Journal IV · The Frozen Chime',
+    inscription: '“Inside the belfry spire, ice preserves the sound of the First Binding like amber.”',
+    x: -1.8,
+    z: -0.9,
+  },
+  {
+    worldId: 3,
+    id: 'f-secret-crevasse',
+    title: 'Journal IV · Below the Glacier',
+    inscription: '“Deep beneath the permafrost lies the stair descending into the Drowned Library.”',
+    x: 1.7,
+    z: 1.15,
+  },
+  // 4
+  {
+    worldId: 4,
+    id: 'a-secret-rotunda',
+    title: 'Journal V · Sunken Catalog',
+    inscription: '“Saltwater dissolved the ink of lesser kings, leaving only the luminous brass annotations intact.”',
+    x: -1.75,
+    z: -1.0,
+  },
+  {
+    worldId: 4,
+    id: 'a-secret-trench',
+    title: 'Journal V · Abyssal Heat',
+    inscription: '“Steam rises through the lower spine—beyond the drowned shelves burns the Ember Foundry.”',
+    x: 1.8,
+    z: 1.0,
+  },
+  // 5
+  {
+    worldId: 5,
+    id: 'e-secret-anvil',
+    title: 'Journal VI · Tempering the Compass',
+    inscription: '“In molten paper-gold I recast the cracked ring, yet it still lacked the breath of high winds.”',
+    x: -1.65,
+    z: 1.15,
+  },
+  {
+    worldId: 5,
+    id: 'e-secret-chimney',
+    title: 'Journal VI · Updraft Note',
+    inscription: '“Ride the warm thermal upward past the caldera; cloud islands await above the smoke.”',
+    x: 1.85,
+    z: -0.95,
+  },
+  // 6
+  {
+    worldId: 6,
+    id: 's-secret-vane',
+    title: 'Journal VII · Trade-Wind Chart',
+    inscription: '“The windmills do not grind grain—they wind the mainspring that keeps all ten folios aloft.”',
+    x: -1.7,
+    z: -0.95,
+  },
+  {
+    worldId: 6,
+    id: 's-secret-roots',
+    title: 'Journal VII · Hanging Anchor',
+    inscription: '“Follow the dangling cloud-roots downward into the quiet indigo of the Whispering Mycelium.”',
+    x: 1.75,
+    z: 1.15,
+  },
+  // 7
+  {
+    worldId: 7,
+    id: 'm-secret-spore',
+    title: 'Journal VIII · Memory of Ink',
+    inscription: '“Every crossed-out draft I ever wrote bloomed here as glowing velvet caps.”',
+    x: -1.8,
+    z: 1.1,
+  },
+  {
+    worldId: 7,
+    id: 'm-secret-crypt',
+    title: 'Journal VIII · Heartwood Door',
+    inscription: '“Through the crypt’s silver mirror lies the Glass Archipelago of returning tides.”',
+    x: 1.7,
+    z: -1.0,
+  },
+  // 8
+  {
+    worldId: 8,
+    id: 'g-secret-prism',
+    title: 'Journal IX · Refraction IX',
+    inscription: '“Hold the lens to the crystal court: all eight preceding realms shine back within a single facet.”',
+    x: -1.75,
+    z: -1.05,
+  },
+  {
+    worldId: 8,
+    id: 'g-secret-horizon',
+    title: 'Journal IX · The Penultimate Fold',
+    inscription: '“One crease remains. Turn to Folio X to reunite the Meridian Heart.”',
+    x: 1.8,
+    z: 1.05,
+  },
+  // 9
+  {
+    worldId: 9,
+    id: 'z-secret-astrolabe',
+    title: 'Journal X · The Final Binding',
+    inscription: '“I bound myself inside these pages so the atlas would never go silent. Turn any leaf—the world lives in your hands.”',
+    x: -1.65,
+    z: -0.95,
+  },
+  {
+    worldId: 9,
+    id: 'z-secret-signature',
+    title: 'Journal X · Cartographer’s Colophon',
+    inscription: '“Ten realms folded as one living palimpsest. May every reader chart new rivers and wake new stars.”',
+    x: 1.75,
+    z: 1.15,
   },
 ];
 
@@ -234,7 +646,7 @@ class AtlasStore {
       activeWorld: 0,
       turningToWorld: null,
       turnProgress: 0,
-      timeOfDay: 10.2, // Warm morning light
+      timeOfDay: 10.2,
       autoTime: true,
       weather: 'clear',
       cameraMode: 'inspection',
@@ -243,10 +655,14 @@ class AtlasStore {
       reducedMotion: Boolean(prefersReduced),
       qualityTier: isMobile ? 'medium' : 'high',
       hudCollapsed: false,
+      chronicleOpen: false,
+      portalTransition: null,
+      hoveredPortal: null,
       magnifierActive: false,
       magnifierPos: { x: 0, z: 0 },
       activeSecret: null,
       statusHint: 'Click the brass clasp or press Space to unseal the living atlas.',
+      visitedWorlds: [0],
       worlds: createInitialWorlds(),
     };
   }
@@ -263,7 +679,6 @@ class AtlasStore {
   }
 
   private emit(): void {
-    // Shallow clone top-level object so React re-renders cleanly
     this.state = { ...this.state };
     this.listeners.forEach((l) => l(this.state));
   }
@@ -272,13 +687,14 @@ class AtlasStore {
     if (this.state.bookPhase === phase) return;
     this.state.bookPhase = phase;
     if (phase === 'opening') {
-      this.state.statusHint = 'Unfolding Folio I — The Verdant Kingdom...';
+      this.state.statusHint = 'Unfolding Folio I — Chapter I: Departure from the Hearth...';
     } else if (phase === 'open') {
       this.state.cameraMode = 'diorama';
-      this.state.statusHint = this.getDefaultToolHint(this.state.activeTool);
+      this.state.statusHint = WORLD_METADATA[this.state.activeWorld].storyBeatCue;
     } else {
       this.state.cameraMode = 'inspection';
       this.state.magnifierActive = false;
+      this.state.chronicleOpen = false;
       this.state.statusHint = 'Click the brass clasp or press Space to unseal the living atlas.';
     }
     this.emit();
@@ -289,6 +705,10 @@ class AtlasStore {
     this.state.turningToWorld = null;
     this.state.turnProgress = 0;
     this.state.activeSecret = null;
+    if (!this.state.visitedWorlds.includes(world)) {
+      this.state.visitedWorlds = [...this.state.visitedWorlds, world];
+    }
+    this.state.statusHint = WORLD_METADATA[world].storyBeatCue;
     this.emit();
   }
 
@@ -298,9 +718,33 @@ class AtlasStore {
     this.emit();
   }
 
+  public setPortalTransitionState(
+    transition: AtlasSnapshot['portalTransition'],
+  ): void {
+    this.state.portalTransition = transition;
+    if (transition?.active) {
+      const destMeta = WORLD_METADATA[transition.toWorld];
+      this.state.statusHint = `Crossing ${transition.portalLabel} → ${destMeta.folioCode}: ${destMeta.title}`;
+    }
+    this.emit();
+  }
+
+  public setHoveredPortal(portal: PortalLink | null): void {
+    const prevId = this.state.hoveredPortal?.id ?? null;
+    const nextId = portal?.id ?? null;
+    if (prevId === nextId) return;
+    this.state.hoveredPortal = portal;
+    if (portal && !this.state.portalTransition?.active) {
+      const destMeta = WORLD_METADATA[portal.targetWorld];
+      this.state.statusHint = `${portal.label} → ${destMeta.folioCode} (${destMeta.title}) — click to cross.`;
+    } else if (!portal && !this.state.portalTransition?.active) {
+      this.state.statusHint = WORLD_METADATA[this.state.activeWorld].storyBeatCue;
+    }
+    this.emit();
+  }
+
   public setTimeOfDay(hours: number, emitEvent = true): void {
-    const normalized = ((hours % 24) + 24) % 24;
-    this.state.timeOfDay = normalized;
+    this.state.timeOfDay = ((hours % 24) + 24) % 24;
     if (emitEvent) this.emit();
   }
 
@@ -350,7 +794,6 @@ class AtlasStore {
       this.state.activeSecret = null;
     }
     if (tool === 'constellation' && this.state.timeOfDay > 6 && this.state.timeOfDay < 18.5) {
-      // Gently shift toward twilight so stars glow vividly while still keeping user control
       this.state.timeOfDay = 21.2;
       this.state.autoTime = false;
     }
@@ -375,6 +818,11 @@ class AtlasStore {
 
   public setHudCollapsed(collapsed: boolean): void {
     this.state.hudCollapsed = collapsed;
+    this.emit();
+  }
+
+  public setChronicleOpen(open: boolean): void {
+    this.state.chronicleOpen = open;
     this.emit();
   }
 
@@ -410,7 +858,7 @@ class AtlasStore {
       x: Math.max(-3.6, Math.min(3.6, point.x)),
       z: Math.max(-2.3, Math.min(2.3, point.z)),
     };
-    this.state.statusHint = 'Riverbed geometry reshaped across the parchment.';
+    this.state.statusHint = 'Channel geometry reshaped across the parchment.';
     this.emit();
   }
 
@@ -430,7 +878,7 @@ class AtlasStore {
       world.plantedTrees.shift();
     }
     world.plantedTrees.push(tree);
-    this.state.statusHint = `Ink seed rooted — sprouting a folded ${tree.species} paper tree.`;
+    this.state.statusHint = `Ink seed rooted — sprouting a folded ${tree.species} structure.`;
     this.emit();
   }
 
@@ -442,7 +890,7 @@ class AtlasStore {
     } else {
       world.shipRoutes.push({ shipId, points });
     }
-    this.state.statusHint = `Plotted ${points.length}-waypoint sailing course.`;
+    this.state.statusHint = `Plotted ${points.length}-waypoint course.`;
     this.emit();
   }
 
@@ -456,7 +904,7 @@ class AtlasStore {
       world.constellationEdges.push({ from: a, to: b });
       if (world.constellationEdges.length >= 5) {
         world.constellationComplete = true;
-        this.state.statusHint = 'Celestial constellation aligned — sky magic awakened!';
+        this.state.statusHint = 'Celestial constellation aligned — chapter star magic awakened!';
       } else {
         this.state.statusHint = `Star thread woven (${world.constellationEdges.length}/5 to complete pattern).`;
       }

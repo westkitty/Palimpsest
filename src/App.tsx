@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { soundEngine } from './audio/SoundEngine';
 import { ChapterHeader } from './components/ChapterHeader';
+import { ChroniclePanel } from './components/ChroniclePanel';
 import { ClosedCoverOverlay } from './components/ClosedCoverOverlay';
 import { ControlDock } from './components/ControlDock';
 import { MagnifierReadout } from './components/MagnifierReadout';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { AtlasEngine } from './engine/AtlasEngine';
 import { atlasStore } from './state/atlasStore';
-import { AtlasSnapshot, WorldId } from './types/atlas';
+import { AtlasSnapshot, WORLD_METADATA, WorldId } from './types/atlas';
 
 export default function App() {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -52,6 +53,10 @@ export default function App() {
 
   const handleSelectWorld = (world: WorldId) => {
     engineRef.current?.turnToWorld(world);
+  };
+
+  const handleCrossPortal = () => {
+    engineRef.current?.crossPortal();
   };
 
   const handleTogglePopup = (popupId: string) => {
@@ -118,7 +123,16 @@ export default function App() {
         snapshot={snapshot}
         onToggleMute={handleToggleMute}
         onCloseBook={handleCloseBook}
+        onToggleChronicle={() => atlasStore.setChronicleOpen(!snapshot.chronicleOpen)}
         onOpenHelp={() => setHelpOpen(true)}
+      />
+
+      {/* Coherent 10-chapter narrative Chronicle drawer */}
+      <ChroniclePanel
+        snapshot={snapshot}
+        onClose={() => atlasStore.setChronicleOpen(false)}
+        onSelectWorld={handleSelectWorld}
+        onCrossPortal={handleCrossPortal}
       />
 
       {/* Closed book arrival overlay */}
@@ -129,6 +143,31 @@ export default function App() {
       {/* Secret ink discovery readout for Magical Magnifier */}
       {snapshot.bookPhase === 'open' && snapshot.magnifierActive && (
         <MagnifierReadout secret={snapshot.activeSecret} />
+      )}
+
+      {/* Hovered 3D Portal Landmark Callout */}
+      {snapshot.bookPhase === 'open' && snapshot.hoveredPortal && !snapshot.portalTransition?.active && (
+        <div className="pointer-events-none fixed bottom-28 left-1/2 z-20 -translate-x-1/2 rounded-md border border-[#D4AF6E]/55 bg-[#16100C]/95 px-4 py-2 text-center shadow-xl">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#D4AF6E]">
+            {snapshot.hoveredPortal.label} &rarr; {WORLD_METADATA[snapshot.hoveredPortal.targetWorld].folioCode}
+          </div>
+          <div className="mt-0.5 text-xs text-[#F4ECDC]">
+            {WORLD_METADATA[snapshot.hoveredPortal.targetWorld].title} &mdash; Click gate or press Enter
+          </div>
+        </div>
+      )}
+
+      {/* Active Portal Entry Passage Caption */}
+      {snapshot.bookPhase === 'open' && snapshot.portalTransition?.active && (
+        <div className="pointer-events-none fixed top-20 left-1/2 z-20 w-[min(520px,92vw)] -translate-x-1/2 text-center">
+          <p className="text-[11px] font-mono uppercase tracking-[0.14em] text-[#D4AF6E]">
+            Portal Entry &middot; {snapshot.portalTransition.portalLabel} &rarr;{' '}
+            {WORLD_METADATA[snapshot.portalTransition.toWorld].chapterTitle}
+          </p>
+          <p className="mt-1 font-display text-sm italic text-[#F4ECDC] drop-shadow">
+            {WORLD_METADATA[snapshot.portalTransition.fromWorld].portal.passageText}
+          </p>
+        </div>
       )}
 
       {/* Unified collapsible bottom control dock */}
@@ -158,6 +197,7 @@ export default function App() {
         onNudgeMagnifier={(dx, dz) => engineRef.current?.nudgeMagnifier(dx, dz)}
         onNudgeImmersion={(dx, dz) => engineRef.current?.nudgeImmersion(dx, dz)}
         onNudgeRiver={handleNudgeRiver}
+        onCrossPortal={handleCrossPortal}
       />
 
       {/* On-demand keyboard & touch shortcuts reference */}

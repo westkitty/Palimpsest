@@ -12,7 +12,7 @@ export function ClosedCoverOverlay({ onOpenBook }: ClosedCoverOverlayProps) {
           An Unsealed Relic Awaits
         </p>
         <p className="max-w-md text-xs text-[#C8BBA4]">
-          Click the brass clasp on the leather tome, or open the atlas below to unfold three living worlds.
+          Click the brass clasp on the leather tome, or open the atlas below to unfold ten living chapters of the Cartographer&rsquo;s pilgrimage.
         </p>
         <button
           type="button"

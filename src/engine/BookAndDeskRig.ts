@@ -40,6 +40,15 @@ export class BookAndDeskRig {
     uSecretTex: { value: null as THREE.Texture | null },
   };
 
+  // Animated portal aperture wave & parchment dimple shader on the spread surface
+  private portalRingMesh: THREE.Mesh;
+  private portalRingMat: THREE.MeshBasicMaterial;
+  private spreadPortalUniforms = {
+    uSpreadPortalMorph: { value: 0.0 },
+    uSpreadPortalUv: { value: new THREE.Vector2(0.5, 0.5) },
+    uSpreadPortalColor: { value: new THREE.Color(0xf0c96a) },
+  };
+
   private openAmount = 0; // 0 = closed, 1 = open flat
   private currentCornerLift = 0;
 
@@ -212,11 +221,40 @@ export class BookAndDeskRig {
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -1,
     });
+    this.spreadMat.customProgramCacheKey = () => 'spread-magnifier-portal-v1';
     this.spreadMat.onBeforeCompile = (shader) => {
       shader.uniforms.uMagActive = this.magnifierUniforms.uMagActive;
       shader.uniforms.uMagCenter = this.magnifierUniforms.uMagCenter;
       shader.uniforms.uMagRadius = this.magnifierUniforms.uMagRadius;
       shader.uniforms.uSecretTex = this.magnifierUniforms.uSecretTex;
+      shader.uniforms.uSpreadPortalMorph = this.spreadPortalUniforms.uSpreadPortalMorph;
+      shader.uniforms.uSpreadPortalUv = this.spreadPortalUniforms.uSpreadPortalUv;
+      shader.uniforms.uSpreadPortalColor = this.spreadPortalUniforms.uSpreadPortalColor;
+
+      shader.vertexShader =
+        `
+        uniform float uSpreadPortalMorph;
+        uniform vec2 uSpreadPortalUv;
+        varying float vPortalWave;
+        ` + shader.vertexShader;
+
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `
+        #include <begin_vertex>
+        vPortalWave = 0.0;
+        if (uSpreadPortalMorph > 0.001) {
+          vec2 pDelta = uv - uSpreadPortalUv;
+          pDelta.x *= 1.5;
+          float pDist = length(pDelta);
+          float well = exp(-pDist * pDist * 16.0);
+          float crest = exp(-pow((pDist - (1.0 - uSpreadPortalMorph) * 0.55) * 7.5, 2.0));
+          transformed.z -= well * 0.24 * uSpreadPortalMorph;
+          transformed.z += crest * 0.08 * uSpreadPortalMorph;
+          vPortalWave = clamp(well * 0.85 + crest * 0.7, 0.0, 1.0) * uSpreadPortalMorph;
+        }
+        `,
+      );
 
       shader.fragmentShader =
         `
@@ -224,6 +262,8 @@ export class BookAndDeskRig {
         uniform vec2 uMagCenter;
         uniform float uMagRadius;
         uniform sampler2D uSecretTex;
+        uniform vec3 uSpreadPortalColor;
+        varying float vPortalWave;
         ` + shader.fragmentShader;
 
       shader.fragmentShader = shader.fragmentShader.replace(
@@ -239,12 +279,15 @@ export class BookAndDeskRig {
           vec3 glowInk = mix(diffuseColor.rgb * 0.72, vec3(0.95, 0.82, 0.45), secretSample.a);
           diffuseColor.rgb = mix(diffuseColor.rgb, glowInk, innerMask * uMagActive * 0.92);
         }
+        if (vPortalWave > 0.005) {
+          diffuseColor.rgb = mix(diffuseColor.rgb, uSpreadPortalColor * 1.25, vPortalWave * 0.65);
+        }
         `,
       );
     };
 
     this.spreadMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(BOOK_SPREAD_W, BOOK_PAGE_D, 16, 10),
+      new THREE.PlaneGeometry(BOOK_SPREAD_W, BOOK_PAGE_D, 36, 24),
       this.spreadMat,
     );
     this.spreadMesh.rotation.x = -Math.PI / 2;
@@ -288,6 +331,25 @@ export class BookAndDeskRig {
     this.cornerLeftHit.userData = { interactionType: 'pageCorner', direction: -1 };
 
     this.bookGroup.add(this.cornerRightHit, this.cornerLeftHit);
+
+    // Gilded portal aperture shockwave ring flush on open spread
+    this.portalRingMat = new THREE.MeshBasicMaterial({
+      color: 0xf0c96a,
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+    });
+    this.portalRingMesh = new THREE.Mesh(
+      new THREE.RingGeometry(0.42, 0.56, 36),
+      this.portalRingMat,
+    );
+    this.portalRingMesh.rotation.x = -Math.PI / 2;
+    this.portalRingMesh.position.set(0, BOOK_BASE_Y + 0.025, 0);
+    this.portalRingMesh.visible = false;
+    this.bookGroup.add(this.portalRingMesh);
 
     // Start closed
     this.setBookOpenProgress(0);
@@ -456,7 +518,7 @@ export class BookAndDeskRig {
   }
 
   public setActiveWorldSpread(worldId: number): void {
-    const idx = Math.max(0, Math.min(2, worldId)) as 0 | 1 | 2;
+    const idx = Math.max(0, Math.min(this.textures.worldParchment.length - 1, worldId));
     this.spreadMat.map = this.textures.worldParchment[idx];
     this.spreadMat.needsUpdate = true;
     this.magnifierUniforms.uSecretTex.value = this.textures.worldSecretInk[idx];
@@ -467,6 +529,29 @@ export class BookAndDeskRig {
     const u = (worldX + BOOK_SPREAD_W / 2) / BOOK_SPREAD_W;
     const v = 1.0 - (worldZ + BOOK_PAGE_D / 2) / BOOK_PAGE_D;
     this.magnifierUniforms.uMagCenter.value.set(u, v);
+  }
+
+  public updatePortalRing(
+    active: boolean,
+    progress: number,
+    worldX: number,
+    worldZ: number,
+    accentHex: string,
+  ): void {
+    const wave = active ? Math.sin(progress * Math.PI) : 0;
+    this.spreadPortalUniforms.uSpreadPortalMorph.value = active && this.openAmount > 0.85 ? wave : 0;
+    const u = (worldX + BOOK_SPREAD_W / 2) / BOOK_SPREAD_W;
+    const v = 1.0 - (worldZ + BOOK_PAGE_D / 2) / BOOK_PAGE_D;
+    this.spreadPortalUniforms.uSpreadPortalUv.value.set(u, v);
+    this.spreadPortalUniforms.uSpreadPortalColor.value.set(accentHex);
+
+    this.portalRingMesh.visible = active && this.openAmount > 0.85;
+    if (!this.portalRingMesh.visible) return;
+    const scale = 0.8 + wave * 6.2;
+    this.portalRingMesh.position.set(worldX, BOOK_BASE_Y + 0.025, worldZ);
+    this.portalRingMesh.scale.setScalar(scale);
+    this.portalRingMat.color.set(accentHex);
+    this.portalRingMat.opacity = wave * 0.72;
   }
 
   /**
@@ -487,7 +572,8 @@ export class BookAndDeskRig {
     this.turningLeafMesh.visible = showLeaf && this.openAmount > 0.9;
     if (!this.turningLeafMesh.visible) return;
 
-    const tex = this.textures.worldParchment[Math.max(0, Math.min(2, worldTextureIndex)) as 0 | 1 | 2];
+    const idx = Math.max(0, Math.min(this.textures.worldParchment.length - 1, worldTextureIndex));
+    const tex = this.textures.worldParchment[idx];
     if (this.turningLeafMat.map !== tex) {
       this.turningLeafMat.map = tex;
       this.turningLeafMat.needsUpdate = true;

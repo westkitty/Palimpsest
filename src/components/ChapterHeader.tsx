@@ -1,10 +1,11 @@
-import { BookOpen, HelpCircle, Volume2, VolumeX } from 'lucide-react';
+import { BookOpen, HelpCircle, ScrollText, Volume2, VolumeX } from 'lucide-react';
 import { WORLD_METADATA, AtlasSnapshot } from '../types/atlas';
 
 interface ChapterHeaderProps {
   snapshot: AtlasSnapshot;
   onToggleMute: () => void;
   onCloseBook: () => void;
+  onToggleChronicle: () => void;
   onOpenHelp: () => void;
 }
 
@@ -19,6 +20,7 @@ export function ChapterHeader({
   snapshot,
   onToggleMute,
   onCloseBook,
+  onToggleChronicle,
   onOpenHelp,
 }: ChapterHeaderProps) {
   const meta = WORLD_METADATA[snapshot.activeWorld];
@@ -26,7 +28,7 @@ export function ChapterHeader({
 
   return (
     <header className="pointer-events-none fixed top-0 left-0 right-0 z-20 flex items-start justify-between px-5 pt-4 sm:px-7 sm:pt-5">
-      <div className="pointer-events-auto flex flex-col gap-0.5">
+      <div className="pointer-events-auto flex max-w-[min(640px,70vw)] flex-col gap-0.5">
         <div className="flex items-center gap-2.5 text-[#F4ECDC]">
           <h1 className="font-display text-2xl font-bold tracking-tight sm:text-[28px] text-balance">
             Palimpsest
@@ -34,7 +36,7 @@ export function ChapterHeader({
           <span className="text-[#D4AF6E]/60" aria-hidden="true">
             ·
           </span>
-          <span className="text-sm font-medium text-[#E2C996]">
+          <span className="truncate text-sm font-medium text-[#E2C996]">
             {isOpen ? meta.title : 'The Impossible Living Atlas'}
           </span>
         </div>
@@ -42,7 +44,7 @@ export function ChapterHeader({
         <div className="flex flex-wrap items-center gap-2 text-xs text-[#C8BBA4]">
           <span>{isOpen ? meta.folioCode : 'Antiquarian Folio'}</span>
           <span aria-hidden="true">·</span>
-          <span>{isOpen ? meta.subtitle : 'Three Interactive Paper-Engineered Realms'}</span>
+          <span>{isOpen ? meta.chapterTitle : 'Tenfold Paper-Engineered Odyssey'}</span>
           {isOpen && (
             <>
               <span aria-hidden="true">·</span>
@@ -52,19 +54,41 @@ export function ChapterHeader({
             </>
           )}
         </div>
+
+        {isOpen && (
+          <p className="hidden sm:block truncate text-[11px] italic text-[#C8BBA4]/85">
+            {meta.narrativeLead}
+          </p>
+        )}
       </div>
 
       <div className="pointer-events-auto flex items-center gap-2">
         {isOpen && (
-          <button
-            type="button"
-            onClick={onCloseBook}
-            className="hidden sm:inline-flex items-center gap-1.5 rounded-md border border-[#D4AF6E]/25 bg-[#16100C]/92 px-3 py-1.5 text-xs font-medium text-[#E9DEC8] transition-colors hover:border-[#D4AF6E]/55 hover:text-[#F4ECDC] focus-visible:outline-2 focus-visible:outline-[#D4AF6E] whitespace-nowrap shrink-0 cursor-pointer"
-            title="Close the atlas cover"
-          >
-            <BookOpen className="h-3.5 w-3.5 text-[#D4AF6E]" />
-            <span>Close Tome</span>
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={onToggleChronicle}
+              aria-pressed={snapshot.chronicleOpen}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                snapshot.chronicleOpen
+                  ? 'border-[#D4AF6E]/75 bg-[#2E2118] text-[#F4ECDC]'
+                  : 'border-[#D4AF6E]/25 bg-[#16100C]/92 text-[#E9DEC8] hover:border-[#D4AF6E]/55 hover:text-[#F4ECDC]'
+              }`}
+              title="Open Cartographer's Chronicle (N)"
+            >
+              <ScrollText className="h-3.5 w-3.5 text-[#D4AF6E]" />
+              <span>Chronicle</span>
+            </button>
+            <button
+              type="button"
+              onClick={onCloseBook}
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-md border border-[#D4AF6E]/25 bg-[#16100C]/92 px-3 py-1.5 text-xs font-medium text-[#E9DEC8] transition-colors hover:border-[#D4AF6E]/55 hover:text-[#F4ECDC] focus-visible:outline-2 focus-visible:outline-[#D4AF6E] whitespace-nowrap shrink-0 cursor-pointer"
+              title="Close the atlas cover"
+            >
+              <BookOpen className="h-3.5 w-3.5 text-[#D4AF6E]" />
+              <span>Close Tome</span>
+            </button>
+          </>
         )}
         <button
           type="button"

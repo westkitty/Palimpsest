@@ -6,7 +6,10 @@ import { atlasStore } from '../state/atlasStore';
 import {
   CameraMode,
   PlantedTreeState,
+  PortalLink,
+  TOTAL_WORLDS,
   Vec2Point,
+  WORLD_METADATA,
   WorldId,
 } from '../types/atlas';
 import { AtmosphereSystem } from './AtmosphereSystem';
@@ -15,6 +18,17 @@ import { createProceduralTextures, ProceduralTexturePack } from './proceduralTex
 import { BaseWorld } from './worlds/BaseWorld';
 import { CelestialDesertWorld } from './worlds/CelestialDesertWorld';
 import { ForgottenHarborWorld } from './worlds/ForgottenHarborWorld';
+import {
+  ClockworkSkyWorld,
+  EmberFoundryWorld,
+  FrostboundSpireWorld,
+  SunkenAthenaeumWorld,
+} from './worlds/NorthernAndAbyssWorlds';
+import {
+  GlassArchipelagoWorld,
+  MeridianHeartWorld,
+  WhisperingMyceliumWorld,
+} from './worlds/TwilightAndZenithWorlds';
 import { VerdantKingdomWorld } from './worlds/VerdantKingdomWorld';
 
 const _raycaster = new THREE.Raycaster();
@@ -25,6 +39,8 @@ const _camTargetGoal = new THREE.Vector3();
 const _camPosGoal = new THREE.Vector3();
 const _moveDir = new THREE.Vector3();
 const _camRight = new THREE.Vector3();
+const _magGoal = new THREE.Vector3();
+const _immersionStep = new THREE.Vector3();
 
 function detectSoftwareGl(): boolean {
   try {
@@ -49,7 +65,7 @@ export class AtlasEngine {
   private textures: ProceduralTexturePack;
   private bookRig: BookAndDeskRig;
   private atmosphere: AtmosphereSystem;
-  private worlds: [BaseWorld, BaseWorld, BaseWorld];
+  private worlds: BaseWorld[];
 
   // Physical 3D Magical Magnifier prop
   private magnifierMesh: THREE.Group;
@@ -74,6 +90,17 @@ export class AtlasEngine {
   private pageTurnDragging = false;
   private cornerHoverLift = 0;
 
+  // Portal landmark origami fold transition
+  private portalTransition: {
+    active: boolean;
+    fromWorld: WorldId;
+    toWorld: WorldId;
+    progress: number;
+    swapped: boolean;
+    portal: PortalLink;
+  } | null = null;
+  private lastHoverCheck = 0;
+
   // Camera transition state
   private cameraPresetActive = true;
   private lastCameraMode: CameraMode = 'inspection';
@@ -81,7 +108,13 @@ export class AtlasEngine {
 
   // Pointer drag state
   private draggingBead: { worldId: WorldId; index: number } | null = null;
-  private draggingPopup: { worldId: WorldId; popupId: string; startX: number; baseRatio: number } | null = null;
+  private draggingPopup: {
+    worldId: WorldId;
+    popupId: string;
+    startX: number;
+    baseRatio: number;
+    isLeftTab: boolean;
+  } | null = null;
   private drawingSailing = false;
   private draggingMagnifier = false;
 
@@ -148,17 +181,25 @@ export class AtlasEngine {
     this.atmosphere.onThunder = () => soundEngine.playThunder();
     this.scene.add(this.atmosphere.root);
 
-    // Build all three living worlds
+    // Build all ten living worlds
     const snap = atlasStore.getSnapshot();
-    const w0 = new VerdantKingdomWorld(this.textures.paperGrainBump, this.textures.contactShadow);
-    const w1 = new ForgottenHarborWorld(this.textures.paperGrainBump, this.textures.contactShadow);
-    const w2 = new CelestialDesertWorld(this.textures.paperGrainBump, this.textures.contactShadow);
-    w0.build(snap.worlds[0]);
-    w1.build(snap.worlds[1]);
-    w2.build(snap.worlds[2]);
-    this.worlds = [w0, w1, w2];
+    const bump = this.textures.paperGrainBump;
+    const shadow = this.textures.contactShadow;
+    this.worlds = [
+      new VerdantKingdomWorld(bump, shadow),
+      new ForgottenHarborWorld(bump, shadow),
+      new CelestialDesertWorld(bump, shadow),
+      new FrostboundSpireWorld(bump, shadow),
+      new SunkenAthenaeumWorld(bump, shadow),
+      new EmberFoundryWorld(bump, shadow),
+      new ClockworkSkyWorld(bump, shadow),
+      new WhisperingMyceliumWorld(bump, shadow),
+      new GlassArchipelagoWorld(bump, shadow),
+      new MeridianHeartWorld(bump, shadow),
+    ];
 
     this.worlds.forEach((w, idx) => {
+      w.build(snap.worlds[idx]);
       w.setFoldFactor(idx === snap.activeWorld && snap.bookPhase === 'open' ? 1 : 0);
       this.scene.add(w.root);
     });
@@ -294,7 +335,13 @@ export class AtlasEngine {
     if (snap.bookPhase === 'closed') {
       this.openBook();
     }
-    if (targetWorld === snap.activeWorld || this.pageTurnActive) return;
+    if (
+      targetWorld === snap.activeWorld ||
+      this.pageTurnActive ||
+      this.portalTransition?.active
+    ) {
+      return;
+    }
 
     soundEngine.playPageTurn();
     this.pageTurnActive = true;
@@ -303,6 +350,44 @@ export class AtlasEngine {
     this.pageTurnTargetWorld = targetWorld;
     this.pageTurnProgress = this.pageTurnDirection === 1 ? 0.02 : 0.98;
     atlasStore.setPageTurnState(targetWorld, this.pageTurnProgress);
+  }
+
+  public crossPortal(targetWorld?: WorldId): void {
+    const snap = atlasStore.getSnapshot();
+    if (snap.bookPhase === 'closed') {
+      this.openBook();
+    }
+    if (this.pageTurnActive || this.portalTransition?.active) return;
+
+    const basePortal = WORLD_METADATA[snap.activeWorld].portal;
+    const portal: PortalLink =
+      targetWorld !== undefined && targetWorld !== basePortal.targetWorld
+        ? { ...basePortal, targetWorld }
+        : basePortal;
+
+    if (portal.targetWorld === snap.activeWorld) return;
+
+    soundEngine.unlock();
+    soundEngine.playPortalTransition();
+
+    this.portalTransition = {
+      active: true,
+      fromWorld: snap.activeWorld,
+      toWorld: portal.targetWorld,
+      progress: 0,
+      swapped: false,
+      portal,
+    };
+
+    this.worlds[snap.activeWorld].setPortalHovered(null);
+    atlasStore.setHoveredPortal(null);
+    atlasStore.setPortalTransitionState({
+      active: true,
+      fromWorld: snap.activeWorld,
+      toWorld: portal.targetWorld,
+      progress: 0,
+      portalLabel: portal.label,
+    });
   }
 
   public applyCameraPreset(mode: CameraMode): void {
@@ -347,6 +432,13 @@ export class AtlasEngine {
       0: ['pine', 'oak', 'blossom'],
       1: ['cypress', 'pine'],
       2: ['palm', 'crystal'],
+      3: ['icepine', 'pine'],
+      4: ['coral', 'crystal'],
+      5: ['emberfern', 'crystal'],
+      6: ['skybloom', 'cypress'],
+      7: ['mushroom', 'blossom'],
+      8: ['prism', 'crystal'],
+      9: ['goldlotus', 'blossom'],
     };
     const pool = speciesPool[snap.activeWorld];
     const species = pool[Math.floor(Math.random() * pool.length)];
@@ -429,7 +521,7 @@ export class AtlasEngine {
       );
       if (cornerHits.length > 0) {
         const dir = cornerHits[0].object.userData.direction as 1 | -1;
-        const target = ((snap.activeWorld + dir + 3) % 3) as WorldId;
+        const target = ((snap.activeWorld + dir + TOTAL_WORLDS) % TOTAL_WORLDS) as WorldId;
         this.controls.enabled = false;
         this.pageTurnActive = true;
         this.pageTurnDragging = true;
@@ -449,6 +541,13 @@ export class AtlasEngine {
           0: ['pine', 'oak', 'blossom'],
           1: ['cypress', 'pine'],
           2: ['palm', 'crystal'],
+          3: ['icepine', 'pine'],
+          4: ['coral', 'crystal'],
+          5: ['emberfern', 'crystal'],
+          6: ['skybloom', 'cypress'],
+          7: ['mushroom', 'blossom'],
+          8: ['prism', 'crystal'],
+          9: ['goldlotus', 'blossom'],
         };
         const options = speciesPool[snap.activeWorld];
         const species = options[Math.floor(Math.random() * options.length)];
@@ -506,6 +605,7 @@ export class AtlasEngine {
             popupId: data.popupId,
             startX: e.clientX,
             baseRatio: popupState?.pullRatio ?? 1,
+            isLeftTab: hits[0].point.x < 0,
           };
           soundEngine.playPaperFold();
           return;
@@ -559,6 +659,11 @@ export class AtlasEngine {
         soundEngine.playPaperFold();
         return;
       }
+
+      if (data.interactionType === 'portalLandmark') {
+        this.crossPortal(data.targetWorld as WorldId);
+        return;
+      }
     }
   };
 
@@ -590,11 +695,7 @@ export class AtlasEngine {
     // Pop-up Margin Tab Drag
     if (this.draggingPopup) {
       const deltaX = (e.clientX - this.draggingPopup.startX) / 110;
-      const isLeftTab = this.draggingPopup.baseRatio !== undefined &&
-        (this.draggingPopup.popupId.includes('peaks') ||
-          this.draggingPopup.popupId.includes('lighthouse') ||
-          this.draggingPopup.popupId.includes('orrery'));
-      const signed = isLeftTab ? -deltaX : deltaX;
+      const signed = this.draggingPopup.isLeftTab ? -deltaX : deltaX;
       const nextRatio = THREE.MathUtils.clamp(this.draggingPopup.baseRatio + signed, 0.05, 1);
       atlasStore.updatePopupRatio(this.draggingPopup.worldId, this.draggingPopup.popupId, nextRatio);
       this.worlds[this.draggingPopup.worldId].syncState(
@@ -631,11 +732,24 @@ export class AtlasEngine {
       return;
     }
 
-    // Subtle corner lift hover feedback
+    // Subtle corner lift hover feedback & throttled portal landmark hover detection
     this.updateNdc(e.clientX, e.clientY);
     _raycaster.setFromCamera(_ndc, this.camera);
     const cornerHits = _raycaster.intersectObjects([this.bookRig.cornerRightHit], false);
     this.cornerHoverLift = cornerHits.length > 0 ? 1 : 0;
+
+    const now = performance.now();
+    if (now - this.lastHoverCheck > 45 && !this.portalTransition?.active && !this.pageTurnActive) {
+      this.lastHoverCheck = now;
+      const activeWorld = this.worlds[snap.activeWorld];
+      const portalHits = _raycaster.intersectObjects(activeWorld.getPortalInteractables(), false);
+      const hitPortal =
+        portalHits.length > 0 ? ((portalHits[0].object.userData.portal as PortalLink) ?? null) : null;
+      activeWorld.setPortalHovered(hitPortal?.id ?? null);
+      atlasStore.setHoveredPortal(hitPortal);
+      this.renderer.domElement.style.cursor =
+        hitPortal || cornerHits.length > 0 ? 'pointer' : 'default';
+    }
   };
 
   private onPointerUp = (e: PointerEvent) => {
@@ -734,13 +848,20 @@ export class AtlasEngine {
       atlasStore.setCameraMode('immersion');
       this.applyCameraPreset('immersion');
     } else if (e.key === '[') {
-      this.turnToWorld(((snap.activeWorld + 2) % 3) as WorldId);
+      this.turnToWorld(((snap.activeWorld + TOTAL_WORLDS - 1) % TOTAL_WORLDS) as WorldId);
     } else if (e.key === ']') {
-      this.turnToWorld(((snap.activeWorld + 1) % 3) as WorldId);
+      this.turnToWorld(((snap.activeWorld + 1) % TOTAL_WORLDS) as WorldId);
     } else if (e.key.toLowerCase() === 'h') {
       atlasStore.setHudCollapsed(!snap.hudCollapsed);
+    } else if (e.key.toLowerCase() === 'n') {
+      if (snap.bookPhase !== 'closed') {
+        atlasStore.setChronicleOpen(!snap.chronicleOpen);
+      }
     } else if (e.key.toLowerCase() === 't') {
       atlasStore.setAutoTime(!snap.autoTime);
+    } else if (e.code === 'Enter' && snap.bookPhase === 'open') {
+      e.preventDefault();
+      this.crossPortal();
     }
   };
 
@@ -807,66 +928,148 @@ export class AtlasEngine {
       atlasStore.setBookPhase('open');
     }
 
-    // 3. Physical Page Turn Progress & Continuous World Cross-Folding
-    if (this.pageTurnActive && !this.pageTurnDragging) {
-      const targetProgress =
-        this.pageTurnTargetWorld === snap.activeWorld
-          ? this.pageTurnDirection === 1
-            ? 0
-            : 1
-          : this.pageTurnDirection === 1
-            ? 1
-            : 0;
-      const turnRate = snap.reducedMotion ? 5.0 : 1.85;
-      if (Math.abs(this.pageTurnProgress - targetProgress) < 0.025) {
-        const finalWorld = this.pageTurnTargetWorld;
-        this.pageTurnActive = false;
-        this.pageTurnProgress = 0;
-        atlasStore.setActiveWorld(finalWorld);
-        this.bookRig.setActiveWorldSpread(finalWorld);
-      } else {
-        this.pageTurnProgress += Math.sign(targetProgress - this.pageTurnProgress) * turnRate * rawDt;
-        this.pageTurnProgress = THREE.MathUtils.clamp(this.pageTurnProgress, 0, 1);
-      }
-    }
+    // 3. Portal Morph OR Physical Page Turn Progress & Continuous World Cross-Folding
+    if (this.portalTransition?.active) {
+      const pt = this.portalTransition;
+      const morphRate = snap.reducedMotion ? 1.85 : 0.72;
+      pt.progress = Math.min(1, pt.progress + rawDt * morphRate);
 
-    // Fold outgoing world down as page turns across spine, unfold incoming world
-    this.worlds.forEach((w, idx) => {
-      if (this.bookOpenProgress < 0.35) {
-        w.setFoldFactor(0);
-        return;
-      }
-      const openPop = THREE.MathUtils.clamp((this.bookOpenProgress - 0.35) / 0.65, 0, 1);
-      if (!this.pageTurnActive) {
-        w.setFoldFactor(idx === snap.activeWorld ? openPop : 0);
+      const destMeta = WORLD_METADATA[pt.toWorld];
+      const destPortal = destMeta.portal;
+
+      if (pt.progress < 0.48) {
+        const tOut = pt.progress / 0.48;
+        this.worlds.forEach((w, idx) => {
+          if (idx === pt.fromWorld) {
+            w.setPortalMorph(tOut, 'outgoing', pt.portal.x, pt.portal.z);
+          } else {
+            w.setFoldFactor(0);
+          }
+        });
+        this.cameraPresetActive = true;
+        _camPosGoal.set(pt.portal.x * 0.45, 2.35, pt.portal.z * 0.45 + 2.85);
+        _camTargetGoal.set(pt.portal.x * 0.8, 0.45, pt.portal.z * 0.8);
+        this.bookRig.setActiveWorldSpread(pt.fromWorld);
+        this.bookRig.updateTurningLeaf(
+          true,
+          tOut,
+          0,
+          this.elapsed,
+          snap.weather,
+          pt.fromWorld,
+        );
+        this.bookRig.updatePortalRing(
+          true,
+          pt.progress,
+          pt.portal.x,
+          pt.portal.z,
+          destMeta.accentHex,
+        );
       } else {
-        const dist = this.pageTurnDirection === 1 ? this.pageTurnProgress : 1 - this.pageTurnProgress;
-        if (idx === snap.activeWorld && this.pageTurnTargetWorld !== snap.activeWorld) {
-          w.setFoldFactor(Math.max(0, 1 - dist * 1.9) * openPop);
-        } else if (idx === this.pageTurnTargetWorld) {
-          w.setFoldFactor(Math.max(0, (dist - 0.48) * 1.92) * openPop);
+        if (!pt.swapped) {
+          pt.swapped = true;
+          atlasStore.setActiveWorld(pt.toWorld);
+          this.bookRig.setActiveWorldSpread(pt.toWorld);
+          this.worlds[pt.fromWorld].setPortalHovered(null);
+          atlasStore.setHoveredPortal(null);
+          this.applyCameraPreset(atlasStore.getSnapshot().cameraMode);
+        }
+
+        const tIn = (pt.progress - 0.48) / 0.52;
+        this.worlds.forEach((w, idx) => {
+          if (idx === pt.toWorld) {
+            w.setPortalMorph(tIn, 'incoming', destPortal.x, destPortal.z);
+          } else {
+            w.setFoldFactor(0);
+          }
+        });
+        this.bookRig.setActiveWorldSpread(pt.toWorld);
+        this.bookRig.updateTurningLeaf(
+          false,
+          0,
+          0,
+          this.elapsed,
+          snap.weather,
+          pt.toWorld,
+        );
+        this.bookRig.updatePortalRing(
+          true,
+          pt.progress,
+          destPortal.x,
+          destPortal.z,
+          destMeta.accentHex,
+        );
+      }
+
+      if (pt.progress >= 1) {
+        this.worlds[pt.fromWorld].setFoldFactor(0);
+        this.worlds[pt.toWorld].setPortalMorph(1, 'idle', 0, 0);
+        this.bookRig.updatePortalRing(false, 0, 0, 0, destMeta.accentHex);
+        this.portalTransition = null;
+        atlasStore.setPortalTransitionState(null);
+      }
+    } else {
+      if (this.pageTurnActive && !this.pageTurnDragging) {
+        const targetProgress =
+          this.pageTurnTargetWorld === snap.activeWorld
+            ? this.pageTurnDirection === 1
+              ? 0
+              : 1
+            : this.pageTurnDirection === 1
+              ? 1
+              : 0;
+        const turnRate = snap.reducedMotion ? 5.0 : 1.85;
+        if (Math.abs(this.pageTurnProgress - targetProgress) < 0.025) {
+          const finalWorld = this.pageTurnTargetWorld;
+          this.pageTurnActive = false;
+          this.pageTurnProgress = 0;
+          atlasStore.setActiveWorld(finalWorld);
+          this.bookRig.setActiveWorldSpread(finalWorld);
         } else {
-          w.setFoldFactor(0);
+          this.pageTurnProgress += Math.sign(targetProgress - this.pageTurnProgress) * turnRate * rawDt;
+          this.pageTurnProgress = THREE.MathUtils.clamp(this.pageTurnProgress, 0, 1);
         }
       }
-    });
 
-    this.bookRig.setActiveWorldSpread(
-      this.pageTurnActive && this.pageTurnProgress > 0.5 && this.pageTurnDirection === 1
-        ? this.pageTurnTargetWorld
-        : this.pageTurnActive && this.pageTurnProgress < 0.5 && this.pageTurnDirection === -1
+      // Fold outgoing world down as page turns across spine, unfold incoming world
+      this.worlds.forEach((w, idx) => {
+        if (this.bookOpenProgress < 0.35) {
+          w.setFoldFactor(0);
+          return;
+        }
+        const openPop = THREE.MathUtils.clamp((this.bookOpenProgress - 0.35) / 0.65, 0, 1);
+        if (!this.pageTurnActive) {
+          w.setFoldFactor(idx === snap.activeWorld ? openPop : 0);
+        } else {
+          const dist = this.pageTurnDirection === 1 ? this.pageTurnProgress : 1 - this.pageTurnProgress;
+          if (idx === snap.activeWorld && this.pageTurnTargetWorld !== snap.activeWorld) {
+            w.setFoldFactor(Math.max(0, 1 - dist * 1.9) * openPop);
+          } else if (idx === this.pageTurnTargetWorld) {
+            w.setFoldFactor(Math.max(0, (dist - 0.48) * 1.92) * openPop);
+          } else {
+            w.setFoldFactor(0);
+          }
+        }
+      });
+
+      this.bookRig.setActiveWorldSpread(
+        this.pageTurnActive && this.pageTurnProgress > 0.5 && this.pageTurnDirection === 1
           ? this.pageTurnTargetWorld
-          : snap.activeWorld,
-    );
+          : this.pageTurnActive && this.pageTurnProgress < 0.5 && this.pageTurnDirection === -1
+            ? this.pageTurnTargetWorld
+            : snap.activeWorld,
+      );
 
-    this.bookRig.updateTurningLeaf(
-      this.pageTurnActive,
-      this.pageTurnProgress,
-      this.cornerHoverLift,
-      this.elapsed,
-      snap.weather,
-      snap.activeWorld,
-    );
+      this.bookRig.updateTurningLeaf(
+        this.pageTurnActive,
+        this.pageTurnProgress,
+        this.cornerHoverLift,
+        this.elapsed,
+        snap.weather,
+        snap.activeWorld,
+      );
+      this.bookRig.updatePortalRing(false, 0, 0, 0, '#D4AF6E');
+    }
 
     // 4. 24-Hour Day/Night Auto-Progression
     if (snap.autoTime && snap.bookPhase !== 'closed') {
@@ -878,6 +1081,7 @@ export class AtlasEngine {
 
     // 5. Atmosphere, Sun/Moon, Weather & Candle Flicker
     const currentSnap = atlasStore.getSnapshot();
+    const activeAmbientHex = WORLD_METADATA[currentSnap.activeWorld].ambientHex;
     this.atmosphere.update(
       dt,
       this.elapsed,
@@ -885,6 +1089,7 @@ export class AtlasEngine {
       currentSnap.weather,
       currentSnap.qualityTier,
       this.bookOpenProgress > 0.5,
+      activeAmbientHex,
     );
     this.bookRig.updateCandle(this.elapsed, this.atmosphere.nightFactor, currentSnap.weather);
     soundEngine.updateAtmosphere(
@@ -935,10 +1140,8 @@ export class AtlasEngine {
         atlasStore.updateMagnifier({ x: mx, z: mz });
       }
       const p = atlasStore.getSnapshot().magnifierPos;
-      this.magnifierMesh.position.lerp(
-        new THREE.Vector3(p.x, BOOK_BASE_Y + 0.42, p.z),
-        1 - Math.exp(-14 * rawDt),
-      );
+      _magGoal.set(p.x, BOOK_BASE_Y + 0.42, p.z);
+      this.magnifierMesh.position.lerp(_magGoal, 1 - Math.exp(-14 * rawDt));
     }
 
     // 8. Camera Mode Transitions & Immersion Navigation (WASD / Arrow Keys)
@@ -962,11 +1165,12 @@ export class AtlasEngine {
 
       if (deltaX !== 0 || deltaZ !== 0) {
         this.cameraPresetActive = false;
-        const step = new THREE.Vector3()
+        _immersionStep
+          .set(0, 0, 0)
           .addScaledVector(_moveDir, deltaZ * speed)
           .addScaledVector(_camRight, deltaX * speed);
-        this.camera.position.add(step);
-        this.controls.target.add(step);
+        this.camera.position.add(_immersionStep);
+        this.controls.target.add(_immersionStep);
       }
     }
 

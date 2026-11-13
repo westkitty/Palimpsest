@@ -10,12 +10,14 @@ export function ShortcutsModal({ open, onClose }: ShortcutsModalProps) {
 
   const rows = [
     ['Space', 'Open book / activate focused bridge, seal, or hidden layer'],
-    ['[  /  ]', 'Turn physically to previous or next world folio'],
+    ['Enter', 'Cross the active folio’s 3D portal landmark to its linked chapter'],
+    ['[  /  ]', 'Turn physically across all 10 world folios (I through X)'],
+    ['N', 'Open or close the Cartographer’s Chronicle narrative'],
     ['1  ·  2  ·  3', 'Switch camera: Desk Inspection · Diorama · Miniature Immersion'],
     ['W A S D / Arrows', 'Navigate inside Immersion view or glide Magical Magnifier'],
     ['T', 'Pause or resume 24-hour celestial time progression'],
     ['H', 'Collapse or expand the bottom control dock'],
-    ['Touch / Mouse', 'Drag corners to turn pages, pull tabs, bend rivers, draw routes'],
+    ['Touch / Mouse', 'Click portal gates, drag corners to turn pages, pull tabs, draw routes'],
   ];
 
   return (

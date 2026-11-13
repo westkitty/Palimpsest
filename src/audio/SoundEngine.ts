@@ -104,6 +104,9 @@ export class SoundEngine {
     const now = this.ctx.currentTime;
     const baseOpen = isOpen ? 1 : 0.2;
 
+    const isWaterWorld = world === 1 || world === 4 || world === 8;
+    const isWindyWorld = world === 2 || world === 3 || world === 6;
+
     const windTarget =
       weather === 'windy'
         ? 0.22
@@ -111,7 +114,7 @@ export class SoundEngine {
           ? 0.18
           : weather === 'mist'
             ? 0.07
-            : world === 1
+            : isWaterWorld || isWindyWorld
               ? 0.08
               : 0.04;
 
@@ -120,11 +123,11 @@ export class SoundEngine {
         ? 0.16
         : weather === 'thunderstorm'
           ? 0.24
-          : world === 1 && isOpen
+          : isWaterWorld && isOpen
             ? 0.03
             : 0.0;
 
-    const windFreq = world === 2 ? 620 : world === 1 ? 360 : 480;
+    const windFreq = isWindyWorld ? 620 : isWaterWorld ? 360 : 480;
     this.windFilter.frequency.setTargetAtTime(windFreq, now, 0.5);
     this.windGain.gain.setTargetAtTime(windTarget * baseOpen, now, 0.4);
     this.rainGain.gain.setTargetAtTime(rainTarget * baseOpen, now, 0.4);
@@ -201,6 +204,30 @@ export class SoundEngine {
   public playSecretReveal(): void {
     this.unlock();
     this.playChime([659.25, 987.77, 1318.5], 0.14);
+  }
+
+  public playPortalTransition(): void {
+    this.unlock();
+    if (!this.ctx || !this.masterGain) return;
+    const now = this.ctx.currentTime;
+
+    // Warm resonant brass swell
+    const baseOsc = this.ctx.createOscillator();
+    const baseGain = this.ctx.createGain();
+    baseOsc.type = 'triangle';
+    baseOsc.frequency.setValueAtTime(196.0, now);
+    baseOsc.frequency.exponentialRampToValueAtTime(293.66, now + 0.65);
+    baseGain.gain.setValueAtTime(0.001, now);
+    baseGain.gain.linearRampToValueAtTime(0.2, now + 0.12);
+    baseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
+    baseOsc.connect(baseGain);
+    baseGain.connect(this.masterGain);
+    baseOsc.start(now);
+    baseOsc.stop(now + 1.0);
+
+    // Origami paper bloom + ascending harmonic shimmer
+    this.playPaperRustle(0.6, 1180, 0.22);
+    this.playChime([392.0, 493.88, 587.33, 783.99, 987.77], 0.13);
   }
 
   public playThunder(): void {
