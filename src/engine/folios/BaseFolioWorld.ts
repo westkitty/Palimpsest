@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { FOLIO_BY_WORLD } from '../../story/historyManifest';
 import { DraxisId, FolioInteractionSlot, FolioRuntimeState, WorldId } from '../../types/atlas';
+import { buildCutCardShape, buildIllustratedSkyTexture } from '../drakken/papercraftArt';
 import { BOOK_BASE_Y, getOpenPageY } from '../BookAndDeskRig';
 
 // Interior 4:3 teaching aperture bounds inside the open book spread
@@ -24,8 +25,8 @@ export interface AccordionRib {
 
 /**
  * Shared reusable physical pop-up book engineering scaffolding for every folio F01-F12:
- * curved page-arch grounding, 1024px sharp archival plaques, sliding brass/cardstock A/B/C pull-tabs,
- * reusable V-fold backdrops, accordion bellows, stepped terrain pads, and clean GPU disposal.
+ * curved page-arch grounding, sharp archival plaques, sliding brass/cardstock A/B/C pull-tabs,
+ * illustrated multi-layered pop-up backdrops, folded terrain ridges, accordion bellows, and clean GPU disposal.
  */
 export abstract class BaseFolioWorld {
   public readonly root = new THREE.Group();
@@ -78,8 +79,9 @@ export abstract class BaseFolioWorld {
     emissive = 0x000000,
     emissiveIntensity = 0,
     dynamic = false,
+    flatShading = false,
   ): THREE.MeshStandardMaterial {
-    const key = `${color}_${roughness}_${metalness}_${emissive}_${emissiveIntensity}`;
+    const key = `${color}_${roughness}_${metalness}_${emissive}_${emissiveIntensity}_${flatShading ? 1 : 0}`;
     if (!dynamic) {
       const existing = this.matCache.get(key);
       if (existing) return existing;
@@ -92,6 +94,7 @@ export abstract class BaseFolioWorld {
       metalness,
       emissive,
       emissiveIntensity,
+      flatShading,
       side: THREE.DoubleSide,
     });
     if (!dynamic) {
@@ -101,17 +104,17 @@ export abstract class BaseFolioWorld {
   }
 
   /**
-   * Builds a high-DPI 1024x288 physical cardstock plaque with cut-edge thickness, subtle ink frame,
-   * corner brass pins, and optional easel tilt for crisp readability in 4:3 overhead and Slate views.
+   * Builds a high-DPI 1024x288 physical cardstock plaque with cut-edge thickness, corner brass dots,
+   * crisp legible typography, and a tiny rear paper easel kick-foot for tactile overhead clarity.
    */
   protected makeCardLabel(
     title: string,
     subtitle: string,
     w = 1.6,
     h = 0.42,
-    bgColor = '#EFE9DA',
-    inkColor = '#20262E',
-    tiltX = 0.16,
+    bgColor = '#FAF5E8',
+    inkColor = '#181C22',
+    tiltX = 0.22,
   ): THREE.Group {
     const c = document.createElement('canvas');
     c.width = 1024;
@@ -120,22 +123,46 @@ export abstract class BaseFolioWorld {
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, c.width, c.height);
 
+    // Delicate paper deckle shading band along lower edge
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
+    ctx.fillRect(0, c.height - 16, c.width, 16);
+
     // Double mid-century archival border
     ctx.strokeStyle = inkColor;
-    ctx.lineWidth = 6;
+    ctx.lineWidth = 7;
     ctx.strokeRect(10, 10, c.width - 20, c.height - 20);
-    ctx.globalAlpha = 0.35;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(22, 22, c.width - 44, c.height - 44);
+    ctx.globalAlpha = 0.42;
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(24, 24, c.width - 48, c.height - 48);
     ctx.globalAlpha = 1;
 
-    ctx.fillStyle = inkColor;
-    ctx.font = '700 46px "Courier New", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(title.toUpperCase(), c.width / 2, 114);
+    // Corner registration rivets
+    ctx.fillStyle = '#C2A25D';
+    for (const [rx, ry] of [
+      [34, 34],
+      [c.width - 34, 34],
+      [34, c.height - 34],
+      [c.width - 34, c.height - 34],
+    ]) {
+      ctx.beginPath();
+      ctx.arc(rx, ry, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
-    ctx.font = '600 34px Georgia, serif';
-    ctx.fillText(subtitle, c.width / 2, 198);
+    ctx.fillStyle = inkColor;
+    ctx.font = '700 56px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(title.toUpperCase(), c.width / 2, 114, c.width - 92);
+
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    ctx.moveTo(76, 142);
+    ctx.lineTo(c.width - 76, 142);
+    ctx.stroke();
+    ctx.globalAlpha = 0.96;
+    ctx.font = '700 43px Georgia, serif';
+    ctx.fillText(subtitle, c.width / 2, 212, c.width - 92);
+    ctx.globalAlpha = 1;
 
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
@@ -144,21 +171,25 @@ export abstract class BaseFolioWorld {
     this.ownedTextures.push(tex);
 
     const group = new THREE.Group();
-    const cardThickness = 0.022;
+    const cardThickness = 0.024;
+    const bgLower = bgColor.toLowerCase();
+    const isCrimson = bgLower.startsWith('#6') || bgLower.startsWith('#7');
+    const isDark = bgLower.startsWith('#2') || bgLower.startsWith('#1') || isCrimson;
     const backingMat = this.makePaperMat(
-      bgColor.toLowerCase().startsWith('#2') ? 0x1a1e24 : 0xcbc0a8,
+      isCrimson ? 0x4c1411 : isDark ? 0x171b21 : 0xcbc0a8,
       0.86,
       0.03,
     );
+    const tiltHolder = new THREE.Group();
     const backing = new THREE.Mesh(new THREE.BoxGeometry(w, cardThickness, h), backingMat);
     backing.castShadow = true;
     backing.receiveShadow = true;
 
     const topPlate = new THREE.Mesh(
-      new THREE.PlaneGeometry(w - 0.01, h - 0.01),
+      new THREE.PlaneGeometry(w - 0.012, h - 0.012),
       new THREE.MeshStandardMaterial({
         map: tex,
-        roughness: 0.84,
+        roughness: 0.82,
         metalness: 0.02,
       }),
     );
@@ -166,10 +197,26 @@ export abstract class BaseFolioWorld {
     topPlate.position.y = cardThickness / 2 + 0.002;
     topPlate.receiveShadow = true;
 
-    group.add(backing, topPlate);
+    tiltHolder.add(backing, topPlate);
+
     if (tiltX !== 0) {
-      group.rotation.x = tiltX;
+      tiltHolder.rotation.x = tiltX;
+      const liftY = (h / 2 + 0.028) * Math.sin(Math.abs(tiltX)) + cardThickness * 0.5;
+      tiltHolder.position.y = liftY;
+
+      // Grounded cardstock kickstand wedge resting flush on y=0 under rear edge
+      if (tiltX > 0.06) {
+        const standH = Math.max(0.022, liftY + Math.sin(tiltX) * (h * 0.28));
+        const foot = new THREE.Mesh(
+          new THREE.BoxGeometry(w * 0.54, standH, 0.028),
+          backingMat,
+        );
+        foot.position.set(0, standH * 0.5, -h * 0.34);
+        group.add(foot);
+      }
     }
+
+    group.add(tiltHolder);
     return group;
   }
 
@@ -224,7 +271,174 @@ export abstract class BaseFolioWorld {
   }
 
   /**
-   * Builds a V-fold die-cut cardstock horizon arch anchored at the rear gutter with triangular paper braces.
+   * Builds multi-layered die-cut papercraft foothills/mountains/waves (used in P00-inspired backdrops and folios).
+   */
+  protected buildPaperRidgeCluster(
+    totalW: number,
+    layers: number,
+    backHex: number,
+    frontHex: number,
+    maxH = 0.42,
+    depthStep = 0.06,
+  ): THREE.Group {
+    const g = new THREE.Group();
+    const backC = new THREE.Color(backHex);
+    const frontC = new THREE.Color(frontHex);
+    const hw = totalW / 2;
+
+    for (let l = 0; l < layers; l++) {
+      const t = layers > 1 ? l / (layers - 1) : 1;
+      const col = backC.clone().lerp(frontC, t).getHex();
+      const mat = this.makePaperMat(col, 0.86, 0.02, 0, 0, false, true);
+      const pts: [number, number][] = [[-hw, 0]];
+      const peaks = 5 + (l % 2);
+      const layerH = maxH * (1 - t * 0.36);
+      for (let p = 0; p <= peaks; p++) {
+        const px = THREE.MathUtils.lerp(-hw, hw, p / peaks);
+        const crest =
+          p === 0 || p === peaks
+            ? layerH * 0.14
+            : layerH * (0.45 + 0.55 * Math.abs(Math.sin(p * 1.9 + l * 1.4)));
+        pts.push([px, crest]);
+      }
+      pts.push([hw, 0]);
+      const cut = buildCutCardShape(pts, 0.022, mat);
+      cut.position.set(0, 0, l * depthStep);
+      g.add(cut);
+    }
+    return g;
+  }
+
+  /**
+   * Builds a richly illustrated die-cut pop-up theater backdrop arch with:
+   * - cream/tarnished-brass cardstock cutaway proscenium border
+   * - custom painted Canvas sky/horizon illustration (stars, nebula, storm, sun, citadel, ash, daylight)
+   * - foreground stepped paper mountain/cloud wings & V-fold ground braces
+   */
+  protected buildIllustratedBackdropArch(
+    w: number,
+    h: number,
+    opts: {
+      topHex: string;
+      bottomHex: string;
+      cloudHex: string;
+      accentHex: string;
+      motif: 'stars' | 'nebula' | 'storm' | 'sun' | 'citadel' | 'ash' | 'daylight';
+      frameColor?: number;
+      ridgeBackHex?: number;
+      ridgeFrontHex?: number;
+    },
+  ): THREE.Group {
+    const archH = h * 0.88;
+    const g = new THREE.Group();
+    const hw = w / 2;
+    const frameColor = opts.frameColor ?? 0xd8ceb8;
+
+    // Outer cream cardstock arch frame
+    const shape = new THREE.Shape();
+    shape.moveTo(-hw, 0);
+    shape.lineTo(-hw, archH * 0.56);
+    shape.lineTo(-hw * 0.72, archH * 0.84);
+    shape.lineTo(-hw * 0.28, archH * 0.96);
+    shape.lineTo(0, archH);
+    shape.lineTo(hw * 0.28, archH * 0.96);
+    shape.lineTo(hw * 0.72, archH * 0.84);
+    shape.lineTo(hw, archH * 0.56);
+    shape.lineTo(hw, 0);
+    shape.closePath();
+
+    const extrude = new THREE.ExtrudeGeometry(shape, {
+      depth: 0.026,
+      bevelEnabled: false,
+      curveSegments: 1,
+    });
+    const frameCard = new THREE.Mesh(extrude, this.makePaperMat(frameColor, 0.88));
+    frameCard.position.z = -0.022;
+    frameCard.castShadow = true;
+    frameCard.receiveShadow = true;
+
+    // Painted illustrated sky cutout mounted neatly inside the frame with matching arch silhouette
+    const skyTex = buildIllustratedSkyTexture({
+      topHex: opts.topHex,
+      bottomHex: opts.bottomHex,
+      cloudHex: opts.cloudHex,
+      accentHex: opts.accentHex,
+      motif: opts.motif,
+    });
+    this.ownedTextures.push(skyTex);
+
+    const innerShape = new THREE.Shape();
+    const ihw = hw - 0.08;
+    const iArchH = archH - 0.06;
+    innerShape.moveTo(-ihw, 0.02);
+    innerShape.lineTo(-ihw, iArchH * 0.56);
+    innerShape.lineTo(-ihw * 0.72, iArchH * 0.84);
+    innerShape.lineTo(-ihw * 0.28, iArchH * 0.96);
+    innerShape.lineTo(0, iArchH);
+    innerShape.lineTo(ihw * 0.28, iArchH * 0.96);
+    innerShape.lineTo(ihw * 0.72, iArchH * 0.84);
+    innerShape.lineTo(ihw, iArchH * 0.56);
+    innerShape.lineTo(ihw, 0.02);
+    innerShape.closePath();
+
+    const innerGeo = new THREE.ShapeGeometry(innerShape, 1);
+    const uvAttr = innerGeo.attributes.uv as THREE.BufferAttribute;
+    const posAttr = innerGeo.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < posAttr.count; i++) {
+      uvAttr.setXY(
+        i,
+        (posAttr.getX(i) + ihw) / (ihw * 2),
+        posAttr.getY(i) / iArchH,
+      );
+    }
+    uvAttr.needsUpdate = true;
+
+    const skyPanel = new THREE.Mesh(
+      innerGeo,
+      new THREE.MeshStandardMaterial({
+        map: skyTex,
+        roughness: 0.84,
+        metalness: 0.02,
+      }),
+    );
+    skyPanel.position.z = 0.008;
+    skyPanel.receiveShadow = true;
+
+    // Stepped cardstock foothill/cloud wings grounded at bottom edge of arch
+    const ridge = this.buildPaperRidgeCluster(
+      w * 0.94,
+      2,
+      opts.ridgeBackHex ?? 0x262c36,
+      opts.ridgeFrontHex ?? 0x3b4352,
+      archH * 0.34,
+      0.038,
+    );
+    ridge.position.set(0, 0.012, 0.024);
+
+    // Cream cardstock hinge base rail anchoring cleanly onto spread page
+    const footRail = new THREE.Mesh(
+      new THREE.BoxGeometry(w + 0.04, 0.042, 0.14),
+      this.makePaperMat(frameColor, 0.86),
+    );
+    footRail.position.set(0, 0.02, 0.01);
+
+    // Visible rear triangular cardstock V-braces
+    for (const sx of [-hw * 0.62, hw * 0.62]) {
+      const strut = new THREE.Mesh(
+        new THREE.ConeGeometry(0.16, archH * 0.45, 3),
+        this.makePaperMat(frameColor, 0.85),
+      );
+      strut.position.set(sx, archH * 0.22, -0.11);
+      strut.scale.set(0.32, 1, 1.15);
+      g.add(strut);
+    }
+
+    g.add(frameCard, skyPanel, ridge, footRail);
+    return g;
+  }
+
+  /**
+   * Legacy signature retained for safe fallback; wraps illustrated arch cleanly.
    */
   protected buildBackdropArch(
     w: number,
@@ -232,49 +446,17 @@ export abstract class BaseFolioWorld {
     faceColor: number,
     trimColor: number,
   ): THREE.Group {
-    const archH = h * 0.78;
-    const g = new THREE.Group();
-    const shape = new THREE.Shape();
-    const hw = w / 2;
-    shape.moveTo(-hw, 0);
-    shape.lineTo(-hw, archH * 0.58);
-    shape.lineTo(-hw * 0.65, archH * 0.86);
-    shape.lineTo(-hw * 0.22, archH * 0.96);
-    shape.lineTo(0, archH);
-    shape.lineTo(hw * 0.22, archH * 0.96);
-    shape.lineTo(hw * 0.65, archH * 0.86);
-    shape.lineTo(hw, archH * 0.58);
-    shape.lineTo(hw, 0);
-    shape.closePath();
-
-    const extrude = new THREE.ExtrudeGeometry(shape, {
-      depth: 0.026,
-      bevelEnabled: false,
+    const c = '#' + faceColor.toString(16).padStart(6, '0');
+    const a = '#' + trimColor.toString(16).padStart(6, '0');
+    return this.buildIllustratedBackdropArch(w, h, {
+      topHex: c,
+      bottomHex: '#1A2029',
+      cloudHex: c,
+      accentHex: a,
+      motif: 'stars',
+      ridgeBackHex: faceColor,
+      ridgeFrontHex: trimColor,
     });
-    const backCard = new THREE.Mesh(extrude, this.makePaperMat(faceColor, 0.88));
-    backCard.position.z = -0.013;
-    backCard.castShadow = true;
-    backCard.receiveShadow = true;
-
-    const rim = new THREE.Mesh(
-      new THREE.BoxGeometry(w + 0.04, 0.04, 0.08),
-      this.makePaperMat(trimColor, 0.72),
-    );
-    rim.position.y = 0.02;
-
-    // Two visible rear triangle paper V-struts behind the backplate grounding it to the spread
-    for (const sx of [-hw * 0.6, hw * 0.6]) {
-      const strut = new THREE.Mesh(
-        new THREE.ConeGeometry(0.16, 0.36, 3),
-        this.makePaperMat(trimColor, 0.85),
-      );
-      strut.position.set(sx, 0.18, -0.1);
-      strut.scale.set(0.35, 1, 1.1);
-      g.add(strut);
-    }
-
-    g.add(backCard, rim);
-    return g;
   }
 
   /**
@@ -313,11 +495,24 @@ export abstract class BaseFolioWorld {
   ): { root: THREE.Group; setExpand: (expand01: number) => void } {
     const root = new THREE.Group();
     const ribs: THREE.Mesh[] = [];
+    const ruleMat = this.makePaperMat(0x2b2620, 0.88);
+    const stampMat = this.makePaperMat(0x8e2c26, 0.72);
     for (let i = 0; i < foldCount; i++) {
       const panel = new THREE.Mesh(
         new THREE.BoxGeometry(panelW, 0.02, panelD),
         this.makePaperMat(i % 2 === 0 ? colorA : colorB, 0.85),
       );
+      const topRule = new THREE.Mesh(
+        new THREE.BoxGeometry(panelW * 0.82, 0.004, 0.014),
+        ruleMat,
+      );
+      topRule.position.set(0, 0.011, -panelD * 0.2);
+      const stamp = new THREE.Mesh(
+        new THREE.BoxGeometry(panelW * 0.24, 0.004, 0.026),
+        i % 2 === 0 ? stampMat : ruleMat,
+      );
+      stamp.position.set(-panelW * 0.26, 0.011, panelD * 0.14);
+      panel.add(topRule, stamp);
       panel.castShadow = true;
       panel.receiveShadow = true;
       if (targetSlot) this.bindMechanismTarget(panel, targetSlot);
@@ -326,7 +521,6 @@ export abstract class BaseFolioWorld {
     }
     const setExpand = (expand01: number) => {
       const e = THREE.MathUtils.clamp(expand01, 0.08, 1);
-      // Tilt ranges from near-vertical stacked (when compressed) to low flat zigzag (when extended)
       const angle = THREE.MathUtils.lerp(1.18, 0.16, e);
       const stepZ = Math.cos(angle) * panelD * 0.94;
       const liftY = Math.sin(angle) * (panelD * 0.5);
@@ -347,10 +541,9 @@ export abstract class BaseFolioWorld {
     positions?: Partial<Record<FolioInteractionSlot, [number, number]>>,
   ): void {
     const manifest = FOLIO_BY_WORLD[this.worldId];
-    const inkMat = this.makePaperMat(0x282d35, 0.72, 0.12);
+    const inkMat = this.makePaperMat(0x22272f, 0.72, 0.12);
     const brassMat = this.makePaperMat(0xc4a462, 0.36, 0.78);
 
-    // Subtle 4:3 cardstock frame corner brackets + small brass corner registration brads
     const corners: [number, number, number, number][] = [
       [-APERTURE_HALF_W, -APERTURE_HALF_D, 1, 1],
       [APERTURE_HALF_W, -APERTURE_HALF_D, -1, 1],
@@ -368,11 +561,10 @@ export abstract class BaseFolioWorld {
       this.root.add(hArm, vArm, brad);
     }
 
-    // Positioned neatly on the bottom cream spread margin INSIDE camera view (clear of HUD dock)
     const defaultCoords: Record<FolioInteractionSlot, [number, number]> = {
-      A: [-1.72, 1.84],
-      B: [0.0, 1.84],
-      C: [1.72, 1.84],
+      A: [-1.72, 1.82],
+      B: [0.0, 1.82],
+      C: [1.72, 1.82],
     };
 
     (['A', 'B', 'C'] as FolioInteractionSlot[]).forEach((slot, idx) => {
@@ -383,23 +575,21 @@ export abstract class BaseFolioWorld {
       tabGroup.position.set(lx, baseY, lz);
 
       const base = new THREE.Mesh(
-        new THREE.BoxGeometry(1.36, 0.028, 0.34),
+        new THREE.BoxGeometry(1.42, 0.028, 0.36),
         this.makePaperMat(0xdfd6c1, 0.85),
       );
       base.castShadow = true;
       base.receiveShadow = true;
 
-      // Dark slotted channel rail
       const slotTrack = new THREE.Mesh(
-        new THREE.BoxGeometry(0.32, 0.012, 0.065),
+        new THREE.BoxGeometry(0.32, 0.014, 0.068),
         inkMat,
       );
-      slotTrack.position.set(-0.43, 0.014, 0);
+      slotTrack.position.set(-0.46, 0.015, 0);
 
-      // Sliding brass thumb knob inside the slot
       const sliderThumb = new THREE.Group();
       const activeInit = state.interactions[slot].active ? 1 : 0;
-      sliderThumb.position.set(THREE.MathUtils.lerp(-0.52, -0.34, activeInit), 0.03, 0);
+      sliderThumb.position.set(THREE.MathUtils.lerp(-0.55, -0.37, activeInit), 0.032, 0);
 
       const puckMat = this.makePaperMat(
         state.interactions[slot].locked ? 0x9e322b : state.interactions[slot].active ? 0x42c2e0 : 0xc4a462,
@@ -409,24 +599,27 @@ export abstract class BaseFolioWorld {
         0,
         true,
       );
-      const puck = new THREE.Mesh(new THREE.CylinderGeometry(0.072, 0.082, 0.036, 12), puckMat);
+      const puck = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.038, 12), puckMat);
       puck.castShadow = true;
-      const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.052, 8), inkMat);
-      sliderThumb.add(puck, pin);
+      const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 0.056, 8), inkMat);
+      const pullEye = new THREE.Mesh(new THREE.TorusGeometry(0.052, 0.012, 6, 14), brassMat);
+      pullEye.rotation.x = Math.PI / 2;
+      pullEye.position.set(-0.07, 0.012, 0);
+      sliderThumb.add(puck, pin, pullEye);
 
       const labelCard = this.makeCardLabel(
-        `[${slot}]`,
-        def.label.slice(0, 22),
-        0.88,
-        0.24,
-        '#F4EFE2',
-        '#1D2229',
-        0.04,
+        `LEVER [${slot}]`,
+        def.label.slice(0, 24),
+        0.94,
+        0.26,
+        '#FAF5E8',
+        '#181C22',
+        0.18,
       );
-      labelCard.position.set(0.18, 0.022, 0);
+      labelCard.position.set(0.18, 0.034, 0);
 
       const hitMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(1.42, 0.24, 0.44),
+        new THREE.BoxGeometry(1.46, 0.24, 0.44),
         new THREE.MeshBasicMaterial({ visible: false }),
       );
       hitMesh.position.y = 0.06;
@@ -486,7 +679,7 @@ export abstract class BaseFolioWorld {
     const k = 1 - Math.exp(-(reducedMotion ? 16 : 9) * dt);
     for (const lev of this.levers) {
       lev.activeRatio += (lev.targetRatio - lev.activeRatio) * k;
-      lev.sliderThumb.position.x = THREE.MathUtils.lerp(-0.52, -0.34, lev.activeRatio);
+      lev.sliderThumb.position.x = THREE.MathUtils.lerp(-0.55, -0.37, lev.activeRatio);
     }
   }
 

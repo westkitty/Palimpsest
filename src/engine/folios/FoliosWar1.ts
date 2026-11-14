@@ -3,6 +3,7 @@ import { F06_CAMPAIGN_DRAXIS_IDS } from '../../story/draxisCatalog';
 import { DraxisId, FolioRuntimeState } from '../../types/atlas';
 import { buildCodecFigure } from '../drakken/CharacterFigures';
 import { buildDraxisModel, DraxisRig } from '../drakken/DraxisModels';
+import { buildCutCardShape } from '../drakken/papercraftArt';
 import { BaseFolioWorld } from './BaseFolioWorld';
 
 export class F04FolioWorld extends BaseFolioWorld {
@@ -17,9 +18,17 @@ export class F04FolioWorld extends BaseFolioWorld {
   public build(state: FolioRuntimeState): void {
     this.buildApertureAndLevers(state);
 
-    // Subtle colonial-slate V-fold horizon backdrop arch
-    const arch = this.buildBackdropArch(4.5, 1.35, 0x35403b, 0x9b824d);
-    arch.position.set(0, this.pageY(0) + 0.01, -1.78);
+    // Colonial citadel dusk skyline V-fold backdrop
+    const arch = this.buildIllustratedBackdropArch(4.55, 1.36, {
+      topHex: '#1F2B28',
+      bottomHex: '#394B43',
+      cloudHex: '#4E6257',
+      accentHex: '#C8A55E',
+      motif: 'citadel',
+      ridgeBackHex: 0x26322d,
+      ridgeFrontHex: 0x3b4d45,
+    });
+    arch.position.set(0, this.pageY(0) + 0.01, -1.76);
     this.root.add(arch);
 
     // Grounded stepped cardstock terraces under the three stations
@@ -31,12 +40,12 @@ export class F04FolioWorld extends BaseFolioWorld {
     rightPad.position.set(1.48, this.pageY(1.48), -0.24);
     this.root.add(leftPad, centerPad, rightPad);
 
-    // [A] Brass-axle mounted Colonial Citadel: Green Terrace (top) / Charred Basalt Ruin (underside)
-    const axleY = this.pageY(-1.46) + 0.18;
+    // [A] Brass-axle mounted Colonial Citadel: Verdant Terrace City (top) / Jagged Charred Volcanic Underside
+    const axleY = this.pageY(-1.46) + 0.19;
     const trunnionMat = this.makePaperMat(0xc2a25d, 0.36, 0.78);
     for (const sx of [-0.78, 0.78]) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.22, 0.1), trunnionMat);
-      post.position.set(-1.46 + sx, this.pageY(-1.46) + 0.11, -0.24);
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.24, 0.1), trunnionMat);
+      post.position.set(-1.46 + sx, this.pageY(-1.46) + 0.12, -0.24);
       post.castShadow = true;
       this.root.add(post);
     }
@@ -45,52 +54,64 @@ export class F04FolioWorld extends BaseFolioWorld {
     this.colonyFlipPlate.position.set(-1.46, axleY, -0.24);
     const intactSide = new THREE.Mesh(
       new THREE.BoxGeometry(1.42, 0.055, 1.32),
-      this.makePaperMat(0x5b7f62, 0.84),
+      this.makePaperMat(0x527b5b, 0.84, 0.02, 0, 0, false, true),
     );
     intactSide.castShadow = true;
     intactSide.receiveShadow = true;
 
-    const civicTower = new THREE.Mesh(
-      new THREE.BoxGeometry(0.24, 0.42, 0.24),
-      this.makePaperMat(0xeae2ce),
+    const civicPlinth = new THREE.Mesh(
+      new THREE.BoxGeometry(0.86, 0.05, 0.78),
+      this.makePaperMat(0x6b946f, 0.84, 0.02, 0, 0, false, true),
     );
-    civicTower.position.set(-0.22, 0.24, -0.1);
+    civicPlinth.position.set(-0.04, 0.048, -0.06);
+
+    const civicTower = new THREE.Mesh(
+      new THREE.BoxGeometry(0.24, 0.44, 0.24),
+      this.makePaperMat(0xefe6d0, 0.82, 0.03, 0, 0, false, true),
+    );
+    civicTower.position.set(-0.22, 0.26, -0.1);
     civicTower.castShadow = true;
     const dome = new THREE.Mesh(
       new THREE.SphereGeometry(0.14, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2),
       trunnionMat,
     );
-    dome.position.set(-0.22, 0.45, -0.1);
+    dome.position.set(-0.22, 0.48, -0.1);
 
     const wing = new THREE.Mesh(
-      new THREE.BoxGeometry(0.48, 0.2, 0.26),
-      this.makePaperMat(0xdcd3bf),
+      new THREE.BoxGeometry(0.48, 0.22, 0.28),
+      this.makePaperMat(0xdcd3bf, 0.82, 0.03, 0, 0, false, true),
     );
-    wing.position.set(0.24, 0.13, 0.18);
+    wing.position.set(0.24, 0.14, 0.18);
     wing.castShadow = true;
+    const wingRoof = buildCutCardShape([[-0.25, 0], [0, 0.12], [0.25, 0]], 0.3, trunnionMat);
+    wingRoof.position.set(0.24, 0.25, 0.18);
 
-    // Charred basalt underside visible when flipped
+    // Sculpted paper garden hills behind civic dome
+    const gardenHills = this.buildPaperRidgeCluster(1.28, 2, 0x3b6344, 0x628c68, 0.24, 0.035);
+    gardenHills.position.set(0, 0.03, -0.52);
+
+    // Charred basalt underside with jagged crimson-black obsidian craters visible when flipped
     const scarredUnderside = new THREE.Mesh(
       new THREE.BoxGeometry(1.42, 0.05, 1.32),
-      this.makePaperMat(0x3a2420, 0.9),
+      this.makePaperMat(0x2d1c19, 0.9, 0.04, 0, 0, false, true),
     );
     scarredUnderside.position.y = -0.05;
     scarredUnderside.castShadow = true;
 
-    for (let c = 0; c < 3; c++) {
+    for (let c = 0; c < 4; c++) {
       const slag = new THREE.Mesh(
-        new THREE.ConeGeometry(0.18, 0.24, 5),
-        this.makePaperMat(0x6b221a, 0.72),
+        new THREE.ConeGeometry(0.18, 0.3 + (c % 2) * 0.1, 5),
+        this.makePaperMat(c % 2 === 0 ? 0x6b221a : 0x3a2623, 0.72, 0.05, 0, 0, false, true),
       );
       slag.rotation.x = Math.PI;
-      slag.position.set(-0.34 + c * 0.34, -0.16, (c % 2 === 0 ? 1 : -1) * 0.22);
+      slag.position.set(-0.38 + c * 0.25, -0.2, (c % 2 === 0 ? 1 : -1) * 0.22);
       this.colonyFlipPlate.add(slag);
     }
 
     this.bindMechanismTarget(intactSide, 'A');
     this.bindMechanismTarget(civicTower, 'A');
     this.bindMechanismTarget(scarredUnderside, 'A');
-    this.colonyFlipPlate.add(intactSide, civicTower, dome, wing, scarredUnderside);
+    this.colonyFlipPlate.add(intactSide, civicPlinth, civicTower, dome, wing, wingRoof, gardenHills, scarredUnderside);
     this.root.add(this.colonyFlipPlate);
 
     // [B] Codec figure + slotted Administration Macro Response track
@@ -99,7 +120,6 @@ export class F04FolioWorld extends BaseFolioWorld {
     this.addGroundShadow(codec, 0.34, 0.36);
     this.root.add(codec);
 
-    // Etched guide rails on central pad
     const railMat = this.makePaperMat(0xc2a25d, 0.4, 0.72);
     for (let i = 0; i < 3; i++) {
       const rail = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.015, 0.04), railMat);
@@ -109,7 +129,7 @@ export class F04FolioWorld extends BaseFolioWorld {
 
     this.responseArrows = new THREE.Group();
     this.responseArrows.position.set(-0.22, this.pageY(0) + 0.075, -0.02);
-    const arrowMat = this.makePaperMat(0xc48f38, 0.42, 0.55);
+    const arrowMat = this.makePaperMat(0xc8923a, 0.4, 0.58, 0, 0, false, true);
     for (let i = 0; i < 3; i++) {
       const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.045, 0.1), arrowMat);
       shaft.position.set(0, 0, (i - 1) * 0.3);
@@ -130,12 +150,12 @@ export class F04FolioWorld extends BaseFolioWorld {
     strip.root.position.set(1.48, this.pageY(1.48) + 0.03, -0.96);
     this.root.add(strip.root);
 
-    const logLbl = this.makeCardLabel('VERIFICATION', 'Logistics Record', 1.12, 0.24, '#EFE9DA', '#20262E', 0.14);
-    logLbl.position.set(1.48, this.pageY(1.48) + 0.04, 0.72);
+    const logLbl = this.makeCardLabel('VERIFICATION', 'Logistics Record', 1.14, 0.25, '#FAF5E8', '#181C22', 0.2);
+    logLbl.position.set(1.48, this.pageY(1.48) + 0.048, 0.72);
     this.bindMechanismTarget(logLbl, 'C');
     this.root.add(logLbl);
 
-    const lbl = this.makeCardLabel('YEAR 0 · FIRST CONTACT', 'Macro Response & Verification', 2.45, 0.28, '#EFE9DA', '#20262E', 0.18);
+    const lbl = this.makeCardLabel('YEAR 0 · FIRST CONTACT', 'Macro Response & Verification', 2.45, 0.28, '#FAF5E8', '#181C22', 0.2);
     lbl.position.set(0, this.pageY(0) + 0.055, 1.08);
     this.root.add(lbl);
 
@@ -162,7 +182,7 @@ export class F04FolioWorld extends BaseFolioWorld {
 
 export class F05FolioWorld extends BaseFolioWorld {
   private globeMat!: THREE.MeshStandardMaterial;
-  private bloodRingMesh!: THREE.Mesh;
+  private bloodRingGroup!: THREE.Group;
   private ringRevealRatio = 0;
   private ringScaleCurr = 0.05;
 
@@ -182,9 +202,17 @@ export class F05FolioWorld extends BaseFolioWorld {
   public build(state: FolioRuntimeState): void {
     this.buildApertureAndLevers(state);
 
-    // Somber crimson-slate V-fold backdrop arch
-    const arch = this.buildBackdropArch(4.55, 1.4, 0x2c2023, 0x6b2420);
-    arch.position.set(0, this.pageY(0) + 0.01, -1.78);
+    // Somber crimson-slate illustrated battle-storm backdrop arch
+    const arch = this.buildIllustratedBackdropArch(4.55, 1.4, {
+      topHex: '#201316',
+      bottomHex: '#3B1E21',
+      cloudHex: '#4F282B',
+      accentHex: '#B6463D',
+      motif: 'storm',
+      ridgeBackHex: 0x291517,
+      ridgeFrontHex: 0x422023,
+    });
+    arch.position.set(0, this.pageY(0) + 0.01, -1.76);
     this.root.add(arch);
 
     // Grounded stepped terraces for Globe Station (left) & Cutaway Factory (right)
@@ -194,42 +222,56 @@ export class F05FolioWorld extends BaseFolioWorld {
     factoryPad.position.set(0.68, this.pageY(0.68), -0.26);
     this.root.add(globePad, factoryPad);
 
-    // [A] Fallenstar Prime Globe on brass stand + SOLID NON-GLOWING Vitrified Crimson Physical Blood Ring
+    // [A] Fallenstar Prime Globe on brass stand + Multi-layered Vitrified Crimson Physical Blood Ring
     const standPost = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.04, 0.07, 0.42, 8),
+      new THREE.CylinderGeometry(0.04, 0.075, 0.42, 8),
       this.makePaperMat(0xc2a25d, 0.36, 0.78),
     );
     standPost.position.set(-1.42, this.pageY(-1.42) + 0.24, -0.26);
     this.root.add(standPost);
 
-    this.globeMat = this.makePaperMat(0x527a66, 0.78, 0.05, 0x000000, 0, true);
+    this.globeMat = this.makePaperMat(0x527a66, 0.78, 0.05, 0x000000, 0, true, true);
     const globe = new THREE.Mesh(new THREE.IcosahedronGeometry(0.4, 2), this.globeMat);
     globe.position.set(-1.42, this.pageY(-1.42) + 0.56, -0.26);
     globe.castShadow = true;
     this.bindMechanismTarget(globe, 'A');
     this.root.add(globe);
 
-    // Physical vitrified crimson material Blood Ring (zero emissive halo)
-    this.bloodRingMesh = new THREE.Mesh(
-      new THREE.TorusGeometry(0.64, 0.072, 7, 28),
-      this.makePaperMat(0x7c1f1a, 0.56, 0.16, 0x000000, 0),
+    this.bloodRingGroup = new THREE.Group();
+    this.bloodRingGroup.position.set(-1.42, this.pageY(-1.42) + 0.56, -0.26);
+    this.bloodRingGroup.rotation.x = Math.PI / 2 - 0.3;
+    const bloodRingMesh = new THREE.Mesh(
+      new THREE.TorusGeometry(0.64, 0.068, 7, 28),
+      this.makePaperMat(0x7c1f1a, 0.56, 0.16, 0x000000, 0, false, true),
     );
-    this.bloodRingMesh.position.set(-1.42, this.pageY(-1.42) + 0.56, -0.26);
-    this.bloodRingMesh.rotation.x = Math.PI / 2 - 0.3;
-    this.bloodRingMesh.castShadow = true;
-    this.bindMechanismTarget(this.bloodRingMesh, 'A');
-    this.root.add(this.bloodRingMesh);
+    bloodRingMesh.castShadow = true;
+    const innerRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.54, 0.022, 6, 24),
+      this.makePaperMat(0x4c1714, 0.65),
+    );
+    this.bloodRingGroup.add(bloodRingMesh, innerRing);
+    for (let s = 0; s < 8; s++) {
+      const a = (s / 8) * Math.PI * 2;
+      const shard = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.045, 0),
+        this.makePaperMat(0x9a2a23, 0.5, 0.1, 0, 0, false, true),
+      );
+      shard.position.set(Math.cos(a) * 0.75, Math.sin(a) * 0.75, 0);
+      this.bloodRingGroup.add(shard);
+    }
+    this.bindMechanismTarget(bloodRingMesh, 'A');
+    this.root.add(this.bloodRingGroup);
 
     // [B] Four-stage Cutaway Pipeline: Gorevault (044) -> Slurry Conduit -> Ringthroat (029) -> Extruded Slag Sample
-    const fy = this.pageY(0.68) + 0.05;
+    const fy = this.pageY(0.68) + 0.06;
     this.gorevault = buildDraxisModel('044', this.paperBump);
-    this.gorevault.group.position.set(-0.08, fy, -0.26);
-    this.gorevault.group.scale.setScalar(0.8);
+    this.gorevault.group.position.set(-0.08, fy, -0.28);
+    this.gorevault.group.scale.setScalar(0.84);
     this.root.add(this.gorevault.group);
 
     this.ringthroat = buildDraxisModel('029', this.paperBump);
-    this.ringthroat.group.position.set(1.26, fy, -0.26);
-    this.ringthroat.group.scale.setScalar(0.8);
+    this.ringthroat.group.position.set(1.26, fy, -0.28);
+    this.ringthroat.group.scale.setScalar(0.84);
     this.root.add(this.ringthroat.group);
 
     const conduit = new THREE.Mesh(
@@ -237,65 +279,89 @@ export class F05FolioWorld extends BaseFolioWorld {
       this.makePaperMat(0x56201c, 0.65),
     );
     conduit.rotation.z = Math.PI / 2;
-    conduit.position.set(0.58, fy + 0.22, -0.26);
+    conduit.position.set(0.58, fy + 0.22, -0.28);
     this.root.add(conduit);
 
     this.slurryPulse = new THREE.Mesh(
       new THREE.BoxGeometry(0.24, 0.08, 0.08),
       this.makePaperMat(0x9e2720, 0.52),
     );
-    this.slurryPulse.position.set(0.58, fy + 0.22, -0.26);
+    this.slurryPulse.position.set(0.58, fy + 0.22, -0.28);
     this.root.add(this.slurryPulse);
 
-    // Output physical Blood Ring segment sample leaving Ringthroat nozzle
     this.extrudedSample = new THREE.Mesh(
       new THREE.TorusGeometry(0.18, 0.036, 6, 16, Math.PI * 1.4),
       this.makePaperMat(0x7c1f1a, 0.55, 0.14),
     );
-    this.extrudedSample.position.set(1.72, fy + 0.26, -0.26);
+    this.extrudedSample.position.set(1.72, fy + 0.26, -0.28);
     this.extrudedSample.rotation.x = Math.PI / 2;
     this.root.add(this.extrudedSample);
 
-    // Split outward-parting bi-fold shutter doors (ZERO clipping/occlusion when open!)
+    // See-through slotted brass-and-vellum inspection doors (Gorevault & Ringthroat visible at rest AND open wide on [B]!)
     const rail = new THREE.Mesh(
       new THREE.BoxGeometry(2.44, 0.04, 0.06),
       this.makePaperMat(0xc2a25d, 0.36, 0.78),
     );
-    rail.position.set(0.68, fy + 0.78, 0.36);
+    rail.position.set(0.68, fy + 0.78, 0.34);
     this.root.add(rail);
 
-    const shutterMat = this.makePaperMat(0xdcd3bf, 0.86);
+    const buildInspectionLeaf = (width: number, height: number, dir: 1 | -1) => {
+      const leaf = new THREE.Group();
+      const brassFrame = this.makePaperMat(0xc2a25d, 0.38, 0.76);
+      const cx = (width / 2) * dir;
+
+      const glassPane = new THREE.Mesh(
+        new THREE.PlaneGeometry(width - 0.1, height - 0.1),
+        new THREE.MeshStandardMaterial({
+          color: 0xe6dcc6,
+          transparent: true,
+          opacity: 0.24,
+          roughness: 0.5,
+          side: THREE.DoubleSide,
+        }),
+      );
+      glassPane.position.set(cx, height / 2, 0);
+
+      const topStile = new THREE.Mesh(new THREE.BoxGeometry(width, 0.055, 0.042), brassFrame);
+      topStile.position.set(cx, height - 0.025, 0);
+      const botStile = new THREE.Mesh(new THREE.BoxGeometry(width, 0.055, 0.042), brassFrame);
+      botStile.position.set(cx, 0.025, 0);
+      const hingeStile = new THREE.Mesh(new THREE.BoxGeometry(0.055, height, 0.042), brassFrame);
+      hingeStile.position.set(0.025 * dir, height / 2, 0);
+      const centerStile = new THREE.Mesh(new THREE.BoxGeometry(0.055, height, 0.042), brassFrame);
+      centerStile.position.set(width * dir - 0.025 * dir, height / 2, 0);
+      const midBar = new THREE.Mesh(new THREE.BoxGeometry(width - 0.08, 0.036, 0.032), brassFrame);
+      midBar.position.set(cx, height * 0.48, 0);
+
+      this.bindMechanismTarget(glassPane, 'B');
+      this.bindMechanismTarget(midBar, 'B');
+      leaf.add(glassPane, topStile, botStile, hingeStile, centerStile, midBar);
+      return leaf;
+    };
+
     this.coverLeft = new THREE.Group();
-    this.coverLeft.position.set(-0.52, fy, 0.36);
-    const doorL = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.76, 0.045), shutterMat);
-    doorL.position.set(0.59, 0.38, 0);
-    doorL.castShadow = true;
-    this.coverLeft.add(doorL);
+    this.coverLeft.position.set(-0.52, fy, 0.34);
+    this.coverLeft.add(buildInspectionLeaf(1.18, 0.58, 1));
 
     this.coverRight = new THREE.Group();
-    this.coverRight.position.set(1.88, fy, 0.36);
-    const doorR = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.76, 0.045), shutterMat);
-    doorR.position.set(-0.59, 0.38, 0);
-    doorR.castShadow = true;
-    this.coverRight.add(doorR);
+    this.coverRight.position.set(1.88, fy, 0.34);
+    this.coverRight.add(buildInspectionLeaf(1.18, 0.58, -1));
 
-    this.bindMechanismTarget(doorL, 'B');
-    this.bindMechanismTarget(doorR, 'B');
     this.bindMechanismTarget(this.gorevault.group, 'B');
     this.bindMechanismTarget(this.ringthroat.group, 'B');
     this.root.add(this.coverLeft, this.coverRight);
 
     // [C] Doctrinal Inscription vs Verbatim Memorial Record on stepped easel
     this.quotePanel = new THREE.Group();
-    this.quotePanel.position.set(0, this.pageY(0) + 0.04, 0.86);
+    this.quotePanel.position.set(0, this.pageY(0) + 0.04, 0.88);
     const doctrineCard = this.makeCardLabel(
       'DOCTRINAL RING INSCRIPTION',
       'Fallenstar Prime Monument',
       2.05,
       0.3,
-      '#282C32',
-      '#DED5C0',
-      0.2,
+      '#24272E',
+      '#EFE6D2',
+      0.22,
     );
     doctrineCard.position.set(-1.12, 0.03, 0);
     const verbatimCard = this.makeCardLabel(
@@ -303,9 +369,9 @@ export class F05FolioWorld extends BaseFolioWorld {
       '"Your sky is built from your dead."',
       2.35,
       0.32,
-      '#EFE8D6',
+      '#FAF4E6',
       '#6B1C18',
-      0.2,
+      0.22,
     );
     verbatimCard.position.set(1.12, 0.04, 0);
     this.bindMechanismTarget(doctrineCard, 'C');
@@ -328,19 +394,20 @@ export class F05FolioWorld extends BaseFolioWorld {
     const k = 1 - Math.exp(-(reducedMotion ? 10 : 5) * dt);
     const targetSc = 0.04 + this.ringRevealRatio * 0.96;
     this.ringScaleCurr += (targetSc - this.ringScaleCurr) * k;
-    this.bloodRingMesh.scale.setScalar(this.ringScaleCurr);
-    this.bloodRingMesh.visible = this.ringScaleCurr > 0.07;
+    this.bloodRingGroup.scale.setScalar(this.ringScaleCurr);
+    this.bloodRingGroup.visible = this.ringScaleCurr > 0.07;
 
     this.cutawayOpenRatio += (this.cutawayTargetOpen - this.cutawayOpenRatio) * k;
-    // Swing doors cleanly backward/outward (+/- 1.52 rad) away from front plaques
-    this.coverLeft.rotation.y = this.cutawayOpenRatio * 1.52;
-    this.coverRight.rotation.y = -this.cutawayOpenRatio * 1.52;
+    // Slight baseline outward parting (0.24 rad) swinging wide open outward (1.62 rad) on activation
+    const doorAng = 0.24 + this.cutawayOpenRatio * 1.38;
+    this.coverLeft.rotation.y = -doorAng;
+    this.coverRight.rotation.y = doorAng;
 
     this.quotePanel.position.y += (this.pageY(0) + 0.04 + this.quoteSlideTarget - this.quotePanel.position.y) * k;
 
     if (!reducedMotion) {
-      if (this.bloodRingMesh.visible) {
-        this.bloodRingMesh.rotation.z = elapsed * 0.16;
+      if (this.bloodRingGroup.visible) {
+        this.bloodRingGroup.rotation.z = elapsed * 0.16;
       }
       this.slurryPulse.position.x = 0.2 + ((elapsed * 0.45) % 0.78);
       this.extrudedSample.rotation.z = elapsed * 0.3;
@@ -363,9 +430,17 @@ export class F06FolioWorld extends BaseFolioWorld {
   public build(state: FolioRuntimeState): void {
     this.buildApertureAndLevers(state);
 
-    // Charcoal-slate & rust V-fold horizon arch
-    const arch = this.buildBackdropArch(4.5, 1.35, 0x262930, 0x8e3b2e);
-    arch.position.set(0, this.pageY(0) + 0.01, -1.78);
+    // Charcoal-slate & rust storm horizon arch
+    const arch = this.buildIllustratedBackdropArch(4.55, 1.36, {
+      topHex: '#1C1E26',
+      bottomHex: '#33292D',
+      cloudHex: '#46383D',
+      accentHex: '#9E3E33',
+      motif: 'storm',
+      ridgeBackHex: 0x26262e,
+      ridgeFrontHex: 0x3b3338,
+    });
+    arch.position.set(0, this.pageY(0) + 0.01, -1.76);
     this.root.add(arch);
 
     // [A] Geared Attrition Chronology Drum (Years 7-120)
@@ -379,7 +454,7 @@ export class F06FolioWorld extends BaseFolioWorld {
     const gearRim = this.buildBrassGear(0.76, 16, 0.045, 0xc2a25d);
     const disc = new THREE.Mesh(
       new THREE.CylinderGeometry(0.68, 0.7, 0.055, 16),
-      this.makePaperMat(0xdcd3bf),
+      this.makePaperMat(0xe5dcc8),
     );
     const rim = new THREE.Mesh(
       new THREE.TorusGeometry(0.68, 0.028, 6, 24),
@@ -388,17 +463,23 @@ export class F06FolioWorld extends BaseFolioWorld {
     rim.rotation.x = Math.PI / 2;
     const spokeA = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.06, 0.05), this.makePaperMat(0x20262e));
     const spokeB = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, 1.3), this.makePaperMat(0x20262e));
+    for (let k = 0; k < 4; k++) {
+      const a = (k / 4) * Math.PI * 2;
+      const stud = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.075, 6), this.makePaperMat(0xc2a25d, 0.36, 0.78));
+      stud.position.set(Math.cos(a) * 0.56, 0.01, Math.sin(a) * 0.56);
+      this.chronoWheel.add(stud);
+    }
     this.bindMechanismTarget(disc, 'A');
     this.bindMechanismTarget(gearRim, 'A');
     this.chronoWheel.add(gearRim, disc, rim, spokeA, spokeB);
     this.root.add(this.chronoWheel);
 
-    // Fixed stationary brass index pointer over chronology wheel
     const indexBridge = new THREE.Mesh(
-      new THREE.BoxGeometry(0.14, 0.09, 0.24),
+      new THREE.ConeGeometry(0.1, 0.24, 3),
       this.makePaperMat(0x9e322b, 0.45),
     );
-    indexBridge.position.set(-1.42, chronoBaseY + 0.09, 0.54);
+    indexBridge.rotation.x = -Math.PI / 2;
+    indexBridge.position.set(-1.42, chronoBaseY + 0.09, 0.56);
     this.root.add(indexBridge);
 
     // [B] Source-verified 14 Campaign DRAXIS Pedestal Stage
@@ -407,17 +488,25 @@ export class F06FolioWorld extends BaseFolioWorld {
       [1.48, 1.32],
       [1.48, 1.32],
       0.038,
-      [0x282c32, 0x3b4048],
+      [0x262a30, 0x3b414c],
       0xc2a25d,
     );
     specPedestal.position.set(0.14, specY, -0.24);
     this.bindMechanismTarget(specPedestal, 'B');
     this.root.add(specPedestal);
 
+    const ringFrame = new THREE.Mesh(
+      new THREE.TorusGeometry(0.62, 0.022, 6, 24),
+      this.makePaperMat(0xc2a25d, 0.36, 0.78),
+    );
+    ringFrame.rotation.x = Math.PI / 2;
+    ringFrame.position.set(0.14, specY + 0.082, -0.24);
+    this.root.add(ringFrame);
+
     F06_CAMPAIGN_DRAXIS_IDS.forEach((dId, idx) => {
       const rig = buildDraxisModel(dId, this.paperBump);
-      rig.group.position.set(0.14, specY + 0.085, -0.24);
-      rig.group.scale.setScalar(0.95);
+      rig.group.position.set(0.14, specY + 0.088, -0.24);
+      rig.group.scale.setScalar(0.98);
       rig.group.visible = idx === 0;
       this.bindMechanismTarget(rig.group, 'B');
       this.root.add(rig.group);
@@ -431,12 +520,12 @@ export class F06FolioWorld extends BaseFolioWorld {
     acc.root.position.set(1.56, accBaseY, -0.96);
     this.root.add(acc.root);
 
-    const accLbl = this.makeCardLabel('CUMULATIVE LOSS', 'No Invented Totals', 1.05, 0.22, '#24272D', '#EFE8D6', 0.14);
-    accLbl.position.set(1.56, accBaseY + 0.03, 0.72);
+    const accLbl = this.makeCardLabel('CUMULATIVE LOSS', 'No Invented Totals', 1.08, 0.24, '#24272D', '#FAF4E6', 0.2);
+    accLbl.position.set(1.56, accBaseY + 0.048, 0.72);
     this.bindMechanismTarget(accLbl, 'C');
     this.root.add(accLbl);
 
-    const lbl = this.makeCardLabel('YEARS 7–120 · LONG ATTRITION', '14 Sourced Campaign Plates', 2.45, 0.28, '#EFE9DA', '#20262E', 0.18);
+    const lbl = this.makeCardLabel('YEARS 7–120 · LONG ATTRITION', '14 Sourced Campaign Plates', 2.45, 0.28, '#FAF5E8', '#181C22', 0.2);
     lbl.position.set(0, this.pageY(0) + 0.055, 1.08);
     this.root.add(lbl);
 

@@ -204,11 +204,11 @@ export class BookAndDeskRig {
     addCornerGuard(this.bookGroup, boardWidth, boardDepth / 2, boardThickness / 2);
     addCornerGuard(this.bookGroup, boardWidth, -boardDepth / 2, boardThickness / 2);
 
-    // Three-step fanned right page stack (visibly layered cream cardstock edges)
-    for (let s = 0; s < 3; s++) {
-      const stepH = stackThickness / 3;
-      const wInset = s * 0.032;
-      const dInset = s * 0.022;
+    // Four-step fanned right page stack (visibly layered cream cardstock signatures)
+    for (let s = 0; s < 4; s++) {
+      const stepH = stackThickness / 4;
+      const wInset = s * 0.026;
+      const dInset = s * 0.018;
       const layer = new THREE.Mesh(
         new THREE.BoxGeometry(BOOK_PAGE_W - wInset, stepH + 0.004, BOOK_PAGE_D - dInset),
         pageEdgeMat,
@@ -246,6 +246,31 @@ export class BookAndDeskRig {
       this.spineGroup.add(band);
     }
     this.bookGroup.add(this.spineGroup);
+
+    // Sewn archival headbands + subtle brass spine binding eyelets at top/bottom binding channel
+    const headbandMat = new THREE.MeshStandardMaterial({
+      color: 0x3b687c,
+      roughness: 0.72,
+      metalness: 0.08,
+    });
+    for (const hz of [-(BOOK_PAGE_D / 2 - 0.04), BOOK_PAGE_D / 2 - 0.04]) {
+      const hb = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.032, 0.032, 0.22, 8),
+        headbandMat,
+      );
+      hb.rotation.z = Math.PI / 2;
+      hb.position.set(0, BOOK_BASE_Y - 0.035, hz);
+      this.bookGroup.add(hb);
+    }
+    for (const ez of [-1.85, 0, 1.85]) {
+      const eyelet = new THREE.Mesh(
+        new THREE.TorusGeometry(0.032, 0.008, 6, 12),
+        tarnishedBrassMat,
+      );
+      eyelet.rotation.x = Math.PI / 2;
+      eyelet.position.set(0, BOOK_BASE_Y - 0.02, ez);
+      this.bookGroup.add(eyelet);
+    }
 
     // Subtle bookmark ribbon emerging cleanly from the bottom gutter onto the slate
     const ribbonMat = new THREE.MeshStandardMaterial({
@@ -327,11 +352,11 @@ export class BookAndDeskRig {
     emblemGroup.add(outerRing, midRing, filamentArc, centerStar);
     this.leftCoverPivot.add(emblemGroup);
 
-    // Three-step fanned left page stack
-    for (let s = 0; s < 3; s++) {
-      const stepH = stackThickness / 3;
-      const wInset = s * 0.032;
-      const dInset = s * 0.022;
+    // Four-step fanned left page stack
+    for (let s = 0; s < 4; s++) {
+      const stepH = stackThickness / 4;
+      const wInset = s * 0.026;
+      const dInset = s * 0.018;
       const layer = new THREE.Mesh(
         new THREE.BoxGeometry(BOOK_PAGE_W - wInset, stepH + 0.004, BOOK_PAGE_D - dInset),
         pageEdgeMat,

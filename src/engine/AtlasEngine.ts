@@ -107,9 +107,9 @@ export class AtlasEngine {
     });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.94;
+    this.renderer.toneMappingExposure = 1.04;
     this.renderer.setPixelRatio(
-      this.isSoftwareGl ? 0.75 : Math.min(window.devicePixelRatio || 1, 2),
+      this.isSoftwareGl ? 0.85 : Math.min(window.devicePixelRatio || 1, 2),
     );
     this.renderer.setSize(
       Math.max(1, container.clientWidth),
@@ -303,7 +303,7 @@ export class AtlasEngine {
     const tier = atlasStore.getSnapshot().qualityTier;
     const dpr = window.devicePixelRatio || 1;
     const ratio = this.isSoftwareGl
-      ? 0.75
+      ? 0.85
       : tier === 'low'
         ? 1
         : tier === 'medium'
@@ -1006,7 +1006,7 @@ export class AtlasEngine {
       snap.reducedMotion,
       snap.noFlashMode,
     );
-    this.scene.environmentIntensity = isBookOpen ? 0.34 : 0.44;
+    this.scene.environmentIntensity = isBookOpen ? 0.42 : 0.52;
 
     this.bookRig.setDeskPropStates({
       magnifierOnDesk: !(snap.bookPhase === 'open' && snap.magnifierActive),

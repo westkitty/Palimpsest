@@ -1,5 +1,10 @@
 import * as THREE from 'three';
 import { DraxisId } from '../../types/atlas';
+import {
+  buildCutCardShape,
+  buildTaperedCurve,
+  getSharedPapercraftTextures,
+} from './papercraftArt';
 
 export interface DraxisRig {
   id: DraxisId;
@@ -20,23 +25,29 @@ class LocalMatPalette {
       metalness?: number;
       transparent?: boolean;
       opacity?: number;
+      map?: THREE.Texture;
+      flatShading?: boolean;
     },
   ): THREE.MeshStandardMaterial {
-    const r = opts?.roughness ?? 0.8;
-    const m = opts?.metalness ?? 0.1;
+    const r = opts?.roughness ?? 0.82;
+    const m = opts?.metalness ?? 0.08;
     const e = opts?.emissive ?? 0x000000;
     const ei = opts?.emissiveIntensity ?? 0;
     const t = opts?.transparent ? 1 : 0;
     const op = opts?.opacity ?? 1;
-    const key = `${color}_${r}_${m}_${e}_${ei}_${t}_${op}`;
+    const mapId = opts?.map?.uuid ?? 'none';
+    const fs = opts?.flatShading === false ? 0 : 1;
+    const key = `${color}_${r}_${m}_${e}_${ei}_${t}_${op}_${mapId}_${fs}`;
     const hit = this.cache.get(key);
     if (hit) return hit;
     const mat = new THREE.MeshStandardMaterial({
       color,
+      map: opts?.map ?? null,
       bumpMap: this.paperBump,
       bumpScale: 0.008,
       roughness: r,
       metalness: m,
+      flatShading: fs === 1,
       emissive: e,
       emissiveIntensity: ei,
       transparent: opts?.transparent ?? false,
@@ -49,748 +60,1337 @@ class LocalMatPalette {
 }
 
 /**
- * Source-grounded modular 3D reconstructions of all 21 DRAXIS specimens (plates 001..060),
- * faithful to the original plate silhouettes, paper-craft facets, and functional mechanics.
+ * Reconstructed modular 3D papercraft assemblies for all 21 DRAXIS specimens (plates 001..060),
+ * matching the original DRAXIS plates and accepted/repaired papercraft studies P00-U01.
  */
 export function buildDraxisModel(id: DraxisId, paperBump: THREE.Texture): DraxisRig {
   const g = new THREE.Group();
   const pal = new LocalMatPalette(paperBump);
+  const tex = getSharedPapercraftTextures();
 
-  const basaltInk = pal.get(0x232730, { roughness: 0.72, metalness: 0.18 });
-  const slateArmor = pal.get(0x46505e, { roughness: 0.68, metalness: 0.24 });
-  const warmCream = pal.get(0xece2cc, { roughness: 0.85, metalness: 0.04 });
-  const bronzeMat = pal.get(0x7c5c44, { roughness: 0.56, metalness: 0.35 });
-  const brassMat = pal.get(0xc6a35c, { roughness: 0.36, metalness: 0.76 });
-  const cyanMat = pal.get(0x48d2f0, { emissive: 0x15708a, emissiveIntensity: 0.52, roughness: 0.32 });
-  const magentaSlice = pal.get(0xd94ea8, { emissive: 0x6e1a50, emissiveIntensity: 0.45, roughness: 0.35 });
-  const crimsonMat = pal.get(0x8e2420, { roughness: 0.58, metalness: 0.12 });
-  const amberMagma = pal.get(0xe57628, { emissive: 0x8c310a, emissiveIntensity: 0.56, roughness: 0.42 });
-  const limeBio = pal.get(0x8ad643, { emissive: 0x3b6e12, emissiveIntensity: 0.45, roughness: 0.45 });
+  const basaltInk = pal.get(0x1f232c, { roughness: 0.74, metalness: 0.16 });
+  const slateArmor = pal.get(0x454f5e, { roughness: 0.68, metalness: 0.22 });
+  const warmCream = pal.get(0xf0e7d3, { roughness: 0.86, metalness: 0.03 });
+  const ivoryBone = pal.get(0xeadec4, { roughness: 0.82, metalness: 0.04 });
+  const bronzeMat = pal.get(0x7c5c44, { roughness: 0.56, metalness: 0.34 });
+  const brassMat = pal.get(0xd0a858, { roughness: 0.36, metalness: 0.74 });
+  const cyanMat = pal.get(0x50e2ff, { emissive: 0x1680a4, emissiveIntensity: 0.62, roughness: 0.3 });
+  const barcodeMat = pal.get(0xffffff, {
+    map: tex.barcodeStrip,
+    emissive: 0x165e78,
+    emissiveIntensity: 0.38,
+    roughness: 0.38,
+  });
+  const magentaSlice = pal.get(0xee4cb8, { emissive: 0x8a1c64, emissiveIntensity: 0.55, roughness: 0.32 });
+  const crimsonMat = pal.get(0x9a2420, { emissive: 0x450b09, emissiveIntensity: 0.28, roughness: 0.52 });
+  const amberMagma = pal.get(0xf07a24, { emissive: 0xa43408, emissiveIntensity: 0.68, roughness: 0.36 });
+  const limeBio = pal.get(0x94e046, { emissive: 0x407a12, emissiveIntensity: 0.55, roughness: 0.4 });
 
-  const spinParts: { obj: THREE.Object3D; axis: 'x' | 'y' | 'z'; speed: number; base?: number }[] = [];
+  const spinParts: { obj: THREE.Object3D; axis: 'x' | 'y' | 'z'; speed: number }[] = [];
   const orbitParts: { obj: THREE.Object3D; radius: number; phase: number; speed: number; y: number }[] = [];
-  const waveParts: { obj: THREE.Object3D; baseY: number; amp: number; speed: number; phase: number; axis?: 'y' | 'z' }[] = [];
+  const waveParts: { obj: THREE.Object3D; baseY: number; amp: number; speed: number; phase: number }[] = [];
 
   switch (id) {
     case '001': {
-      // MAGMA PLEURON: Arched articulated basalt centipede with orange magma fissures, side legs & blue dorsal telemetry bars
+      // MAGMA PLEURON (Plate 001 / P12): Arched articulated basalt centipede of convex curved dorsal carapace arches,
+      // glowing orange magma joints, 3 axial cyan dorsal data-stripes, jointed curved legs, & 4-mandible shovel head.
       const spineGroup = new THREE.Group();
-      for (let i = 0; i < 8; i++) {
-        const t = i / 7;
-        const z = -0.52 + t * 1.04;
-        const archY = 0.2 + Math.sin(t * Math.PI * 0.92) * 0.26;
-        const scale = 1 - Math.abs(t - 0.35) * 0.42;
+      for (let i = 0; i < 9; i++) {
+        const t = i / 8;
+        const z = -0.54 + t * 1.08;
+        const archY = 0.22 + Math.sin(t * Math.PI * 0.9) * 0.25;
+        const scale = 1 - Math.abs(t - 0.36) * 0.44;
+        const pitch = Math.cos(t * Math.PI * 0.9) * -0.4;
 
-        // Basalt plate
-        const seg = new THREE.Mesh(
-          new THREE.BoxGeometry(0.32 * scale, 0.16 * scale, 0.12),
+        // Convex arched carapace hood (half-cylinder arch)
+        const arch = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.18 * scale, 0.2 * scale, 0.11, 7, 1, false, -Math.PI * 0.46, Math.PI * 0.92),
           basaltInk,
         );
-        seg.position.set(0, archY, z);
-        seg.rotation.x = Math.cos(t * Math.PI * 0.92) * -0.45;
-        seg.castShadow = true;
-        spineGroup.add(seg);
+        arch.rotation.set(Math.PI / 2 + pitch, 0, Math.PI / 2);
+        arch.scale.set(0.76, 1, 1.28);
+        arch.position.set(0, archY, z);
+        arch.castShadow = true;
+        spineGroup.add(arch);
 
-        // Glowing orange magma fissure between carapace plates
-        if (i < 7) {
-          const fissure = new THREE.Mesh(
-            new THREE.BoxGeometry(0.28 * scale, 0.12 * scale, 0.045),
+        // Glowing orange magma seam beneath/between carapace shells
+        if (i < 8) {
+          const seam = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.155 * scale, 0.155 * scale, 0.055, 7),
             amberMagma,
           );
-          fissure.position.set(0, archY - 0.01, z + 0.068);
-          spineGroup.add(fissure);
+          seam.rotation.x = Math.PI / 2 + pitch;
+          seam.scale.set(1.18, 1, 0.72);
+          seam.position.set(0, archY - 0.01, z + 0.068);
+          spineGroup.add(seam);
         }
 
-        // Blue dorsal telemetry blocks
-        const tele = new THREE.Mesh(
-          new THREE.BoxGeometry(0.08 * scale, 0.045, 0.075),
-          cyanMat,
-        );
-        tele.position.set(0, archY + 0.095 * scale, z);
-        spineGroup.add(tele);
+        // Triple axial cyan dorsal telemetry bars on ridge
+        for (const sx of [-0.045, 0, 0.045]) {
+          const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.02 * scale, 0.024, 0.085), cyanMat);
+          stripe.position.set(sx * scale, archY + 0.135 * scale, z);
+          stripe.rotation.x = pitch;
+          spineGroup.add(stripe);
+        }
 
-        // Articulated left/right basalt legs
+        // Two-segment curved armored centipede legs
         for (const sx of [-1, 1]) {
-          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.24 * scale, 0.045), slateArmor);
-          leg.position.set(sx * 0.21 * scale, archY - 0.11, z);
-          leg.rotation.z = sx * 0.45;
+          const leg = buildTaperedCurve(
+            [
+              new THREE.Vector3(sx * 0.17 * scale, archY - 0.02, z),
+              new THREE.Vector3(sx * 0.28 * scale, archY - 0.08, z + 0.02),
+              new THREE.Vector3(sx * 0.25 * scale, 0.015, z + 0.05),
+            ],
+            0.026 * scale,
+            0.011 * scale,
+            5,
+            4,
+            slateArmor,
+          );
           spineGroup.add(leg);
         }
       }
-      // Twin curved front mandibles
-      for (const sx of [-1, 1]) {
-        const mand = new THREE.Mesh(new THREE.ConeGeometry(0.042, 0.24, 4), basaltInk);
-        mand.position.set(sx * 0.11, 0.2, 0.62);
-        mand.rotation.x = Math.PI / 2 + 0.2;
-        mand.rotation.z = -sx * 0.32;
+      // Flat armored shovel-head + 4 forward mandibles + glowing orange eye slits
+      const shovelHead = buildCutCardShape(
+        [
+          [-0.14, -0.06],
+          [0.14, -0.06],
+          [0.1, 0.1],
+          [-0.1, 0.1],
+        ],
+        0.09,
+        basaltInk,
+      );
+      shovelHead.rotation.x = Math.PI / 2 + 0.25;
+      shovelHead.position.set(0, 0.24, 0.56);
+      const eyeBar = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.022, 0.04), amberMagma);
+      eyeBar.position.set(0, 0.24, 0.62);
+      spineGroup.add(shovelHead, eyeBar);
+      for (const [mx, sc] of [[-0.09, 1], [-0.035, 0.85], [0.035, 0.85], [0.09, 1]]) {
+        const mand = new THREE.Mesh(new THREE.ConeGeometry(0.02 * sc, 0.19 * sc, 4), basaltInk);
+        mand.position.set(mx, 0.18, 0.68);
+        mand.rotation.set(Math.PI / 2 + 0.2, 0, -Math.sign(mx) * 0.24);
         spineGroup.add(mand);
       }
       g.add(spineGroup);
-      waveParts.push({ obj: spineGroup, baseY: 0, amp: 0.022, speed: 1.6, phase: 0 });
+      waveParts.push({ obj: spineGroup, baseY: 0, amp: 0.02, speed: 1.5, phase: 0 });
       break;
     }
 
     case '003': {
-      // FAULT-TONGUE: Sinuous armored seismic wyrm with barcode ribs, dorsal fins & circular glowing cyan turbine mouth
+      // FAULT-TONGUE (Plate 003 / P11): Armored sinuous seismic wyrm with barcode hull bands & dorsal fins,
+      // splitting into SIDEWAYS/HORIZONTALLY opening armored jaws revealing an inner glowing CYAN RINGED TURBINE.
       const bodyCurve = new THREE.Group();
-      for (let i = 0; i < 8; i++) {
-        const t = i / 7;
-        const z = -0.5 + t * 0.92;
-        const x = Math.sin(t * Math.PI * 1.4) * 0.14;
-        const y = 0.18 + Math.sin(t * Math.PI) * 0.12;
-        const rad = 0.09 + t * 0.1;
+      const spinePts = [
+        new THREE.Vector3(-0.08, 0.12, -0.58),
+        new THREE.Vector3(0.12, 0.24, -0.32),
+        new THREE.Vector3(-0.08, 0.26, -0.04),
+        new THREE.Vector3(0.05, 0.24, 0.22),
+        new THREE.Vector3(0, 0.25, 0.42),
+      ];
+      const bodyTube = buildTaperedCurve(spinePts, 0.08, 0.165, 16, 8, slateArmor);
+      bodyCurve.add(bodyTube);
 
-        const seg = new THREE.Mesh(
-          new THREE.CylinderGeometry(rad, rad * 0.92, 0.13, 8),
-          i % 2 === 0 ? slateArmor : basaltInk,
+      // Barcode hull collar rings & dorsal blade fins
+      for (let i = 0; i < 6; i++) {
+        const t = i / 5;
+        const pt = new THREE.CatmullRomCurve3(spinePts).getPointAt(t);
+        const r = THREE.MathUtils.lerp(0.085, 0.168, t);
+        const band = new THREE.Mesh(new THREE.TorusGeometry(r, 0.016, 5, 12), barcodeMat);
+        band.position.copy(pt);
+        const fin = buildCutCardShape(
+          [
+            [-0.04, 0],
+            [0.05, 0],
+            [0.01, 0.13 + t * 0.04],
+          ],
+          0.018,
+          basaltInk,
         );
-        seg.rotation.x = Math.PI / 2;
-        seg.position.set(x, y, z);
-        seg.castShadow = true;
-        bodyCurve.add(seg);
-
-        // Dorsal seismic fin
-        const fin = new THREE.Mesh(new THREE.ConeGeometry(0.036, 0.14, 3), brassMat);
-        fin.position.set(x, y + rad + 0.05, z);
-        fin.rotation.x = -0.35;
-        bodyCurve.add(fin);
+        fin.rotation.y = Math.PI / 2;
+        fin.position.set(pt.x, pt.y + r * 0.85, pt.z);
+        bodyCurve.add(band, fin);
       }
-      // Open circular acoustic projector head with glowing cyan concentric turbine rings
-      const headCowl = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.19, 0.24, 10, 1, true), basaltInk);
-      headCowl.rotation.x = Math.PI / 2;
-      headCowl.position.set(0, 0.24, 0.52);
-      headCowl.castShadow = true;
-      const cyanCore = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 10), cyanMat);
-      cyanCore.position.set(0, 0.24, 0.5);
-      const turbineRing = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.02, 6, 14), cyanMat);
-      turbineRing.position.set(0, 0.24, 0.62);
-      bodyCurve.add(headCowl, cyanCore, turbineRing);
+
+      // Twin horizontally-opening armored side jaws flanking glowing ringed cyan resonance turbine
+      const headPivot = new THREE.Group();
+      headPivot.position.set(0, 0.25, 0.44);
+      for (const sx of [-1, 1]) {
+        const jaw = buildCutCardShape(
+          [
+            [0, -0.11],
+            [0.34, -0.05],
+            [0.4, 0],
+            [0.34, 0.05],
+            [0, 0.11],
+          ],
+          0.11,
+          basaltInk,
+        );
+        jaw.rotation.y = -Math.PI / 2 + sx * 0.36;
+        jaw.position.set(sx * 0.13, 0, 0.04);
+        headPivot.add(jaw);
+      }
+      // Inner concentric glowing cyan seismic resonance turbine rings + crescent wave arcs
+      const coreTube = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.07, 0.24, 12), cyanMat);
+      coreTube.rotation.x = Math.PI / 2;
+      coreTube.position.z = 0.08;
+      headPivot.add(coreTube);
+      const turbSpinner = new THREE.Group();
+      turbSpinner.position.z = 0.18;
+      for (const [tr, tz] of [
+        [0.145, 0.0],
+        [0.11, 0.07],
+        [0.075, 0.13],
+      ]) {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(tr, 0.014, 6, 16), cyanMat);
+        ring.position.z = tz;
+        turbSpinner.add(ring);
+      }
+      headPivot.add(turbSpinner);
+      bodyCurve.add(headPivot);
       g.add(bodyCurve);
-      spinParts.push({ obj: turbineRing, axis: 'z', speed: 2.0 });
+      spinParts.push({ obj: turbSpinner, axis: 'z', speed: 2.2 });
       break;
     }
 
     case '004': {
-      // OBSIDIAN GUL: Jagged wingless predator made of fractured obsidian shards around glowing orange magma seams
-      const coreGlow = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.58), amberMagma);
-      coreGlow.position.set(0, 0.28, 0.02);
+      // OBSIDIAN GUL (Plate 004 / P11): Wingless fierce volcanic-glass shard quadruped
+      // bristling with backward-swept black obsidian crystal plates over glowing orange molten seams.
+      const coreGlow = new THREE.Mesh(new THREE.DodecahedronGeometry(0.16, 0), amberMagma);
+      coreGlow.scale.set(0.9, 0.78, 2.2);
+      coreGlow.position.set(0, 0.26, -0.02);
       g.add(coreGlow);
 
-      // Floating angular obsidian armor shards around the molten core
-      const shardPos: [number, number, number, number, number][] = [
-        [-0.14, 0.34, 0.16, 0.3, 0.25],
-        [0.14, 0.34, 0.16, -0.3, -0.25],
-        [0, 0.42, 0.04, 0, 0.18],
-        [-0.12, 0.28, -0.18, 0.2, -0.15],
-        [0.12, 0.28, -0.18, -0.2, 0.15],
-        [0, 0.38, -0.28, 0, -0.3],
+      // Swept backward overlapping black obsidian crystal shards along shoulders, flanks, back, and rump
+      const shardSpecs: [number, number, number, number, number, number, number][] = [
+        [0, 0.38, 0.18, -0.68, 0, 0, 0.26],
+        [-0.12, 0.35, 0.14, -0.65, -0.3, -0.45, 0.24],
+        [0.12, 0.35, 0.14, -0.65, 0.3, 0.45, 0.24],
+        [-0.13, 0.31, -0.06, -0.82, -0.25, -0.5, 0.28],
+        [0.13, 0.31, -0.06, -0.82, 0.25, 0.5, 0.28],
+        [0, 0.38, -0.1, -0.88, 0, 0, 0.29],
+        [-0.09, 0.27, -0.25, -0.95, -0.2, -0.3, 0.24],
+        [0.09, 0.27, -0.25, -0.95, 0.2, 0.3, 0.24],
       ];
-      shardPos.forEach(([sx, sy, sz, rz, rx]) => {
-        const shard = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.32, 4), basaltInk);
-        shard.position.set(sx, sy, sz);
-        shard.rotation.set(rx + Math.PI / 2, 0, rz);
-        shard.castShadow = true;
-        g.add(shard);
-      });
-      // Sculpted obsidian head + jaw
-      const head = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.34, 4), basaltInk);
-      head.rotation.x = Math.PI / 2;
-      head.position.set(0, 0.35, 0.44);
-      const eyeGlow = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.035, 0.08), amberMagma);
-      eyeGlow.position.set(0, 0.36, 0.46);
-      // Tail + four clawed shard legs
-      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.44, 4), basaltInk);
-      tail.rotation.x = -1.1;
-      tail.position.set(0, 0.38, -0.46);
-      for (const [lx, lz] of [[-0.16, 0.22], [0.16, 0.22], [-0.15, -0.22], [0.15, -0.22]]) {
-        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.26, 0.08), basaltInk);
-        leg.position.set(lx, 0.13, lz);
-        leg.rotation.x = lz > 0 ? -0.2 : 0.2;
+      for (const [x, y, z, rx, ry, rz, h] of shardSpecs) {
+        const plate = new THREE.Mesh(new THREE.ConeGeometry(0.085, h, 4), basaltInk);
+        plate.position.set(x, y, z);
+        plate.rotation.set(rx, ry, rz);
+        plate.castShadow = true;
+        g.add(plate);
+      }
+
+      // Fierce horned obsidian skull & fiery orange gullet maw
+      const skull = new THREE.Mesh(new THREE.ConeGeometry(0.115, 0.28, 4), basaltInk);
+      skull.rotation.x = Math.PI / 2 + 0.15;
+      skull.position.set(0, 0.34, 0.42);
+      const hornL = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.18, 4), basaltInk);
+      hornL.position.set(-0.075, 0.42, 0.32);
+      hornL.rotation.set(-0.85, 0, 0.35);
+      const hornR = hornL.clone();
+      hornR.position.x = 0.075;
+      hornR.rotation.z = -0.35;
+      const mawGlow = new THREE.Mesh(new THREE.BoxGeometry(0.095, 0.032, 0.09), amberMagma);
+      mawGlow.position.set(0, 0.31, 0.46);
+      g.add(skull, hornL, hornR, mawGlow);
+
+      // 4 clawed obsidian shard legs + serrated tail
+      for (const [lx, lz, rx] of [
+        [-0.145, 0.22, -0.22],
+        [0.145, 0.22, -0.22],
+        [-0.135, -0.24, 0.28],
+        [0.135, -0.24, 0.28],
+      ]) {
+        const leg = buildTaperedCurve(
+          [
+            new THREE.Vector3(lx * 0.85, 0.26, lz),
+            new THREE.Vector3(lx * 1.15, 0.14, lz - rx * 0.12),
+            new THREE.Vector3(lx, 0.015, lz + 0.04),
+          ],
+          0.048,
+          0.025,
+          6,
+          4,
+          basaltInk,
+        );
         g.add(leg);
       }
-      g.add(head, eyeGlow, tail);
+      const tail = buildTaperedCurve(
+        [
+          new THREE.Vector3(0, 0.28, -0.28),
+          new THREE.Vector3(0.05, 0.34, -0.46),
+          new THREE.Vector3(0.14, 0.46, -0.56),
+        ],
+        0.046,
+        0.01,
+        8,
+        4,
+        basaltInk,
+      );
+      g.add(tail);
       break;
     }
 
     case '005': {
-      // TREMORHOUND: Low-slung crouching dark-slate wolf with cyan forehead sigil, cyan flank streaks & ground seismic rings
-      const groundRipple1 = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.014, 5, 24), cyanMat);
-      groundRipple1.rotation.x = Math.PI / 2;
-      groundRipple1.position.y = 0.018;
-      const groundRipple2 = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.012, 5, 20), cyanMat);
-      groundRipple2.rotation.x = Math.PI / 2;
-      groundRipple2.position.y = 0.018;
-      g.add(groundRipple1, groundRipple2);
+      // TREMORHOUND (Plate 005 / P12): Low crouching dark-indigo layered origami wolf on concentric cyan rune discs,
+      // glowing cyan diamond forehead sigil, cyan flank lightning bolts, and glowing cyan foreclaws.
+      const discOuter = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.015, 5, 24), cyanMat);
+      discOuter.rotation.x = Math.PI / 2;
+      discOuter.position.y = 0.016;
+      const discInner = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.014, 5, 20), cyanMat);
+      discInner.rotation.x = Math.PI / 2;
+      discInner.position.y = 0.016;
+      const crackPad = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.45, 0.02, 8), basaltInk);
+      crackPad.position.y = 0.01;
+      g.add(crackPad, discOuter, discInner);
 
-      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.2, 0.64), basaltInk);
-      torso.position.set(0, 0.24, -0.02);
-      torso.rotation.x = 0.14;
+      const wolfIndigo = pal.get(0x20273a, { roughness: 0.76, metalness: 0.12 });
+      const torsoPts = [
+        new THREE.Vector2(0.08, 0),
+        new THREE.Vector2(0.1, 0.18),
+        new THREE.Vector2(0.135, 0.42),
+        new THREE.Vector2(0.06, 0.56),
+      ];
+      const torso = new THREE.Mesh(new THREE.LatheGeometry(torsoPts, 6), wolfIndigo);
+      torso.rotation.x = Math.PI / 2 + 0.14;
+      torso.scale.set(0.88, 1, 0.92);
+      torso.position.set(0, 0.27, -0.26);
       torso.castShadow = true;
+      g.add(torso);
 
-      // Shoulder ruff spikes & cyan flank streaks
-      for (const sx of [-0.13, 0.13]) {
-        const streak = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.05, 0.42), cyanMat);
-        streak.position.set(sx, 0.25, 0);
-        g.add(streak);
+      // Layered backward-swept jagged hackle shards on ruff + cyan flank bolts
+      for (let i = 0; i < 4; i++) {
+        const hackle = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.22 - i * 0.02, 4), slateArmor);
+        hackle.rotation.x = -0.92;
+        hackle.position.set(0, 0.37 - i * 0.02, 0.2 - i * 0.12);
+        g.add(hackle);
       }
-      const neck = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.34, 5), slateArmor);
-      neck.rotation.x = Math.PI / 2 - 0.35;
-      neck.position.set(0, 0.29, 0.32);
-      const snout = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.26, 4), basaltInk);
-      snout.rotation.x = Math.PI / 2;
-      snout.position.set(0, 0.28, 0.5);
-      // Glowing cyan forehead diamond sigil
-      const sigil = new THREE.Mesh(new THREE.OctahedronGeometry(0.048, 0), cyanMat);
-      sigil.scale.set(0.8, 0.35, 1.3);
-      sigil.position.set(0, 0.36, 0.42);
-      // Crouching forelegs & hindlegs with cyan claws
-      for (const [lx, lz, rotX] of [[-0.16, 0.24, -0.25], [0.16, 0.24, -0.25], [-0.15, -0.26, 0.3], [0.15, -0.26, 0.3]]) {
-        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.24, 0.085), basaltInk);
-        leg.position.set(lx, 0.12, lz);
-        leg.rotation.x = rotX;
-        const claw = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.09), cyanMat);
-        claw.position.set(lx, 0.02, lz + 0.05);
-        g.add(leg, claw);
+      for (const sx of [-0.115, 0.115]) {
+        const bolt = buildCutCardShape(
+          [
+            [-0.18, 0.01],
+            [-0.04, 0.04],
+            [0.02, -0.01],
+            [0.16, 0.02],
+            [0.04, -0.04],
+            [-0.02, 0.01],
+          ],
+          0.02,
+          cyanMat,
+        );
+        bolt.rotation.y = Math.PI / 2;
+        bolt.position.set(sx, 0.24, 0);
+        g.add(bolt);
       }
-      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.34, 5), slateArmor);
-      tail.rotation.x = -1.25;
-      tail.position.set(0, 0.28, -0.44);
-      g.add(torso, neck, snout, sigil, tail);
+
+      // Low crouching wolf skull + ears + glowing cyan diamond forehead rune
+      const head = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.28, 5), wolfIndigo);
+      head.rotation.x = Math.PI / 2 + 0.18;
+      head.position.set(0, 0.31, 0.44);
+      const sigil = new THREE.Mesh(new THREE.OctahedronGeometry(0.04, 0), cyanMat);
+      sigil.scale.set(0.75, 0.28, 1.35);
+      sigil.position.set(0, 0.37, 0.39);
+      for (const sx of [-1, 1]) {
+        const ear = new THREE.Mesh(new THREE.ConeGeometry(0.032, 0.12, 3), wolfIndigo);
+        ear.position.set(sx * 0.055, 0.41, 0.33);
+        ear.rotation.set(-0.25, 0, -sx * 0.22);
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.015, 5, 5), cyanMat);
+        eye.position.set(sx * 0.048, 0.32, 0.46);
+        g.add(ear, eye);
+      }
+
+      // Crouching muscular legs + glowing cyan ground claws
+      for (const [lx, lz, kneeZ] of [
+        [-0.15, 0.22, 0.06],
+        [0.15, 0.22, 0.06],
+        [-0.14, -0.25, -0.08],
+        [0.14, -0.25, -0.08],
+      ]) {
+        const leg = buildTaperedCurve(
+          [
+            new THREE.Vector3(lx * 0.8, 0.25, lz),
+            new THREE.Vector3(lx * 1.12, 0.14, lz + kneeZ),
+            new THREE.Vector3(lx, 0.025, lz + 0.04),
+          ],
+          0.042,
+          0.024,
+          6,
+          5,
+          wolfIndigo,
+        );
+        const pawGlow = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.075, 3), cyanMat);
+        pawGlow.rotation.x = Math.PI / 2;
+        pawGlow.position.set(lx, 0.03, lz + 0.085);
+        g.add(leg, pawGlow);
+      }
+      const tail = buildTaperedCurve(
+        [
+          new THREE.Vector3(0, 0.26, -0.32),
+          new THREE.Vector3(0, 0.22, -0.52),
+          new THREE.Vector3(-0.04, 0.16, -0.64),
+        ],
+        0.045,
+        0.014,
+        6,
+        5,
+        slateArmor,
+      );
+      g.add(head, sigil, tail);
       break;
     }
 
     case '008': {
-      // AEROKARST: Vertical axis core orb + nested upper/lower disk satellites + 6 curved crescent stone ribs
-      const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.18, 1), cyanMat);
-      core.position.y = 0.52;
-      core.castShadow = true;
-      g.add(core);
+      // AEROKARST (Plate 008 / U01): Strictly HEADLESS atmospheric engine:
+      // nested wind-vortex sphere core, vertical polar stack of orbs/discs, orbited symmetrically by 8 arc brackets.
+      const eyeCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.11, 1), warmCream);
+      eyeCore.position.y = 0.52;
+      const perforatedShell = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.19, 1),
+        pal.get(0x303b4a, { roughness: 0.6, metalness: 0.25, transparent: true, opacity: 0.86 }),
+      );
+      perforatedShell.position.y = 0.52;
+      const equatorHalo = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.016, 6, 18), cyanMat);
+      equatorHalo.rotation.x = Math.PI / 2;
+      equatorHalo.position.y = 0.52;
+      g.add(eyeCore, perforatedShell, equatorHalo);
 
-      // Vertical satellite domes above and below core
-      for (const dy of [-0.34, -0.22, 0.22, 0.34]) {
-        const disk = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.11 - Math.abs(dy) * 0.15, 0.13 - Math.abs(dy) * 0.15, 0.06, 8),
-          slateArmor,
-        );
-        disk.position.y = 0.52 + dy;
-        g.add(disk);
+      // Vertical stack of polar stone-metal spheres and disc nodes above and below
+      for (const [dy, rad] of [
+        [-0.36, 0.05],
+        [-0.25, 0.085],
+        [0.25, 0.085],
+        [0.37, 0.055],
+        [0.46, 0.03],
+      ]) {
+        const node = new THREE.Mesh(new THREE.CylinderGeometry(rad * 0.85, rad, 0.065, 8), slateArmor);
+        node.position.y = 0.52 + dy;
+        g.add(node);
       }
 
-      // Orbiting curved concave basaltic karst shell crescents
-      const ringGroup = new THREE.Group();
-      ringGroup.position.y = 0.52;
-      for (let i = 0; i < 6; i++) {
+      // 8 curved segmented arc brackets orbiting core
+      const orbitRig = new THREE.Group();
+      orbitRig.position.y = 0.52;
+      for (let i = 0; i < 8; i++) {
+        const r = i < 4 ? 0.34 : 0.47;
         const arc = new THREE.Mesh(
-          new THREE.TorusGeometry(0.38 + (i % 2) * 0.1, 0.038, 5, 10, Math.PI * 0.55),
+          new THREE.TorusGeometry(r, 0.032, 5, 10, Math.PI * 0.42),
           i % 2 === 0 ? basaltInk : slateArmor,
         );
-        arc.rotation.y = (i / 6) * Math.PI * 2;
-        arc.rotation.z = (i % 2 === 0 ? 0.55 : -0.45);
+        arc.rotation.y = (i / 4) * Math.PI * 2 + (i >= 4 ? 0.4 : 0);
+        arc.rotation.z = i % 2 === 0 ? 0.48 : -0.42;
         arc.castShadow = true;
-        ringGroup.add(arc);
+        orbitRig.add(arc);
       }
-      g.add(ringGroup);
-      spinParts.push({ obj: ringGroup, axis: 'y', speed: 0.75 });
+      g.add(orbitRig);
+      spinParts.push({ obj: orbitRig, axis: 'y', speed: 0.8 });
       break;
     }
 
     case '009': {
-      // CLOUDMAW: Coiled boiling storm-cloud dragon plates + glowing plasma maw + swirling rain column
-      const vortex = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.26, 0.08, 0.34, 10, 1, true),
-        pal.get(0x88b4cc, { transparent: true, opacity: 0.45 }),
+      // CLOUDMAW (Plate 009 / P11): Massive coiled billowing storm-cloud sea-serpent laced with gold lightning,
+      // horned icy/storm jaws roaring downward above swirling spiral ocean/rain funnel waves.
+      const oceanWaveMat = pal.get(0x4f92ad, { roughness: 0.48 });
+      const stormCloudMat = pal.get(0xd7e3ee, { roughness: 0.88 });
+      const darkStormMat = pal.get(0x3a485e, { roughness: 0.78 });
+
+      const vortexFunnel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.28, 0.06, 0.36, 12, 1, true),
+        pal.get(0x7fb4cc, { transparent: true, opacity: 0.5 }),
       );
-      vortex.position.y = 0.17;
-      g.add(vortex);
+      vortexFunnel.position.y = 0.18;
+      const baseWave = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.045, 5, 14, Math.PI * 1.6), oceanWaveMat);
+      baseWave.rotation.x = Math.PI / 2;
+      baseWave.position.y = 0.05;
+      g.add(vortexFunnel, baseWave);
 
       const coilGroup = new THREE.Group();
-      for (let i = 0; i < 9; i++) {
-        const t = i / 8;
-        const a = t * Math.PI * 1.85;
-        const r = 0.34 - t * 0.12;
-        const cloud = new THREE.Mesh(
-          new THREE.DodecahedronGeometry(0.14 - t * 0.03, 0),
-          i % 2 === 0 ? slateArmor : warmCream,
-        );
-        cloud.position.set(Math.cos(a) * r, 0.24 + t * 0.44, Math.sin(a) * r);
-        cloud.castShadow = true;
-        coilGroup.add(cloud);
+      const coilPts: THREE.Vector3[] = [];
+      for (let i = 0; i <= 12; i++) {
+        const t = i / 12;
+        const a = t * Math.PI * 2.15;
+        const r = THREE.MathUtils.lerp(0.36, 0.18, t);
+        coilPts.push(new THREE.Vector3(Math.cos(a) * r, 0.16 + t * 0.56, Math.sin(a) * r));
       }
-      const head = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.3, 5), basaltInk);
-      head.rotation.x = Math.PI / 2;
-      head.position.set(0.18, 0.72, 0.12);
-      const maw = new THREE.Mesh(new THREE.OctahedronGeometry(0.08, 0), amberMagma);
-      maw.position.set(0.18, 0.7, 0.26);
-      coilGroup.add(head, maw);
+      const serpentBody = buildTaperedCurve(coilPts, 0.06, 0.145, 22, 7, darkStormMat);
+      coilGroup.add(serpentBody);
+
+      // Sculpted paper cloud puffs & golden lightning fins along storm serpent coils
+      for (let i = 0; i < 8; i++) {
+        const t = i / 7;
+        const pt = new THREE.CatmullRomCurve3(coilPts).getPointAt(t);
+        const puff = new THREE.Mesh(new THREE.DodecahedronGeometry(0.095 - t * 0.015, 0), stormCloudMat);
+        puff.position.set(pt.x * 1.15, pt.y + 0.04, pt.z * 1.15);
+        const spark = new THREE.Mesh(new THREE.OctahedronGeometry(0.032, 0), brassMat);
+        spark.position.set(pt.x * 0.88, pt.y + 0.09, pt.z * 0.88);
+        coilGroup.add(puff, spark);
+      }
+
+      // Sculpted open storm-dragon jaws & glowing gold/cyan maw
+      const headGroup = new THREE.Group();
+      headGroup.position.set(0.14, 0.74, 0.1);
+      headGroup.rotation.y = -0.5;
+      const upperJaw = new THREE.Mesh(new THREE.ConeGeometry(0.125, 0.28, 5), stormCloudMat);
+      upperJaw.rotation.x = Math.PI / 2 - 0.18;
+      upperJaw.position.set(0, 0.04, 0.1);
+      const lowerJaw = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.22, 4), darkStormMat);
+      lowerJaw.rotation.x = Math.PI / 2 + 0.35;
+      lowerJaw.position.set(0, -0.05, 0.08);
+      const mawCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.072, 0), cyanMat);
+      mawCore.position.set(0, 0, 0.08);
+      headGroup.add(upperJaw, lowerJaw, mawCore);
+      coilGroup.add(headGroup);
       g.add(coilGroup);
       spinParts.push({ obj: coilGroup, axis: 'y', speed: 0.55 });
       break;
     }
 
     case '012': {
-      // VORTENBRAY: Inverted spiraling orbital funnel of concentric upper rings + downward golden-and-steel vortex ribbons
-      const baseCity = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.26, 0.08, 8), warmCream);
-      baseCity.position.y = 0.04;
-      g.add(baseCity);
+      // VORTENBRAY (Plate 012 / P11): Inverted vortex tornado of concentric upper gold-lit rings
+      // spiraling downward into an INVERTED FLOATING SPIRE CITADEL (NO wings/dragon head).
+      const spireCitadel = new THREE.Group();
+      spireCitadel.position.y = 0.28;
+      // Inverted pyramidal floating island rock & upright golden towers on top
+      const rockCone = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.26, 7), slateArmor);
+      rockCone.rotation.x = Math.PI;
+      rockCone.position.y = -0.1;
+      const deck = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.27, 0.04, 8), warmCream);
+      spireCitadel.add(rockCone, deck);
+      for (const [tx, tz, th] of [
+        [0, 0, 0.24],
+        [-0.12, 0.08, 0.15],
+        [0.14, -0.06, 0.17],
+        [-0.08, -0.12, 0.13],
+      ]) {
+        const tower = new THREE.Mesh(new THREE.ConeGeometry(0.036, th, 4), brassMat);
+        tower.position.set(tx, th / 2 + 0.02, tz);
+        spireCitadel.add(tower);
+      }
+      g.add(spireCitadel);
 
-      const funnelGroup = new THREE.Group();
-      for (let i = 0; i < 5; i++) {
-        const t = i / 4;
-        const radius = THREE.MathUtils.lerp(0.14, 0.48, t);
-        const y = THREE.MathUtils.lerp(0.18, 0.84, t);
-        const track = new THREE.Mesh(
-          new THREE.TorusGeometry(radius, 0.024, 6, 20, Math.PI * 1.65),
+      // Spiraling inverted funnel helix ascending into wide golden concentric sky rings
+      const funnel = new THREE.Group();
+      for (let i = 0; i < 6; i++) {
+        const t = i / 5;
+        const r = THREE.MathUtils.lerp(0.16, 0.52, t);
+        const y = THREE.MathUtils.lerp(0.32, 0.9, t);
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(r, 0.024, 5, 22, Math.PI * 1.55),
           i % 2 === 0 ? brassMat : slateArmor,
         );
-        track.position.y = y;
-        track.rotation.x = Math.PI / 2 + (i % 2 === 0 ? 0.18 : -0.16);
-        track.rotation.z = i * 0.85;
-        track.castShadow = true;
-        funnelGroup.add(track);
+        ring.position.y = y;
+        ring.rotation.x = Math.PI / 2 + (i % 2 === 0 ? 0.16 : -0.14);
+        ring.rotation.z = i * 0.9;
+        ring.castShadow = true;
+        funnel.add(ring);
       }
-      // Central spiral golden conduit spine
-      const spire = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.72, 6, 1, true), cyanMat);
-      spire.rotation.x = Math.PI;
-      spire.position.y = 0.48;
-      spire.scale.set(0.5, 1, 0.5);
-      funnelGroup.add(spire);
-      g.add(funnelGroup);
-      spinParts.push({ obj: funnelGroup, axis: 'y', speed: 1.05 });
+      // Ascending spiral gold-cyan conduit ribbon
+      const helixPts: THREE.Vector3[] = [];
+      for (let i = 0; i <= 14; i++) {
+        const t = i / 14;
+        const a = t * Math.PI * 3.2;
+        const r = THREE.MathUtils.lerp(0.1, 0.42, t);
+        helixPts.push(new THREE.Vector3(Math.cos(a) * r, 0.3 + t * 0.6, Math.sin(a) * r));
+      }
+      const helix = buildTaperedCurve(helixPts, 0.015, 0.032, 24, 5, brassMat);
+      funnel.add(helix);
+      g.add(funnel);
+      spinParts.push({ obj: funnel, axis: 'y', speed: 0.95 });
       break;
     }
 
     case '015': {
-      // VERDGORGE: Mossy root-and-ribcage forest titan quadruped + branched stag-antler canopy crown
-      const bark = bronzeMat;
-      const foliage = pal.get(0x4c7c4e, { roughness: 0.88 });
-      const spore = pal.get(0xe28ab4, { emissive: 0x6e284c, emissiveIntensity: 0.3 });
+      // VERDGORGE (Plate 015 / U01): Forest titan quadruped with exposed wooden/ivory RIBCAGE, bark pillar legs,
+      // tiered emerald leaf canopy, pink spore mushrooms, and sweeping branched STAG-ANTLER BOUGHS.
+      const foliage = pal.get(0x4c8248, { roughness: 0.86 });
+      const brightLeaf = pal.get(0x6da652, { roughness: 0.84 });
+      const sporePink = pal.get(0xee8cbf, { emissive: 0x7a2654, emissiveIntensity: 0.36 });
 
-      for (const [lx, lz] of [[-0.22, 0.22], [0.22, 0.22], [-0.22, -0.22], [0.22, -0.22]]) {
-        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.11, 0.42, 6), bark);
-        leg.position.set(lx, 0.21, lz);
-        leg.castShadow = true;
+      for (const [lx, lz] of [
+        [-0.22, 0.24],
+        [0.22, 0.24],
+        [-0.22, -0.24],
+        [0.22, -0.24],
+      ]) {
+        const leg = buildTaperedCurve(
+          [
+            new THREE.Vector3(lx * 0.85, 0.44, lz),
+            new THREE.Vector3(lx * 1.04, 0.22, lz),
+            new THREE.Vector3(lx * 1.15, 0.015, lz),
+          ],
+          0.072,
+          0.105,
+          6,
+          6,
+          bronzeMat,
+        );
         g.add(leg);
       }
-      // Open ribcage chest beams
+      // Exposed curved wooden ribcage arches + glowing inner moss spine
+      const spine = buildTaperedCurve(
+        [new THREE.Vector3(0, 0.52, -0.34), new THREE.Vector3(0, 0.58, 0.32)],
+        0.075,
+        0.095,
+        6,
+        6,
+        bronzeMat,
+      );
+      g.add(spine);
       for (let r = -2; r <= 2; r++) {
-        const rib = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.022, 5, 10, Math.PI * 1.25), warmCream);
-        rib.position.set(0, 0.42, r * 0.09);
+        const rib = new THREE.Mesh(
+          new THREE.TorusGeometry(0.22 - Math.abs(r) * 0.02, 0.022, 5, 12, Math.PI * 1.25),
+          ivoryBone,
+        );
+        rib.position.set(0, 0.44, r * 0.095);
         rib.rotation.z = Math.PI * 0.88;
         g.add(rib);
       }
-      // Canopy cluster back
-      const canopyA = new THREE.Mesh(new THREE.DodecahedronGeometry(0.22, 0), foliage);
-      canopyA.position.set(-0.08, 0.66, -0.05);
-      const canopyB = new THREE.Mesh(new THREE.DodecahedronGeometry(0.18, 0), foliage);
-      canopyB.position.set(0.12, 0.62, -0.14);
-      // Stag-antler crown
-      for (const sx of [-1, 1]) {
-        const antler = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.036, 0.34, 5), bark);
-        antler.position.set(sx * 0.16, 0.72, 0.28);
-        antler.rotation.z = -sx * 0.55;
-        const blossom = new THREE.Mesh(new THREE.OctahedronGeometry(0.06, 0), spore);
-        blossom.position.set(sx * 0.28, 0.85, 0.3);
-        g.add(antler, blossom);
+      // Tiered origami canopy foliage & pink spore mushroom caps
+      for (const [cx, cy, cz, cr, col] of [
+        [0, 0.72, -0.08, 0.24, foliage],
+        [-0.18, 0.65, -0.18, 0.16, brightLeaf],
+        [0.18, 0.64, -0.14, 0.17, brightLeaf],
+        [0, 0.68, 0.16, 0.14, foliage],
+      ] as const) {
+        const bush = new THREE.Mesh(new THREE.DodecahedronGeometry(cr, 0), col);
+        bush.position.set(cx, cy, cz);
+        bush.castShadow = true;
+        g.add(bush);
       }
-      g.add(canopyA, canopyB);
+      // Sweeping branched wooden stag antlers adorned with pink spore blossoms
+      for (const sx of [-1, 1]) {
+        const mainAntler = buildTaperedCurve(
+          [
+            new THREE.Vector3(sx * 0.08, 0.62, 0.28),
+            new THREE.Vector3(sx * 0.24, 0.78, 0.32),
+            new THREE.Vector3(sx * 0.32, 0.96, 0.22),
+          ],
+          0.032,
+          0.012,
+          8,
+          5,
+          bronzeMat,
+        );
+        const browTine = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.18, 4), bronzeMat);
+        browTine.position.set(sx * 0.22, 0.82, 0.42);
+        browTine.rotation.set(0.6, 0, -sx * 0.45);
+        const cap = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.04, 6), sporePink);
+        cap.position.set(sx * 0.28, 0.92, 0.25);
+        g.add(mainAntler, browTine, cap);
+      }
       break;
     }
 
     case '019': {
-      // TERRAGULLET: Segmented armored bronze worm + glowing lime bio-compost bays + twin serrated nose grinders
+      // TERRAGULLET (Plate 019 / P12): Jawless colossal bronze tunneling worm
+      // fronted by a SPINNING CONICAL HELICAL AUGER DRILL NOSE, slatted bio-compost bays glowing LIME GREEN.
       for (let s = 0; s < 5; s++) {
-        const z = -0.34 + s * 0.16;
+        const z = -0.44 + s * 0.17;
         const hull = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.21, 0.21, 0.11, 10),
-          s % 2 === 0 ? bronzeMat : basaltInk,
+          new THREE.CylinderGeometry(0.225, 0.225, 0.11, 10),
+          s % 2 === 0 ? bronzeMat : slateArmor,
         );
         hull.rotation.x = Math.PI / 2;
         hull.position.set(0, 0.24, z);
         hull.castShadow = true;
         g.add(hull);
-
-        if (s > 0 && s < 4) {
-          // Open cutaway bay glowing lime-green spheres
-          const pod = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 8), limeBio);
-          pod.position.set(0, 0.24, z + 0.08);
-          g.add(pod);
+        if (s > 0) {
+          const bioCore = new THREE.Mesh(new THREE.SphereGeometry(0.185, 8, 8), limeBio);
+          bioCore.position.set(0, 0.24, z - 0.085);
+          g.add(bioCore);
         }
       }
-      // Twin serrated rotary grinder cones at front
-      const noseL = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.26, 7), brassMat);
-      noseL.rotation.x = Math.PI / 2;
-      noseL.position.set(-0.09, 0.24, 0.48);
-      const noseR = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.26, 7), limeBio);
-      noseR.rotation.x = Math.PI / 2;
-      noseR.position.set(0.09, 0.24, 0.48);
-      g.add(noseL, noseR);
-      spinParts.push({ obj: noseL, axis: 'z', speed: 2.2 }, { obj: noseR, axis: 'z', speed: -2.2 });
+      // Conical multi-tiered helical rotary stone-grinder nose (NO jaws!)
+      const drillGroup = new THREE.Group();
+      drillGroup.position.set(0, 0.24, 0.34);
+      for (let d = 0; d < 4; d++) {
+        const r = 0.21 - d * 0.042;
+        const disc = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.72, r, 0.075, 8), d % 2 === 0 ? brassMat : bronzeMat);
+        disc.rotation.x = Math.PI / 2;
+        disc.position.z = d * 0.068;
+        drillGroup.add(disc);
+      }
+      const drillTip = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.14, 6), limeBio);
+      drillTip.rotation.x = Math.PI / 2;
+      drillTip.position.z = 0.31;
+      drillGroup.add(drillTip);
+      g.add(drillGroup);
+      spinParts.push({ obj: drillGroup, axis: 'z', speed: 2.6 });
       break;
     }
 
     case '023': {
-      // BRINECHOIR: Broad-bodied crystalline salt leviathan trailing translucent pale-mint glyph ribbon fins
-      const mintCrystal = pal.get(0x9bd6cf, { roughness: 0.38, metalness: 0.15 });
-      const head = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.48, 5), mintCrystal);
-      head.rotation.x = Math.PI / 2;
-      head.scale.set(1.25, 0.72, 1);
-      head.position.set(0, 0.28, 0.24);
-      head.castShadow = true;
-      g.add(head);
+      // BRINECHOIR (Plate 023 / U01): Translucent sea-glass turquoise crystalline leviathan
+      // etched with glowing alchemy circles, serrated jaw snout, trailing sweeping layered ribbon-fins.
+      const seaGlass = pal.get(0x8be2dc, {
+        map: tex.alchemyGlass,
+        transparent: true,
+        opacity: 0.78,
+        roughness: 0.25,
+        metalness: 0.1,
+        emissive: 0x1a6864,
+        emissiveIntensity: 0.35,
+      });
+      const leviBody = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.62, 6), seaGlass);
+      leviBody.rotation.x = Math.PI / 2;
+      leviBody.scale.set(1.22, 0.72, 1);
+      leviBody.position.set(0, 0.26, 0.18);
+      leviBody.castShadow = true;
+      g.add(leviBody);
 
-      // Sweeping translucent ribbon fins & dorsal salt spines
+      // Serrated lower crystal jaw + white crystal teeth
+      const snout = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.34, 5), warmCream);
+      snout.rotation.x = Math.PI / 2 + 0.12;
+      snout.scale.set(1.1, 0.55, 1);
+      snout.position.set(0, 0.2, 0.34);
+      g.add(snout);
+
+      // 6 swept curved translucent alchemy ribbon-fins arcing cleanly backward
       for (let i = 0; i < 6; i++) {
-        const fin = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.18, 0.46 - i * 0.03), cyanMat);
-        const side = i % 2 === 0 ? -1 : 1;
-        fin.position.set(side * (0.14 + Math.floor(i / 2) * 0.08), 0.3 + i * 0.04, -0.05 - i * 0.08);
-        fin.rotation.y = side * 0.35;
-        fin.rotation.x = 0.24;
+        const sx = i % 2 === 0 ? -1 : 1;
+        const tier = Math.floor(i / 2);
+        const fin = buildCutCardShape(
+          [
+            [0, 0],
+            [0.08, 0.18],
+            [-0.48, 0.28],
+            [-0.64, 0.1],
+            [-0.22, -0.02],
+          ],
+          0.016,
+          seaGlass,
+        );
+        fin.position.set(sx * (0.12 + tier * 0.06), 0.26 + tier * 0.08, 0.12 - tier * 0.1);
+        fin.rotation.y = sx * (Math.PI / 2 + 0.35);
+        fin.rotation.z = sx * 0.25;
         g.add(fin);
-      }
-      for (let c = 0; c < 4; c++) {
-        const spike = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.2, 4), warmCream);
-        spike.position.set(0, 0.42 - c * 0.03, 0.2 - c * 0.18);
-        spike.rotation.x = -0.35;
-        g.add(spike);
       }
       break;
     }
 
     case '026': {
-      // GLACIERTHROAT: Pale-blue fenestrated serpentine neck/skull fanning wide white pressure-sail wings over ice cliffs
-      const iceBlue = pal.get(0x88c9e4, { roughness: 0.38, metalness: 0.1 });
-      const iceBase = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.38, 0.14, 6), iceBlue);
-      iceBase.position.y = 0.07;
+      // GLACIERTHROAT (Plate 026 / U01): Pale-blue fenestrated/perforated arching neck & predatory jaw
+      // pouring a crystal ice torrent onto ice cliffs, backed by VAST FAN-RIBBED WHITE ORIGAMI SAIL WINGS.
+      const iceBlue = pal.get(0x88cde8, { roughness: 0.36, metalness: 0.12 });
+      const frostSail = pal.get(0xf4f8fc, { transparent: true, opacity: 0.88, roughness: 0.65 });
 
-      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.17, 0.56, 6), iceBlue);
-      neck.position.set(0, 0.38, -0.06);
-      neck.rotation.x = 0.28;
-      neck.castShadow = true;
+      const iceCliffs = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.38, 0.14, 6), iceBlue);
+      iceCliffs.position.y = 0.07;
+      const archNeck = buildTaperedCurve(
+        [
+          new THREE.Vector3(0, 0.12, -0.24),
+          new THREE.Vector3(0, 0.44, -0.18),
+          new THREE.Vector3(0, 0.66, 0.04),
+          new THREE.Vector3(0, 0.6, 0.24),
+        ],
+        0.15,
+        0.09,
+        10,
+        6,
+        iceBlue,
+      );
+      const jawUpper = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.26, 5), iceBlue);
+      jawUpper.rotation.x = Math.PI / 2 + 0.45;
+      jawUpper.position.set(0, 0.59, 0.34);
+      const frostStream = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.48, 5), cyanMat);
+      frostStream.position.set(0, 0.34, 0.28);
+      g.add(iceCliffs, archNeck, jawUpper, frostStream);
 
-      const skull = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.32, 5), cyanMat);
-      skull.rotation.x = Math.PI / 2 + 0.4;
-      skull.position.set(0, 0.62, 0.14);
-
-      // Wide sweeping pressure-sail crest wings
+      // Pair of wide fan-ribbed white origami pressure-sail wings
       for (const sx of [-1, 1]) {
-        const sail = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.32, 0.03), warmCream);
-        sail.position.set(sx * 0.26, 0.58, -0.04);
-        sail.rotation.z = sx * 0.35;
-        sail.rotation.y = -sx * 0.28;
-        sail.castShadow = true;
-        g.add(sail);
+        const wingSail = buildCutCardShape(
+          [
+            [0, 0],
+            [sx * 0.26, 0.44],
+            [sx * 0.56, 0.36],
+            [sx * 0.62, 0.08],
+            [sx * 0.18, -0.1],
+          ],
+          0.018,
+          frostSail,
+        );
+        wingSail.position.set(sx * 0.06, 0.56, -0.06);
+        wingSail.rotation.y = -sx * 0.28;
+        g.add(wingSail);
+        // Dark ice-blue structural wing ribs
+        for (const [rx, ry] of [
+          [0.24, 0.42],
+          [0.52, 0.34],
+          [0.58, 0.08],
+        ]) {
+          const rib = buildTaperedCurve(
+            [new THREE.Vector3(sx * 0.06, 0.56, -0.05), new THREE.Vector3(sx * (0.06 + rx), 0.56 + ry, -0.15)],
+            0.014,
+            0.008,
+            4,
+            4,
+            iceBlue,
+          );
+          g.add(rib);
+        }
       }
-      g.add(iceBase, neck, skull);
       break;
     }
 
     case '029': {
-      // RINGTHROAT: Colossal 4-legged gantry extruder tower, distended glowing red-black belly core & upper vitrified bell nozzle
+      // RINGTHROAT (Plate 029 / U01): 4-legged splayed bronze gantry tripod holding column-neck with exposed
+      // glowing red-black belly core behind ribs, flared nozzle with 3 glowing cyan containment rings & crimson slurry column.
       const ringGroup = new THREE.Group();
       for (let i = 0; i < 4; i++) {
         const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-        const strut = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.44, 0.1), basaltInk);
-        strut.position.set(Math.cos(a) * 0.28, 0.2, Math.sin(a) * 0.28);
-        strut.rotation.z = Math.cos(a) * 0.46;
-        strut.rotation.x = -Math.sin(a) * 0.46;
-        strut.castShadow = true;
+        const strut = buildTaperedCurve(
+          [
+            new THREE.Vector3(Math.cos(a) * 0.14, 0.38, Math.sin(a) * 0.14),
+            new THREE.Vector3(Math.cos(a) * 0.32, 0.24, Math.sin(a) * 0.32),
+            new THREE.Vector3(Math.cos(a) * 0.42, 0.015, Math.sin(a) * 0.42),
+          ],
+          0.048,
+          0.055,
+          5,
+          5,
+          bronzeMat,
+        );
         ringGroup.add(strut);
       }
-      // Distended red-black reactor core belly
-      const belly = new THREE.Mesh(new THREE.OctahedronGeometry(0.18, 1), crimsonMat);
-      belly.position.y = 0.34;
-      // Armored shaft & flared bell nozzle
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.19, 0.46, 8), slateArmor);
-      shaft.position.y = 0.56;
-      const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.11, 0.18, 10), basaltInk);
-      nozzle.position.y = 0.84;
-      // Containment cyan torus & extruded dark crimson slurry ring segment above
-      const contain = new THREE.Mesh(new THREE.TorusGeometry(0.27, 0.015, 6, 20), cyanMat);
-      contain.rotation.x = Math.PI / 2;
-      contain.position.y = 0.94;
-      const plume = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.14, 0.26, 8), crimsonMat);
-      plume.position.y = 1.02;
-      ringGroup.add(belly, shaft, nozzle, contain, plume);
+      // Glowing distended red-black pressure belly caged inside vertical ribs
+      const belly = new THREE.Mesh(new THREE.OctahedronGeometry(0.17, 1), crimsonMat);
+      belly.scale.set(0.95, 1.25, 0.95);
+      belly.position.y = 0.38;
+      for (let r = 0; r < 6; r++) {
+        const a = (r / 6) * Math.PI * 2;
+        const rib = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.34, 0.035), basaltInk);
+        rib.position.set(Math.cos(a) * 0.16, 0.38, Math.sin(a) * 0.16);
+        ringGroup.add(rib);
+      }
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.165, 0.36, 8), slateArmor);
+      shaft.position.y = 0.64;
+      const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.105, 0.16, 10), bronzeMat);
+      bell.position.y = 0.88;
+      // Triple glowing cyan containment rings around extruding crimson plume
+      const haloGroup = new THREE.Group();
+      haloGroup.position.y = 0.98;
+      for (const [ry, rr] of [
+        [0, 0.25],
+        [0.06, 0.27],
+        [0.12, 0.24],
+      ]) {
+        const cRing = new THREE.Mesh(new THREE.TorusGeometry(rr, 0.01, 5, 18), cyanMat);
+        cRing.rotation.x = Math.PI / 2;
+        cRing.position.y = ry;
+        haloGroup.add(cRing);
+      }
+      const plume = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.135, 0.28, 8), crimsonMat);
+      plume.position.y = 1.04;
+      ringGroup.add(belly, shaft, bell, haloGroup, plume);
       g.add(ringGroup);
-      spinParts.push({ obj: contain, axis: 'z', speed: 1.4 });
+      spinParts.push({ obj: haloGroup, axis: 'y', speed: 1.4 });
       break;
     }
 
     case '030': {
-      // SOLNEXUS: Radiant coiled serpent + gravitational spires around a blazing golden sun + prismatic wings
-      const sun = new THREE.Mesh(new THREE.IcosahedronGeometry(0.18, 1), amberMagma);
-      sun.position.y = 0.48;
-      g.add(sun);
+      // SOLNEXUS (Plate 030 / P12): Braided gold serpent coil studded with dorsal gravity spire masts
+      // looping around a glowing faceted golden star, flanked by RAINBOW-PRISMATIC STAINED-GLASS WINGS.
+      const prismMat = pal.get(0xffffff, {
+        map: tex.prismRainbow,
+        emissive: 0x332244,
+        emissiveIntensity: 0.24,
+        roughness: 0.32,
+        metalness: 0.18,
+      });
+      const sunCore = new THREE.Mesh(new THREE.IcosahedronGeometry(0.175, 1), amberMagma);
+      sunCore.position.y = 0.48;
+      g.add(sunCore);
 
-      const coil = new THREE.Group();
-      coil.position.y = 0.48;
-      const arcA = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.032, 6, 20, Math.PI * 1.45), brassMat);
-      arcA.rotation.x = 0.48;
-      const arcB = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.025, 6, 20, Math.PI * 1.3), cyanMat);
-      arcB.rotation.set(-0.52, 0.8, 0.2);
-      // Wing crystal fins
-      for (const sx of [-1, 1]) {
-        const wing = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.44, 4), brassMat);
-        wing.position.set(sx * 0.42, 0.08, 0);
-        wing.rotation.z = -sx * 1.1;
-        coil.add(wing);
+      const coilGroup = new THREE.Group();
+      coilGroup.position.y = 0.48;
+      const spiralPts: THREE.Vector3[] = [];
+      for (let i = 0; i <= 16; i++) {
+        const t = i / 16;
+        const a = t * Math.PI * 2.3;
+        spiralPts.push(new THREE.Vector3(Math.cos(a) * 0.33, (t - 0.5) * 0.36, Math.sin(a) * 0.33));
       }
-      coil.add(arcA, arcB);
-      g.add(coil);
-      spinParts.push({ obj: coil, axis: 'y', speed: 0.9 });
+      const coilBody = buildTaperedCurve(spiralPts, 0.018, 0.044, 24, 6, brassMat);
+      coilGroup.add(coilBody);
+      // Gravity spire masts radiating outward along spiral body
+      for (let i = 2; i < 14; i += 2) {
+        const pt = spiralPts[i];
+        const mast = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.15, 4), warmCream);
+        mast.position.copy(pt).multiplyScalar(1.25);
+        mast.lookAt(pt.clone().multiplyScalar(2));
+        mast.rotateX(Math.PI / 2);
+        coilGroup.add(mast);
+      }
+      // Twin rainbow-prismatic triangular stained-glass crystal wings
+      for (const sx of [-1, 1]) {
+        const wing = buildCutCardShape(
+          [
+            [0, 0],
+            [sx * 0.26, 0.28],
+            [sx * 0.44, 0.14],
+            [sx * 0.34, -0.08],
+          ],
+          0.02,
+          prismMat,
+        );
+        wing.position.set(sx * 0.24, 0.08, 0);
+        wing.rotation.y = -sx * 0.22;
+        coilGroup.add(wing);
+      }
+      g.add(coilGroup);
+      spinParts.push({ obj: coilGroup, axis: 'y', speed: 0.85 });
       break;
     }
 
     case '032': {
-      // LYRIBORIS: Undulating sinuous turquoise-and-brass sky-ribbon serpent lined with dorsal tuning-fork antenna masts
+      // LYRIBORIS (Plate 032 / P12): Completely HEADLESS undulating turquoise-and-cream striped sky-ribbon
+      // studded with upright U-SHAPED TWO-PRONGED TUNING FORK ANTENNAE above parabolic radar dishes!
       const wyrm = new THREE.Group();
-      for (let i = 0; i < 9; i++) {
-        const t = i / 8;
-        const x = -0.48 + t * 0.96;
-        const y = 0.36 + Math.sin(t * Math.PI * 1.5) * 0.16;
-        const z = Math.cos(t * Math.PI * 1.5) * 0.18;
-
-        const plate = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.045, 0.16), i % 2 === 0 ? cyanMat : warmCream);
-        plate.position.set(x, y, z);
-        plate.rotation.z = Math.cos(t * Math.PI * 1.5) * 0.32;
+      const ribbonPts = [
+        new THREE.Vector3(-0.52, 0.3, 0.12),
+        new THREE.Vector3(-0.24, 0.52, -0.1),
+        new THREE.Vector3(0.06, 0.34, 0.16),
+        new THREE.Vector3(0.32, 0.54, -0.08),
+        new THREE.Vector3(0.56, 0.38, 0.08),
+      ];
+      const curve = new THREE.CatmullRomCurve3(ribbonPts);
+      for (let i = 0; i < 11; i++) {
+        const t = i / 10;
+        const pt = curve.getPointAt(t);
+        const tangent = curve.getTangentAt(t);
+        const plate = new THREE.Mesh(
+          new THREE.BoxGeometry(0.115, 0.032, 0.17),
+          i % 2 === 0 ? cyanMat : warmCream,
+        );
+        plate.position.copy(pt);
+        plate.rotation.y = Math.atan2(tangent.z, tangent.x);
+        plate.rotation.z = tangent.y * 0.9;
         plate.castShadow = true;
         wyrm.add(plate);
 
-        // Vertical tuning-fork antenna mast on spine
+        // Two-pronged U-shaped tuning-fork antenna mast along spine
         if (i % 2 === 0) {
-          const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.24, 5), brassMat);
-          mast.position.set(x, y + 0.14, z);
-          const tip = new THREE.Mesh(new THREE.SphereGeometry(0.022, 6, 6), cyanMat);
-          tip.position.set(x, y + 0.27, z);
-          wyrm.add(mast, tip);
+          const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.14, 5), brassMat);
+          stem.position.set(pt.x, pt.y + 0.08, pt.z);
+          const crossbar = new THREE.Mesh(new THREE.BoxGeometry(0.064, 0.014, 0.014), brassMat);
+          crossbar.position.set(pt.x, pt.y + 0.15, pt.z);
+          wyrm.add(stem, crossbar);
+          for (const px of [-0.026, 0.026]) {
+            const prong = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.12, 5), warmCream);
+            prong.position.set(pt.x + px, pt.y + 0.21, pt.z);
+            wyrm.add(prong);
+          }
         }
       }
-      // Small dish receiver base below
-      const dish = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.04, 0.1, 8), slateArmor);
-      dish.position.set(-0.22, 0.08, 0.15);
-      g.add(wyrm, dish);
-      waveParts.push({ obj: wyrm, baseY: 0, amp: 0.03, speed: 1.5, phase: 0.4 });
+      // Concrete/slate parabolic ground radar dish receivers below
+      for (const [dx, dz] of [
+        [-0.26, 0.18],
+        [0.18, -0.14],
+      ]) {
+        const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.07, 0.14, 6), slateArmor);
+        pedestal.position.set(dx, 0.07, dz);
+        const bowl = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.08, 10, 1, true), warmCream);
+        bowl.position.set(dx, 0.16, dz);
+        bowl.rotation.set(-Math.PI * 0.72, 0, 0.25);
+        g.add(pedestal, bowl);
+      }
+      g.add(wyrm);
+      waveParts.push({ obj: wyrm, baseY: 0, amp: 0.028, speed: 1.45, phase: 0.4 });
       break;
     }
 
     case '036': {
-      // SINGULARARCH: Segmented fractal mirror-core sphere + orbiting detached rectangular matrix glyph tiles
-      const centerCore = new THREE.Mesh(new THREE.IcosahedronGeometry(0.18, 1), cyanMat);
-      centerCore.position.y = 0.5;
-      const shellA = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.042, 5, 16, Math.PI * 1.2), warmCream);
-      shellA.position.y = 0.5;
-      shellA.rotation.x = 0.5;
-      const shellB = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.04, 5, 16, Math.PI * 1.25), basaltInk);
-      shellB.position.y = 0.5;
-      shellB.rotation.set(-0.6, 0.9, 0.3);
-      g.add(centerCore, shellA, shellB);
-      spinParts.push({ obj: shellA, axis: 'y', speed: 0.7 }, { obj: shellB, axis: 'x', speed: -0.6 });
+      // SINGULARARCH (Plate 036 / P10 / P13): Fractured white-and-slate curved origami sphere
+      // parted cleanly to expose a concentric SQUARE DIAMOND MATRIX FRACTAL CORE + orbiting flying glyph tiles!
+      const tileMat = pal.get(0xffffff, {
+        map: tex.matrixTile,
+        emissive: 0x10405a,
+        emissiveIntensity: 0.35,
+        roughness: 0.45,
+      });
+      // Concentric glowing nested square diamond core inside
+      for (const [sz, col] of [
+        [0.2, cyanMat],
+        [0.13, warmCream],
+        [0.07, cyanMat],
+      ] as const) {
+        const box = new THREE.Mesh(new THREE.BoxGeometry(sz, sz, sz), col);
+        box.position.y = 0.5;
+        box.rotation.set(Math.PI / 4, Math.PI / 4, 0);
+        g.add(box);
+      }
+      // Fractured curved white origami armor shell arcs & equator slotted ring
+      const shellsGroup = new THREE.Group();
+      shellsGroup.position.y = 0.5;
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const panel = buildCutCardShape(
+          [
+            [-0.14, -0.16],
+            [0.14, -0.12],
+            [0.16, 0.16],
+            [-0.12, 0.14],
+          ],
+          0.022,
+          i % 2 === 0 ? warmCream : slateArmor,
+        );
+        panel.position.set(Math.cos(a) * 0.28, Math.sin(i * 1.3) * 0.12, Math.sin(a) * 0.28);
+        panel.lookAt(0, 0, 0);
+        shellsGroup.add(panel);
+      }
+      const eqRing = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.026, 5, 18, Math.PI * 1.4), warmCream);
+      eqRing.rotation.x = Math.PI / 2 + 0.25;
+      shellsGroup.add(eqRing);
+      g.add(shellsGroup);
+      spinParts.push({ obj: shellsGroup, axis: 'y', speed: 0.65 });
 
       for (let i = 0; i < 6; i++) {
-        const tile = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.18, 0.025), i % 2 === 0 ? slateArmor : warmCream);
+        const tile = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.17, 0.022), tileMat);
         tile.castShadow = true;
         g.add(tile);
-        orbitParts.push({ obj: tile, radius: 0.46, phase: (i / 6) * Math.PI * 2, speed: 0.85, y: 0.5 + (i % 2 === 0 ? 0.08 : -0.08) });
+        orbitParts.push({
+          obj: tile,
+          radius: 0.46,
+          phase: (i / 6) * Math.PI * 2,
+          speed: 0.8,
+          y: 0.5 + (i % 2 === 0 ? 0.1 : -0.1),
+        });
       }
       break;
     }
 
     case '037': {
-      // IRONCANT: Bull-shouldered slag-black iron foundry titan with horned smokestacks & glowing furnace chest ribs
+      // IRONCANT (Plate 037 / P10 / P13): Bull-shouldered slag-black iron furnace knight/colossus
+      // with glowing vertical orange furnace grate chest, riveted gauntlets & twin smokestack horns puffing smoke.
       const legs = new THREE.Group();
-      for (const sx of [-0.14, 0.14]) {
-        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.32, 0.14), basaltInk);
+      for (const sx of [-0.15, 0.15]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.105, 0.32, 6), basaltInk);
         leg.position.set(sx, 0.16, 0);
         leg.castShadow = true;
         legs.add(leg);
       }
-      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.34, 0.24), slateArmor);
+      const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.17, 0.36, 6), slateArmor);
+      torso.scale.set(1.2, 1, 0.78);
       torso.position.y = 0.48;
       torso.castShadow = true;
-      // Glowing vertical furnace grate ribs in chest
-      for (let r = -1; r <= 1; r++) {
-        const grate = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.22, 0.04), amberMagma);
-        grate.position.set(r * 0.075, 0.48, 0.125);
-        g.add(grate);
+      const chestFire = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.2, 0.06), amberMagma);
+      chestFire.position.set(0, 0.48, 0.145);
+      // 4 dark iron vertical furnace grate bars across glowing core
+      for (let r = -1.5; r <= 1.5; r += 1) {
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.22, 0.028), basaltInk);
+        bar.position.set(r * 0.055, 0.48, 0.175);
+        g.add(bar);
       }
-      // Pauldrons + twin curved horn smokestacks
+      // Broad sloped angular bull pauldrons + heavy articulated gauntlets + twin smokestack horns
       for (const sx of [-1, 1]) {
-        const pauldron = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.16, 0.26), basaltInk);
-        pauldron.position.set(sx * 0.24, 0.62, 0);
-        const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.055, 0.24, 6), basaltInk);
-        stack.position.set(sx * 0.16, 0.82, -0.02);
-        stack.rotation.z = -sx * 0.28;
-        const ember = new THREE.Mesh(new THREE.SphereGeometry(0.042, 6, 6), amberMagma);
-        ember.position.set(sx * 0.2, 0.94, -0.02);
-        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.3, 0.14), slateArmor);
-        arm.position.set(sx * 0.28, 0.4, 0.04);
-        g.add(pauldron, stack, ember, arm);
+        const pauldron = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.2, 5), basaltInk);
+        pauldron.position.set(sx * 0.25, 0.61, 0);
+        pauldron.rotation.z = -sx * 0.9;
+        const arm = buildTaperedCurve(
+          [
+            new THREE.Vector3(sx * 0.26, 0.56, 0),
+            new THREE.Vector3(sx * 0.32, 0.38, 0.04),
+            new THREE.Vector3(sx * 0.3, 0.22, 0.09),
+          ],
+          0.075,
+          0.088,
+          6,
+          6,
+          slateArmor,
+        );
+        const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.056, 0.25, 7), basaltInk);
+        stack.position.set(sx * 0.15, 0.81, -0.02);
+        stack.rotation.z = -sx * 0.26;
+        const smoke = new THREE.Mesh(new THREE.DodecahedronGeometry(0.062, 0), warmCream);
+        smoke.position.set(sx * 0.19, 0.96, -0.02);
+        g.add(pauldron, arm, stack, smoke);
       }
-      const head = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.14), basaltInk);
-      head.position.set(0, 0.7, 0.04);
-      g.add(legs, torso, head);
+      const helm = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.16, 5), basaltInk);
+      helm.position.set(0, 0.72, 0.04);
+      const visor = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.024, 0.05), amberMagma);
+      visor.position.set(0, 0.7, 0.095);
+      g.add(legs, torso, chestFire, helm, visor);
       break;
     }
 
     case '044': {
-      // GOREVAULT: Colossal 6-legged armored bioforge crawler + front pincers + dorsal silos + crimson reservoir sacs
-      const chassis = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.24, 0.68), basaltInk);
-      chassis.position.set(0, 0.44, 0);
-      chassis.castShadow = true;
-      g.add(chassis);
+      // GOREVAULT (Plate 044 / P10 / P13): Colossal hunched armored bioforge hulk with big clawed forelimbs,
+      // dorsal smokestack silo towers, glowing side arches & 6 hanging translucent CRIMSON/AMBER RESERVOIR FLASKS.
+      const hullArch = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.24, 0.26, 0.68, 8, 1, false, 0, Math.PI),
+        basaltInk,
+      );
+      hullArch.rotation.set(Math.PI / 2, 0, Math.PI / 2);
+      hullArch.position.set(0, 0.42, 0);
+      hullArch.castShadow = true;
+      g.add(hullArch);
 
-      // 3 Dorsal pressure silos
-      for (let s = -1; s <= 1; s++) {
-        const silo = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.09, 0.22, 8), slateArmor);
-        silo.position.set(0, 0.65, s * 0.2);
-        g.add(silo);
+      // 4 dorsal furnace silo towers
+      for (const sz of [-0.24, -0.08, 0.08, 0.24]) {
+        const silo = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.068, 0.2, 7), slateArmor);
+        silo.position.set(0, 0.68, sz);
+        const glowRim = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.058, 0.03, 7), cyanMat);
+        glowRim.position.set(0, 0.74, sz);
+        g.add(silo, glowRim);
       }
-      // 4 hanging crimson organic biomass reservoir sacs under belly
-      for (const [bx, bz] of [[-0.12, 0.1], [0.12, 0.1], [-0.12, -0.14], [0.12, -0.14]]) {
-        const sac = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), crimsonMat);
-        sac.scale.set(0.85, 1.35, 0.85);
-        sac.position.set(bx, 0.26, bz);
-        g.add(sac);
+      // 6 hanging glowing crimson/amber biomass reservoir flasks under belly
+      for (const sx of [-0.145, 0.145]) {
+        for (const bz of [-0.18, 0, 0.18]) {
+          const flask = new THREE.Mesh(new THREE.CapsuleGeometry(0.065, 0.1, 4, 7), amberMagma);
+          flask.position.set(sx, 0.25, bz);
+          const coreDrop = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), crimsonMat);
+          coreDrop.position.set(sx, 0.22, bz);
+          g.add(flask, coreDrop);
+        }
       }
-      // Twin massive curved front pincer jaws
+      // Massive front clawed excavator forelimbs & 4 rear crawler legs
       for (const sx of [-1, 1]) {
-        const jaw = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.28, 4), slateArmor);
-        jaw.position.set(sx * 0.16, 0.36, 0.44);
-        jaw.rotation.x = Math.PI / 2 + 0.3;
-        jaw.rotation.z = sx * 0.28;
-        g.add(jaw);
-      }
-      // 6 jointed crawler legs
-      for (let l = -1; l <= 1; l++) {
-        for (const sx of [-1, 1]) {
-          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.36, 0.07), slateArmor);
-          leg.position.set(sx * 0.3, 0.2, l * 0.22);
-          leg.rotation.z = sx * 0.32;
-          leg.castShadow = true;
+        const foreArm = buildTaperedCurve(
+          [
+            new THREE.Vector3(sx * 0.2, 0.44, 0.28),
+            new THREE.Vector3(sx * 0.28, 0.26, 0.42),
+            new THREE.Vector3(sx * 0.22, 0.05, 0.48),
+          ],
+          0.072,
+          0.045,
+          6,
+          5,
+          slateArmor,
+        );
+        const claw = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.16, 4), ivoryBone);
+        claw.rotation.x = Math.PI * 0.62;
+        claw.position.set(sx * 0.22, 0.04, 0.56);
+        g.add(foreArm, claw);
+        for (const lz of [-0.08, -0.3]) {
+          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.34, 0.08), slateArmor);
+          leg.position.set(sx * 0.26, 0.17, lz);
+          leg.rotation.z = sx * 0.24;
           g.add(leg);
         }
       }
+      // Arched armored scythe head
+      const head = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.26, 5), basaltInk);
+      head.rotation.x = Math.PI / 2 + 0.35;
+      head.position.set(0, 0.4, 0.42);
+      g.add(head);
       break;
     }
 
     case '045': {
-      // LEXICLAST: Ivory skeletal multi-throated cantor with perforated skull, halo glyphs & trailing cobalt script ribbons
-      const ribGroup = new THREE.Group();
-      for (let r = 0; r < 4; r++) {
-        const rib = new THREE.Mesh(new THREE.TorusGeometry(0.24 - r * 0.03, 0.022, 5, 12, Math.PI * 1.4), warmCream);
-        rib.position.y = 0.2 + r * 0.11;
-        rib.rotation.x = Math.PI / 2 + 0.35;
-        rib.rotation.z = Math.PI * 0.8;
-        ribGroup.add(rib);
+      // LEXICLAST (Plate 045 / P10 / P13): Towering hollow IVORY BONE RIBCAGE COLOSSUS with perforated
+      // multi-cavity skull maw spewing 3 waving ROYAL-BLUE SCRIPT GLYPH RIBBONS & orbiting vowel glyphs!
+      const ribbonMat = pal.get(0xffffff, {
+        map: tex.glyphRibbon,
+        emissive: 0x163868,
+        emissiveIntensity: 0.42,
+        roughness: 0.48,
+      });
+      const ribCage = new THREE.Group();
+      for (let r = 0; r < 5; r++) {
+        const rib = new THREE.Mesh(
+          new THREE.TorusGeometry(0.24 - r * 0.025, 0.024, 5, 14, Math.PI * 1.45),
+          ivoryBone,
+        );
+        rib.position.y = 0.16 + r * 0.11;
+        rib.rotation.x = Math.PI / 2 + 0.32;
+        rib.rotation.z = Math.PI * 0.78;
+        rib.castShadow = true;
+        ribCage.add(rib);
       }
-      // Perforated skull with dark vocal throat sockets
-      const skull = new THREE.Mesh(new THREE.DodecahedronGeometry(0.18, 0), warmCream);
-      skull.position.set(0, 0.68, 0.05);
+      // Sculpted perforated horned skull with dark vocal throat cavities
+      const skull = new THREE.Mesh(new THREE.IcosahedronGeometry(0.18, 1), ivoryBone);
+      skull.scale.set(0.95, 1.05, 1.32);
+      skull.position.set(0, 0.68, 0.1);
       skull.castShadow = true;
-      for (const [vx, vy] of [[-0.06, 0.7], [0.06, 0.7], [0, 0.62]]) {
-        const cavity = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), basaltInk);
-        cavity.position.set(vx, vy, 0.18);
-        ribGroup.add(cavity);
+      ribCage.add(skull);
+      for (const [vx, vy, vr] of [
+        [-0.065, 0.72, 0.048],
+        [0.065, 0.72, 0.048],
+        [0, 0.62, 0.062],
+        [-0.08, 0.63, 0.036],
+        [0.08, 0.63, 0.036],
+      ]) {
+        const socket = new THREE.Mesh(new THREE.SphereGeometry(vr, 6, 6), basaltInk);
+        socket.position.set(vx, vy, 0.24);
+        ribCage.add(socket);
       }
-      // Flowing azure-blue script ribbons spilling forward/downward
+      // Orbiting skull glyph crescents
+      for (const sx of [-1, 1]) {
+        const horn = new THREE.Mesh(new THREE.ConeGeometry(0.032, 0.18, 4), ivoryBone);
+        horn.position.set(sx * 0.16, 0.8, 0.02);
+        horn.rotation.z = -sx * 0.6;
+        ribCage.add(horn);
+      }
+      // 3 billowing wave-curved royal-blue glyph ribbons pouring from jaw
       for (let i = -1; i <= 1; i++) {
-        const ribbon = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.42, 0.02), cyanMat);
-        ribbon.position.set(i * 0.11, 0.36, 0.22 + Math.abs(i) * 0.06);
-        ribbon.rotation.x = -0.58;
-        ribbon.rotation.z = i * 0.22;
-        ribGroup.add(ribbon);
+        const ribPts = [
+          new THREE.Vector3(i * 0.04, 0.61, 0.24),
+          new THREE.Vector3(i * 0.14, 0.45, 0.42),
+          new THREE.Vector3(i * 0.2, 0.26, 0.56),
+          new THREE.Vector3(i * 0.24, 0.08, 0.7),
+        ];
+        const ribbon = buildTaperedCurve(ribPts, 0.032, 0.024, 10, 4, ribbonMat);
+        ribbon.scale.set(1.8, 0.38, 1);
+        ribCage.add(ribbon);
       }
-      g.add(ribGroup);
+      g.add(ribCage);
       break;
     }
 
     case '055': {
-      // FOLDHOWL: Glitch-sliced lupine predator fragmented by horizontal offset slabs + sharp cyan/magenta scan planes
-      const backLeg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.3, 0.16), basaltInk);
-      backLeg.position.set(0, 0.15, -0.22);
-      const frontLeg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.32, 0.16), basaltInk);
-      frontLeg.position.set(0.04, 0.16, 0.2);
-
-      const torsoLower = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.14, 0.52), slateArmor);
-      torsoLower.position.set(-0.04, 0.32, -0.02);
-      const torsoUpper = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.15, 0.48), basaltInk);
-      torsoUpper.position.set(0.06, 0.47, 0.02);
-      torsoUpper.castShadow = true;
-
-      const head = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.32, 4), basaltInk);
-      head.rotation.x = Math.PI / 2;
-      head.position.set(0.05, 0.56, 0.36);
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.028, 6, 6), cyanMat);
-      eye.position.set(0.1, 0.58, 0.42);
-
-      // Sharp horizontal magenta & cyan glitch slice planes
-      for (const [sy, mat, ox] of [
-        [0.4, magentaSlice, 0.08],
-        [0.52, cyanMat, -0.06],
-        [0.24, cyanMat, 0.04],
-      ] as const) {
-        const plane = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.018, 0.48), mat);
-        plane.position.set(ox, sy, 0);
-        g.add(plane);
+      // FOLDHOWL (Plate 055 / P10 / P13): Sleek predatory dark faceted origami wolf
+      // cleanly sliced into offset chunks by razor-sharp HORIZONTAL GLOWING CYAN & MAGENTA GLITCH PLANES.
+      const legs = [
+        [-0.14, 0.24],
+        [0.14, 0.24],
+        [-0.13, -0.25],
+        [0.13, -0.25],
+      ];
+      for (const [lx, lz] of legs) {
+        const leg = buildTaperedCurve(
+          [
+            new THREE.Vector3(lx, 0.34, lz),
+            new THREE.Vector3(lx * 1.1, 0.17, lz),
+            new THREE.Vector3(lx, 0.02, lz + 0.04),
+          ],
+          0.048,
+          0.024,
+          6,
+          4,
+          basaltInk,
+        );
+        g.add(leg);
       }
-      g.add(backLeg, frontLeg, torsoLower, torsoUpper, head, eye);
+      // Offset faceted wolf torso slabs + pointed wolf snout & ears + glowing cyan eyes
+      const lowerBody = new THREE.Mesh(new THREE.BoxGeometry(0.23, 0.13, 0.56), slateArmor);
+      lowerBody.position.set(-0.045, 0.34, -0.02);
+      const upperBody = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.16, 0.52), basaltInk);
+      upperBody.position.set(0.055, 0.49, 0.01);
+      upperBody.castShadow = true;
+
+      const snout = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.34, 4), basaltInk);
+      snout.rotation.x = Math.PI / 2 + 0.1;
+      snout.position.set(0.05, 0.57, 0.38);
+      for (const sx of [-1, 1]) {
+        const ear = new THREE.Mesh(new THREE.ConeGeometry(0.036, 0.15, 3), basaltInk);
+        ear.position.set(0.05 + sx * 0.06, 0.68, 0.26);
+        ear.rotation.z = -sx * 0.2;
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.022, 6, 6), cyanMat);
+        eye.position.set(0.05 + sx * 0.055, 0.585, 0.42);
+        g.add(ear, eye);
+      }
+      const tail = buildTaperedCurve(
+        [
+          new THREE.Vector3(0.02, 0.46, -0.26),
+          new THREE.Vector3(-0.08, 0.38, -0.48),
+          new THREE.Vector3(-0.14, 0.26, -0.62),
+        ],
+        0.065,
+        0.018,
+        6,
+        4,
+        basaltInk,
+      );
+
+      // Stark horizontal glowing magenta & cyan spatial-tear ribbon strips slicing wolf cleanly
+      for (const [sy, mat, ox, oz] of [
+        [0.415, magentaSlice, 0.08, 0.04],
+        [0.54, cyanMat, -0.08, -0.02],
+        [0.25, cyanMat, 0.06, 0.08],
+        [0.62, magentaSlice, 0.09, 0.26],
+      ] as const) {
+        const slicePlane = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.02, 0.52), mat);
+        slicePlane.position.set(ox, sy, oz);
+        g.add(slicePlane);
+      }
+      g.add(lowerBody, upperBody, snout, tail);
       break;
     }
 
     case '059': {
-      // DRAKKEN EGG: Faceted dark obsidian bipyramid obelisk hovering point-down over stepped crater, etched with cyan circuitry seams
-      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.34, 0.08, 6), warmCream);
-      base.position.y = 0.04;
-      const lowerCone = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.46, 6), basaltInk);
-      lowerCone.rotation.x = Math.PI;
-      lowerCone.position.y = 0.35;
-      lowerCone.castShadow = true;
-      const upperCone = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.46, 6), basaltInk);
-      upperCone.position.y = 0.81;
-      upperCone.castShadow = true;
+      // DRAKKEN EGG (Plate 059 / P01): Point-down vertical faceted dark-obsidian geode
+      // with glowing cyan barcode fracture seams + cutaway cavity showing nested spiral barcode rings around diamond core.
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.32, 0.065, 6), warmCream);
+      base.position.y = 0.032;
+      g.add(base);
 
-      const circuitBelt = new THREE.Mesh(new THREE.TorusGeometry(0.242, 0.016, 5, 6), cyanMat);
-      circuitBelt.rotation.x = Math.PI / 2;
-      circuitBelt.position.y = 0.58;
-      const coreBeacon = new THREE.Mesh(new THREE.OctahedronGeometry(0.11, 0), cyanMat);
-      coreBeacon.position.y = 0.58;
-      g.add(base, lowerCone, upperCone, circuitBelt, coreBeacon);
-      waveParts.push({ obj: lowerCone, baseY: 0.35, amp: 0.018, speed: 1.5, phase: 0 });
-      waveParts.push({ obj: upperCone, baseY: 0.81, amp: 0.018, speed: 1.5, phase: 0 });
+      const eggBody = new THREE.Group();
+      eggBody.position.y = 0.56;
+      // Back & left faceted obsidian shell halves framing an exposed glowing interior window
+      const backLower = new THREE.Mesh(
+        new THREE.ConeGeometry(0.25, 0.46, 6, 1, false, Math.PI * 0.25, Math.PI * 1.45),
+        basaltInk,
+      );
+      backLower.rotation.x = Math.PI;
+      backLower.position.y = -0.23;
+      const backUpper = new THREE.Mesh(
+        new THREE.ConeGeometry(0.25, 0.46, 6, 1, false, Math.PI * 0.25, Math.PI * 1.45),
+        basaltInk,
+      );
+      backUpper.position.y = 0.23;
+      // Radiant faceted cyan diamond core + 3 inner barcode rings inside cutaway
+      const coreDiamond = new THREE.Mesh(new THREE.OctahedronGeometry(0.115, 0), cyanMat);
+      coreDiamond.scale.set(0.8, 1.45, 0.8);
+      eggBody.add(backLower, backUpper, coreDiamond);
+      for (const cy of [-0.14, 0, 0.14]) {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.17 - Math.abs(cy) * 0.25, 0.018, 5, 16), barcodeMat);
+        ring.rotation.x = Math.PI / 2 + cy * 0.6;
+        ring.position.y = cy;
+        eggBody.add(ring);
+      }
+      g.add(eggBody);
+      waveParts.push({ obj: eggBody, baseY: 0.56, amp: 0.022, speed: 1.5, phase: 0 });
       break;
     }
 
     case '060':
     default: {
-      // MOTHER: Living planetary homeworld in Aureal Nebula — purplish-slate sphere, glowing cyan macro-node seals, layered paper cloud belts
-      const planetMat = pal.get(0x4b4263, { roughness: 0.78, metalness: 0.08 });
-      const cloudMat = pal.get(0xdad2e3, { roughness: 0.88 });
+      // MOTHER (Plate 060 / P00_060_MOTHER_papercraft_accepted.png):
+      // Purple/lavender continent-plated living planet etched with concentric cyan glyph hubs & branching veins,
+      // wrapped in folded white/cream faceted paper cloud ribbons, orbited by fine gold wire ring with 7 mini-Egg geodes!
+      const planetMat = pal.get(0xffffff, {
+        map: tex.motherSurface,
+        roughness: 0.76,
+        metalness: 0.06,
+      });
       const globe = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 2), planetMat);
-      globe.position.y = 0.48;
+      globe.position.y = 0.5;
       globe.castShadow = true;
+      g.add(globe);
 
-      // Embedded cyan circuit macro-nodes across crust
-      for (const [nx, ny, nz, rx, ry] of [
-        [0, 0.48, 0.41, 0, 0],
-        [0.36, 0.62, 0.16, -0.4, 1.1],
-        [-0.35, 0.38, 0.22, 0.3, -1.0],
+      // Sculpted layered faceted cream-white paper cloud ribbons curving diagonally around globe
+      for (const [ry, rz, tiltX, rad] of [
+        [0.42, 0.35, 1.15, 0.465],
+        [0.58, -0.45, -1.05, 0.475],
       ]) {
-        const node = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.018, 5, 16), cyanMat);
-        node.position.set(nx, ny, nz);
-        node.rotation.set(rx, ry, 0);
-        g.add(node);
+        const cloud = new THREE.Mesh(
+          new THREE.TorusGeometry(rad, 0.036, 4, 16, Math.PI * 1.25),
+          warmCream,
+        );
+        cloud.position.y = ry;
+        cloud.rotation.set(tiltX, 0.25, rz);
+        cloud.castShadow = true;
+        g.add(cloud);
       }
 
-      // Layered curved cream-lavender paper cloud ribbons wrapping globe
-      const cloudA = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.032, 5, 22, Math.PI * 1.4), cloudMat);
-      cloudA.position.y = 0.48;
-      cloudA.rotation.set(1.2, 0.4, 0);
-      const cloudB = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.025, 5, 22, Math.PI * 1.15), cloudMat);
-      cloudB.position.y = 0.48;
-      cloudB.rotation.set(-1.1, -0.5, 0.4);
-
-      g.add(globe, cloudA, cloudB);
-      spinParts.push({ obj: g, axis: 'y', speed: 0.16 });
+      // Inclined fine gold wire orbital ring bearing 7 miniature faceted obsidian-and-cyan Egg geodes!
+      const eggHalo = new THREE.Group();
+      eggHalo.position.y = 0.52;
+      eggHalo.rotation.set(0.28, 0, -0.22);
+      const wireRing = new THREE.Mesh(new THREE.TorusGeometry(0.56, 0.008, 5, 32), brassMat);
+      wireRing.rotation.x = Math.PI / 2;
+      eggHalo.add(wireRing);
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2;
+        const miniEgg = new THREE.Mesh(new THREE.OctahedronGeometry(0.055, 0), basaltInk);
+        miniEgg.scale.set(0.7, 1.45, 0.7);
+        miniEgg.position.set(Math.cos(a) * 0.56, 0, Math.sin(a) * 0.56);
+        const miniCrack = new THREE.Mesh(new THREE.TorusGeometry(0.038, 0.007, 4, 8), cyanMat);
+        miniCrack.rotation.x = Math.PI / 2;
+        miniCrack.position.copy(miniEgg.position);
+        eggHalo.add(miniEgg, miniCrack);
+      }
+      g.add(eggHalo);
+      spinParts.push({ obj: globe, axis: 'y', speed: 0.14 }, { obj: eggHalo, axis: 'y', speed: 0.22 });
       break;
     }
   }
@@ -801,11 +1401,11 @@ export function buildDraxisModel(id: DraxisId, paperBump: THREE.Texture): Draxis
     animate: (elapsed: number, active = true) => {
       if (!active) return;
       for (const s of spinParts) {
-        s.obj.rotation[s.axis] = (s.base ?? 0) + elapsed * s.speed;
+        s.obj.rotation[s.axis] = elapsed * s.speed;
       }
       for (const o of orbitParts) {
         const a = o.phase + elapsed * o.speed;
-        o.obj.position.set(Math.cos(a) * o.radius, o.y, Math.sin(a) * o.radius);
+        o.obj.position.set(Math.cos(a) * o.radius, o.y + Math.sin(elapsed * 2 + o.phase) * 0.03, Math.sin(a) * o.radius);
         o.obj.rotation.y = -a;
       }
       for (const w of waveParts) {

@@ -12,14 +12,15 @@ export class AtmosphereSystem {
   public readonly root = new THREE.Group();
 
   public readonly keyLight: THREE.DirectionalLight;
+  private fillLight: THREE.DirectionalLight;
   private hemiLight: THREE.HemisphereLight;
   private rimLight: THREE.DirectionalLight;
   private projectorWashLight: THREE.SpotLight;
 
   constructor(private scene: THREE.Scene, isSoftwareGl: boolean) {
-    // Overhead soft architectural key light
-    this.keyLight = new THREE.DirectionalLight(0xfff4e0, 1.12);
-    this.keyLight.position.set(3.2, 8.2, 4.4);
+    // Warm overhead architectural key light sculpting upper/right paper facets
+    this.keyLight = new THREE.DirectionalLight(0xfff4de, 1.18);
+    this.keyLight.position.set(3.6, 7.6, 4.6);
     this.keyLight.castShadow = !isSoftwareGl;
     this.keyLight.shadow.mapSize.set(isSoftwareGl ? 512 : 2048, isSoftwareGl ? 512 : 2048);
     this.keyLight.shadow.camera.near = 0.5;
@@ -33,23 +34,28 @@ export class AtmosphereSystem {
     this.keyLight.shadow.normalBias = 0.02;
     this.root.add(this.keyLight);
 
-    // Subtle cool ambient fill balancing slate shadows
-    this.hemiLight = new THREE.HemisphereLight(0xb8cde4, 0x161b22, 0.46);
+    // Subtle cool front-left fill light separating dark origami planes (Shard-god, Egg, Vortenbray)
+    this.fillLight = new THREE.DirectionalLight(0xc8dcf2, 0.36);
+    this.fillLight.position.set(-4.4, 4.4, 5.2);
+    this.root.add(this.fillLight);
+
+    // Ambient hemispherical studio bounce
+    this.hemiLight = new THREE.HemisphereLight(0xc2d5ea, 0x1a2028, 0.48);
     this.root.add(this.hemiLight);
 
-    // Clean top-rear rim separation for layered cream cardstock against matte black slate
-    this.rimLight = new THREE.DirectionalLight(0xd7e4f2, 0.48);
-    this.rimLight.position.set(-5.0, 5.2, -6.5);
+    // Clean top-rear rim separation for layered cream cardstock & silhouette crests
+    this.rimLight = new THREE.DirectionalLight(0xe0edfa, 0.64);
+    this.rimLight.position.set(-4.8, 5.2, -6.4);
     this.root.add(this.rimLight);
 
     // Controlled 4:3 classroom projector wash onto the open book spread
-    this.projectorWashLight = new THREE.SpotLight(0xfff0d4, 10.0, 18, Math.PI / 4.2, 0.62, 1.4);
+    this.projectorWashLight = new THREE.SpotLight(0xfff1d6, 9.0, 18, Math.PI / 4.2, 0.7, 1.4);
     this.projectorWashLight.position.set(0, 7.6, 0.8);
     this.projectorWashLight.target.position.set(0, 0.24, 0);
     this.root.add(this.projectorWashLight);
     this.root.add(this.projectorWashLight.target);
 
-    scene.fog = new THREE.FogExp2(0x0c0f14, 0.018);
+    scene.fog = new THREE.FogExp2(0x0c0f14, 0.016);
     scene.background = new THREE.Color(0x0c0f14);
   }
 
@@ -61,7 +67,7 @@ export class AtmosphereSystem {
     noFlashMode: boolean,
   ): void {
     _tintCol.set(ambientHex);
-    _bgCol.copy(STUDIO_BG).lerp(_tintCol, bookOpen ? 0.22 : 0.06);
+    _bgCol.copy(STUDIO_BG).lerp(_tintCol, bookOpen ? 0.24 : 0.06);
 
     if (this.scene.background instanceof THREE.Color) {
       this.scene.background.copy(_bgCol);
@@ -74,8 +80,8 @@ export class AtmosphereSystem {
     const breathe =
       reducedMotion || noFlashMode ? 0 : Math.sin(elapsed * 2.1) * 0.02 + Math.sin(elapsed * 5.7) * 0.008;
 
-    this.keyLight.intensity = 1.12 + breathe;
-    this.projectorWashLight.intensity = bookOpen ? 10.5 + breathe * 6 : 4.2;
+    this.keyLight.intensity = 1.18 + breathe;
+    this.projectorWashLight.intensity = bookOpen ? 9.2 + breathe * 5 : 4.2;
     this.projectorWashLight.color
       .setHex(0xfff1d8)
       .lerp(_tintCol, 0.14);
