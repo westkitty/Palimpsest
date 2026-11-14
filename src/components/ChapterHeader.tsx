@@ -1,153 +1,188 @@
-import { BookOpen, Camera, Headphones, HelpCircle, Pause, ScrollText, Volume2, VolumeX } from 'lucide-react';
-import { WORLD_METADATA, AtlasSnapshot } from '../types/atlas';
+import {
+  BookOpen,
+  Camera,
+  Captions,
+  FileText,
+  Flag,
+  Headphones,
+  HelpCircle,
+  Pause,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
+import { BOOK_SUBTITLE, BOOK_TITLE, FOLIO_BY_WORLD } from '../story/historyManifest';
+import { AtlasSnapshot } from '../types/atlas';
 
 interface ChapterHeaderProps {
   snapshot: AtlasSnapshot;
   onToggleMute: () => void;
   onToggleNarration: () => void;
+  onToggleCaptions: () => void;
   onCloseBook: () => void;
   onToggleChronicle: () => void;
   onExportPostcard: () => void;
+  onOpenEndcard: () => void;
   onOpenHelp: () => void;
-}
-
-function formatClock(hours: number): string {
-  const totalMins = Math.floor(((hours % 24) + 24) % 24 * 60);
-  const h = Math.floor(totalMins / 60);
-  const m = totalMins % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 export function ChapterHeader({
   snapshot,
   onToggleMute,
   onToggleNarration,
+  onToggleCaptions,
   onCloseBook,
   onToggleChronicle,
   onExportPostcard,
+  onOpenEndcard,
   onOpenHelp,
 }: ChapterHeaderProps) {
-  const meta = WORLD_METADATA[snapshot.activeWorld];
+  const manifest = FOLIO_BY_WORLD[snapshot.activeWorld];
   const isOpen = snapshot.bookPhase !== 'closed';
 
   return (
-    <header className="pointer-events-none fixed top-0 left-0 right-0 z-20 flex items-start justify-between px-5 pt-4 sm:px-7 sm:pt-5">
-      <div className="pointer-events-auto flex max-w-[min(640px,70vw)] flex-col gap-0.5">
-        <div className="flex items-center gap-2.5 text-[#F4ECDC]">
-          <h1 className="font-display text-2xl font-bold tracking-tight sm:text-[28px] text-balance">
-            Palimpsest
+    <header className="pointer-events-none fixed top-0 left-0 right-0 z-20 flex flex-col gap-2 px-3 pt-2.5 sm:flex-row sm:items-start sm:justify-between sm:px-6 sm:pt-4">
+      <div className="pointer-events-auto flex w-full sm:w-auto sm:max-w-[min(580px,56vw)] flex-col gap-0.5 rounded-md border border-[#8CA6B8]/20 bg-[#10141C]/86 px-3 py-1.5 backdrop-blur-xs">
+        <div className="flex items-center gap-2 text-[#F3ECE0]">
+          <h1 className="font-display text-base font-bold tracking-tight sm:text-2xl truncate">
+            {isOpen ? `${manifest.code} · ${manifest.title}` : BOOK_TITLE}
           </h1>
-          <span className="text-[#D4AF6E]/60" aria-hidden="true">
-            ·
-          </span>
-          <span className="truncate text-sm font-medium text-[#E2C996]">
-            {isOpen ? meta.title : 'The Impossible Living Atlas'}
-          </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-xs text-[#C8BBA4]">
-          <span>{isOpen ? meta.folioCode : 'Antiquarian Folio'}</span>
-          <span aria-hidden="true">·</span>
-          <span>{isOpen ? meta.chapterTitle : 'Tenfold Paper-Engineered Odyssey'}</span>
+        <div className="flex flex-wrap items-center gap-1.5 text-[10px] sm:text-[11px] text-[#C8C2B6]">
+          <span className="font-mono text-[#8CA6B8]">
+            {isOpen ? manifest.eraLabel : BOOK_SUBTITLE}
+          </span>
           {isOpen && (
             <>
               <span aria-hidden="true">·</span>
-              <span className="font-mono tabular-nums text-[#E2C996]">
-                {formatClock(snapshot.timeOfDay)}
-              </span>
+              <span className="truncate text-[#DDD6C6]">{manifest.temporalMarker}</span>
             </>
           )}
         </div>
-
-        {isOpen && (
-          <p className="hidden sm:block truncate text-[11px] italic text-[#C8BBA4]/85">
-            {meta.narrativeLead}
-          </p>
-        )}
       </div>
 
-      <div className="pointer-events-auto flex items-center gap-2">
+      <div className="pointer-events-auto flex flex-wrap items-center justify-start sm:justify-end gap-1.5">
         {isOpen && (
           <>
             <button
               type="button"
+              onClick={onToggleChronicle}
+              aria-pressed={snapshot.chronicleOpen}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-[#3D95B5] ${
+                snapshot.chronicleOpen
+                  ? 'border-[#3D95B5] bg-[#1F3142] text-[#F3ECE0]'
+                  : 'border-[#8CA6B8]/28 bg-[#12161E]/92 text-[#DDD6C6] hover:border-[#8CA6B8]/65 hover:text-[#F3ECE0]'
+              }`}
+              title="Open full Transcript, Mechanisms & Source Notes (T)"
+            >
+              <FileText className="h-3.5 w-3.5 text-[#8CA6B8]" />
+              <span>Transcript &amp; Sources</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onToggleCaptions}
+              aria-pressed={snapshot.captionsVisible}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-[#3D95B5] ${
+                snapshot.captionsVisible
+                  ? 'border-[#3D95B5] bg-[#1F3142] text-[#F3ECE0]'
+                  : 'border-[#8CA6B8]/28 bg-[#12161E]/92 text-[#DDD6C6] hover:border-[#8CA6B8]/65 hover:text-[#F3ECE0]'
+              }`}
+              title="Toggle optional projection captions (K)"
+            >
+              <Captions className="h-3.5 w-3.5 text-[#8CA6B8]" />
+              <span className="hidden md:inline">
+                Captions: {snapshot.captionsVisible ? 'On' : 'Off'}
+              </span>
+            </button>
+
+            <button
+              type="button"
               onClick={onToggleNarration}
               aria-pressed={snapshot.narrationStatus === 'speaking'}
-              className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-[#3D95B5] ${
                 snapshot.narrationStatus === 'speaking'
-                  ? 'border-[#D4AF6E]/75 bg-[#3A2218] text-[#F4ECDC]'
-                  : 'border-[#D4AF6E]/25 bg-[#16100C]/92 text-[#E9DEC8] hover:border-[#D4AF6E]/55 hover:text-[#F4ECDC]'
+                  ? 'border-[#B89860]/75 bg-[#2A261E] text-[#F3ECE0]'
+                  : 'border-[#8CA6B8]/28 bg-[#12161E]/92 text-[#DDD6C6] hover:border-[#8CA6B8]/65 hover:text-[#F3ECE0]'
               }`}
-              title="Listen to voiced chapter narration (V)"
+              title={
+                snapshot.narrationCapability === 'browser-speech'
+                  ? 'Play or pause spoken narration & reading cues (V)'
+                  : 'Step reading cues at transcript pace — no system voice detected (V)'
+              }
             >
               {snapshot.narrationStatus === 'speaking' ? (
-                <Pause className="h-3.5 w-3.5 text-[#D4AF6E]" />
+                <Pause className="h-3.5 w-3.5 text-[#B89860]" />
               ) : (
-                <Headphones className="h-3.5 w-3.5 text-[#D4AF6E]" />
+                <Headphones className="h-3.5 w-3.5 text-[#8CA6B8]" />
               )}
               <span className="hidden sm:inline">
                 {snapshot.narrationStatus === 'speaking'
-                  ? 'Pause Voice'
+                  ? 'Pause Cue'
                   : snapshot.narrationStatus === 'paused'
-                    ? 'Resume Voice'
-                    : 'Narrate'}
+                    ? 'Resume'
+                    : 'Read Cue'}
               </span>
             </button>
-            <button
-              type="button"
-              onClick={onToggleChronicle}
-              aria-pressed={snapshot.chronicleOpen}
-              className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                snapshot.chronicleOpen
-                  ? 'border-[#D4AF6E]/75 bg-[#2E2118] text-[#F4ECDC]'
-                  : 'border-[#D4AF6E]/25 bg-[#16100C]/92 text-[#E9DEC8] hover:border-[#D4AF6E]/55 hover:text-[#F4ECDC]'
-              }`}
-              title="Open Cartographer's Chronicle (N)"
-            >
-              <ScrollText className="h-3.5 w-3.5 text-[#D4AF6E]" />
-              <span>Chronicle</span>
-            </button>
-            <button
-              type="button"
-              onClick={onExportPostcard}
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-md border border-[#D4AF6E]/25 bg-[#16100C]/92 px-2.5 py-1.5 text-xs font-medium text-[#E9DEC8] transition-colors hover:border-[#D4AF6E]/55 hover:text-[#F4ECDC] focus-visible:outline-2 focus-visible:outline-[#D4AF6E] whitespace-nowrap shrink-0 cursor-pointer"
-              title="Export gilded archival postcard PNG of active folio"
-            >
-              <Camera className="h-3.5 w-3.5 text-[#D4AF6E]" />
-              <span>Postcard</span>
-            </button>
+
+            {snapshot.activeWorld === 11 && (
+              <button
+                type="button"
+                onClick={onOpenEndcard}
+                className="inline-flex items-center gap-1.5 rounded-md border border-[#B89860]/60 bg-[#212A36] px-2.5 py-1.5 text-xs font-medium text-[#F3ECE0] hover:bg-[#2B3746] focus-visible:outline-2 focus-visible:outline-[#3D95B5] whitespace-nowrap shrink-0 cursor-pointer"
+                title="View Administration Closing Endcard"
+              >
+                <Flag className="h-3.5 w-3.5 text-[#B89860]" />
+                <span>Endcard</span>
+              </button>
+            )}
+
+            {!snapshot.nonWebglMode && (
+              <button
+                type="button"
+                onClick={onExportPostcard}
+                className="hidden lg:inline-flex items-center gap-1.5 rounded-md border border-[#8CA6B8]/28 bg-[#12161E]/92 px-2.5 py-1.5 text-xs font-medium text-[#DDD6C6] hover:border-[#8CA6B8]/65 hover:text-[#F3ECE0] focus-visible:outline-2 focus-visible:outline-[#3D95B5] whitespace-nowrap shrink-0 cursor-pointer"
+                title="Save 4:3 archival snapshot PNG"
+              >
+                <Camera className="h-3.5 w-3.5 text-[#8CA6B8]" />
+                <span>Plate PNG</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={onCloseBook}
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-md border border-[#D4AF6E]/25 bg-[#16100C]/92 px-3 py-1.5 text-xs font-medium text-[#E9DEC8] transition-colors hover:border-[#D4AF6E]/55 hover:text-[#F4ECDC] focus-visible:outline-2 focus-visible:outline-[#D4AF6E] whitespace-nowrap shrink-0 cursor-pointer"
-              title="Close the atlas cover"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-md border border-[#8CA6B8]/28 bg-[#12161E]/92 px-2.5 py-1.5 text-xs font-medium text-[#DDD6C6] hover:border-[#8CA6B8]/65 hover:text-[#F3ECE0] focus-visible:outline-2 focus-visible:outline-[#3D95B5] whitespace-nowrap shrink-0 cursor-pointer"
+              title="Close volume back onto slate"
             >
-              <BookOpen className="h-3.5 w-3.5 text-[#D4AF6E]" />
-              <span>Close Tome</span>
+              <BookOpen className="h-3.5 w-3.5 text-[#8CA6B8]" />
+              <span>Close</span>
             </button>
           </>
         )}
+
         <button
           type="button"
           onClick={onToggleMute}
           aria-label={snapshot.audioMuted ? 'Unmute audio' : 'Mute audio'}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#D4AF6E]/25 bg-[#16100C]/92 text-[#E9DEC8] transition-colors hover:border-[#D4AF6E]/55 hover:text-[#F4ECDC] focus-visible:outline-2 focus-visible:outline-[#D4AF6E] cursor-pointer"
-          title={snapshot.audioMuted ? 'Unmute procedural soundscapes' : 'Mute soundscapes'}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#8CA6B8]/28 bg-[#12161E]/92 text-[#DDD6C6] hover:border-[#8CA6B8]/65 hover:text-[#F3ECE0] focus-visible:outline-2 focus-visible:outline-[#3D95B5] cursor-pointer"
+          title={snapshot.audioMuted ? 'Unmute projector & chime bed' : 'Mute sound'}
         >
           {snapshot.audioMuted ? (
-            <VolumeX className="h-4 w-4 text-[#C8BBA4]" />
+            <VolumeX className="h-4 w-4 text-[#8B929E]" />
           ) : (
-            <Volume2 className="h-4 w-4 text-[#D4AF6E]" />
+            <Volume2 className="h-4 w-4 text-[#8CA6B8]" />
           )}
         </button>
+
         <button
           type="button"
           onClick={onOpenHelp}
-          aria-label="Keyboard and touch controls guide"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#D4AF6E]/25 bg-[#16100C]/92 text-[#E9DEC8] transition-colors hover:border-[#D4AF6E]/55 hover:text-[#F4ECDC] focus-visible:outline-2 focus-visible:outline-[#D4AF6E] cursor-pointer"
-          title="Controls & Gestures Guide"
+          aria-label="Controls and Accessibility Guide"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#8CA6B8]/28 bg-[#12161E]/92 text-[#DDD6C6] hover:border-[#8CA6B8]/65 hover:text-[#F3ECE0] focus-visible:outline-2 focus-visible:outline-[#3D95B5] cursor-pointer"
+          title="Controls & Keyboard Shortcuts"
         >
-          <HelpCircle className="h-4 w-4 text-[#D4AF6E]" />
+          <HelpCircle className="h-4 w-4 text-[#8CA6B8]" />
         </button>
       </div>
     </header>

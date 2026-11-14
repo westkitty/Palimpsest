@@ -1,49 +1,53 @@
-# Palimpsest — The Impossible Living Atlas
+# Palimpsest: An Illustrated History of the All
 
-An interactive 3D magical pop-up storybook built with Three.js, React, TypeScript, and Vite.
+An interactive twelve-folio Three.js pop-up book presenting an Administration instructional edition spanning `F01` through `F12` in layered cream cardstock over a matte black slate table.
 
-## Features
+**Live Deployment:** https://westkitty.github.io/Palimpsest/
 
-- **Candlelit Antiquarian Tome**: Embossed leather and gold-leaf cover resting on a walnut desk with candlelit props. Unclasp the cover to unfold miniature 3D paper-engineered worlds.
-- **Ten Living Worlds & Coherent Chronicle** (with persistent independent state across Folios I–X):
-  1. **I · The Verdant Kingdom**: Layered paper hills, cascading waterfall peaks, Tudor mill village, winding Emerald River, and Root Sanctuary Vault.
-  2. **II · The Forgotten Harbor**: Animated ocean waves, Pharos lighthouse with rotating night beam, maritime citadel, sailing galleons, and Smuggler's Sea Cave.
-  3. **III · The Celestial Desert**: Origami sand dunes, rotating brass astral orrery ziggurat, crystal sun temple, mirage aqueduct, and Sunken Crystal Vault.
-  4. **IV · The Frostbound Spire**: Glacial ridges, swinging icebound belfry spire, frozen falls, boreal pines, snow wolves, and Permafrost Ice Cavern.
-  5. **V · The Sunken Athenaeum**: Drowned rotunda dome, coral arch colonnade, bathysphere vessel, manta rays, and Drowned Scroll Vault.
-  6. **VI · The Ember Foundry**: Basalt caldera cascade, bellows & hammer mill, molten ember stream, magma barge, and Magma Crucible Vault.
-  7. **VII · The Clockwork Sky**: Floating cloud islands, spinning windmill spire, airship mooring mast, paper dirigible, and Cloud-Core Engine.
-  8. **VIII · The Whispering Mycelium**: Bioluminescent toadstool canopy, spore lantern pagoda, twilight brook, luna moths, and Ancient Heartwood Crypt.
-  9. **IX · The Glass Archipelago**: Crystal prism pavilion, mirror sundial court, refracting lagoons, catamaran, crystal heron, and Mirror-Glass Grotto.
-  10. **X · The Meridian Heart**: Rotating Grand Meridian Astrolabe, Chronicler's Sanctum, golden lotus flora, golden gryphon, and Architect's Final Chamber.
-- **Cartographer's Chronicle (`N`)**: Follow the ten-chapter narrative arc of *The Unbound Meridian* and recover 20 secret journal inscriptions via the Magical Magnifier.
-- **24-Hour Day/Night Cycle & 6 Weather Presets**: Orbiting sun/moon, dynamic shadows, nocturnal illumination, stars, plus Clear, Overcast, Rain, Thunderstorm, Windy, and Mist conditions.
-- **Ten Paper-Engineered Interactive Systems**:
-  1. Physical Page Turning (drag corners or turn controls)
-  2. Pop-Up Engineering (pull margin tabs)
-  3. River Redirection (drag water spline beads)
-  4. Folding Bridges (unfold accordion spans)
-  5. Paper Tree Cultivation (plant ink seeds)
-  6. Sailing Routes (draw routes for paper ships)
-  7. Constellation Drawing (connect sky dome star nodes)
-  8. Creature Summoning (press wax seals to unfold origami fauna)
-  9. Hidden Layers (lift hinged terrain flaps to reveal underground chambers)
-  10. Magical Magnifier (glide the brass glass lens to reveal secret ink marginalia)
-- **Three Camera Modes**: Desk Inspection (`1`), Diorama Close-Up (`2`), and Miniature Immersion (`3` with `WASD`/Arrow or touch navigation).
-- **Procedural Web Audio & Adaptive Quality**: Synthesized paper rustles, weather ambience, chimes, plus adaptive mobile quality and reduced-motion support.
+## Overview
 
-## Local Setup
+- **Twelve Historical Folios (`F01`–`F12`)**: Chronicles the initialization of reality, the Triarchic Order, Mother & the 170-Year Blood Eclipse War, the Siege of the Ruby Eclipse, the Aureal Gate, the Hal'Ven Heliocide, the Siege Wall & Postwar Protocols, Nacreous VI, and the unfinished postwar peace ending with *"Your fate is in our hands."*
+- **Thirty-Six Physical Teaching Mechanisms (`3` per Folio)**: Direct interactive dials, pull-tabs, comparison slides, stepped manufacturing sequences, and archival reveals (`[A]`, `[B]`, `[C]`), including persistent state such as `F09`'s irreversible Model Star filament pull.
+- **21 Procedural Drakken Assemblies & 6 Character Figures**: Modular Three.js paper-and-ink models constructed from the 21 DRAXIS catalog entries (`production/history_v1/DRAXIS_21.json`), paired with inspection lens marginalia (`F`).
+- **Period 1954–61 Instructional Presentation**: Controlled `4:3` framing inside a physical hinged charcoal-linen volume with period typography, acoustic projector/paper sound effects, and an archival PNG plate exporter.
+
+## Controls & Accessibility
+
+- **Open / Next Mechanism:** `Space` or `Enter`, pointer click, or touch tap
+- **Teaching Mechanisms:** `A`, `B`, `C` keys, bottom dock buttons, or direct click/tap on 3D paper tabs
+- **Folio Navigation:** `[` / `]`, `ArrowLeft` / `ArrowRight`, page corner drag, or bottom `F01`–`F12` bar
+- **Camera Presets:** `1` (Slate Inspection), `2` (`4:3` Frame), `3` (Close Model View + `WASD`/Arrow panning), plus orbit/zoom
+- **Inspection Lens:** `F` to toggle, move with pointer or `WASD` / Arrow keys
+- **Transcript & Sources Drawer (`T`):** Full accessible DOM transcript (`OPEN`, `LESSON`, `A`, `B`, `C`, `CLOSE` cues), mechanism triggers, and DRAXIS catalog inspector
+- **Optional Captions (`K`):** Strictly **Off** by default; toggleable via header button or `K`
+- **Cue Playback (`V`):** Steps narration cues via browser speech synthesis when available or timed caption progression
+- **Accessibility Modes:** `Reduced Motion`, `No Flash` (disables gate flicker/luminance shifts), collapsible HUD (`H`), and full **Non-WebGL `4:3 Schematic` SVG & Reading Fallback**
+
+## Local Setup & Build
+
+Requires Node.js 20+ (tested on Node 22).
 
 ```bash
 npm install
+npm run lint
+npm run build
+npm run preview
+```
+
+For full local development with the Node server:
+
+```bash
 npm run dev
 ```
 
-Open `http://localhost:3000` in your browser.
+Static production assets build cleanly into `dist/` via Vite (`base: './'`) and do not require the Node/Express server at runtime on static hosts such as GitHub Pages.
 
-### Production Build
+## Historical Version & Rollback
 
-```bash
-npm run lint
-npm run build
-```
+The earlier **ten-world prototype** (*Palimpsest — The Impossible Living Atlas*, Folios `I`–`X`, preserving `localStorage['palimpsest_atlas_save_v1']`) remains preserved at commit `1416c581b703e8385f33a5385163d7c51aac6bae` (`rollback/ten-world-main-20261114`). The twelve-folio edition stores temporary session state strictly in `sessionStorage` so prior save data is untouched.
+
+## Known Limitations
+
+- **Software WebGL Rendering:** Environments lacking hardware GPU acceleration fall back to software rasterization (e.g., SwiftShader) at reduced pixel ratio and frame rate; use **Quality** or **4:3 Schematic** mode if needed.
+- **Browser Speech Voices:** Spoken audio narration depends on operating-system/browser `speechSynthesis` voices; when no voice is installed, **Read Cue (`V`)** steps reading cues silently at transcript pace.
+- **Static Browser Hosting:** The static GitHub Pages build omits local-only Node server routes and runs fully client-side.

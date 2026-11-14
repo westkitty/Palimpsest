@@ -1,666 +1,633 @@
 import { useState } from 'react';
 import {
-  Award,
+  AlertCircle,
   BookOpen,
-  Camera,
   Check,
   ChevronLeft,
   ChevronRight,
-  Compass,
-  Eye,
-  Flame,
-  Headphones,
+  ExternalLink,
+  FileText,
+  Flag,
+  Layers,
   Pause,
   Play,
   RotateCcw,
   Search,
-  Sparkles,
-  Trash2,
-  Trees,
-  Waves,
-  Wind,
+  Volume2,
   X,
 } from 'lucide-react';
-import { GeminiNarratorVoiceId, narrationEngine } from '../audio/NarrationEngine';
+import { DRAXIS_21_LIST, DRAXIS_BY_ID } from '../story/draxisCatalog';
 import {
-  computeCrossWorldInfluence,
-  computeMeridianQuestProgress,
+  ADMINISTRATION_SLOGAN,
+  BOOK_ENDCARD_CUE,
+  BOOK_IMPRINT_CUE,
+  BOOK_PROLOGUE_CUE,
+  BOOK_TITLE,
+  FOLIO_BY_WORLD,
+  FOLIO_MANIFESTS,
   MAGNIFIER_SECRETS,
-} from '../state/atlasStore';
-import { CHRONICLE_SCRIPTS } from '../story/chronicleScripts';
+} from '../story/historyManifest';
 import {
   AtlasSnapshot,
+  CueSlot,
+  DraxisId,
+  EvidenceKind,
+  FolioInteractionSlot,
   TOTAL_WORLDS,
-  WORLD_METADATA,
   WorldId,
 } from '../types/atlas';
+
+type ChronicleTab = 'transcript' | 'sources' | 'folios';
 
 interface ChroniclePanelProps {
   snapshot: AtlasSnapshot;
   onClose: () => void;
   onSelectWorld: (world: WorldId) => void;
-  onCrossPortal: () => void;
-  onBlotMargins: () => void;
-  onStampFolio: () => void;
-  onMendMeridian: () => void;
-  onExportPostcard: () => void;
-  onResetChronicle: () => void;
+  onTriggerInteraction: (slot: FolioInteractionSlot) => void;
+  onSelectDraxis: (id: DraxisId) => void;
+  onPlayCueSlot: (world: WorldId, slot: CueSlot) => void;
   onToggleNarration: () => void;
-  onReplayNarration: () => void;
-  onToggleAutoNarrate: () => void;
+  onToggleCaptions: () => void;
+  onOpenEndcard: () => void;
+  onRestartSession: () => void;
 }
 
-const WORLD_IDS: WorldId[] = Array.from(
-  { length: TOTAL_WORLDS },
-  (_, i) => i as WorldId,
-);
+const CUE_ORDER: CueSlot[] = ['OPEN', 'LESSON', 'A', 'B', 'C', 'CLOSE'];
+
+const EVIDENCE_STYLES: Record<EvidenceKind, { label: string; cls: string }> = {
+  'source-fact': {
+    label: 'Source Fact',
+    cls: 'border-[#4E8096]/60 bg-[#1B2B38] text-[#A8D2E6]',
+  },
+  'historical-quotation': {
+    label: 'Historical Quotation',
+    cls: 'border-[#B89860]/60 bg-[#2A2319] text-[#E6CF9F]',
+  },
+  'editorial-illustration': {
+    label: 'Editorial Illustration',
+    cls: 'border-[#8CA6B8]/45 bg-[#1D222C] text-[#D0DAE6]',
+  },
+  demonstration: {
+    label: 'Physical Model',
+    cls: 'border-[#3D95B5]/60 bg-[#162B34] text-[#8CE0FA]',
+  },
+  uncertainty: {
+    label: 'Archival Uncertainty',
+    cls: 'border-[#B35D53]/60 bg-[#2E1A1A] text-[#E8ACA4]',
+  },
+};
 
 export function ChroniclePanel({
   snapshot,
   onClose,
   onSelectWorld,
-  onCrossPortal,
-  onBlotMargins,
-  onStampFolio,
-  onMendMeridian,
-  onExportPostcard,
-  onResetChronicle,
+  onTriggerInteraction,
+  onSelectDraxis,
+  onPlayCueSlot,
   onToggleNarration,
-  onReplayNarration,
-  onToggleAutoNarrate,
+  onToggleCaptions,
+  onOpenEndcard,
+  onRestartSession,
 }: ChroniclePanelProps) {
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [tab, setTab] = useState<ChronicleTab>('transcript');
+  const [fullBookTranscript, setFullBookTranscript] = useState(false);
+  const [confirmRestart, setConfirmRestart] = useState(false);
 
   if (!snapshot.chronicleOpen || snapshot.bookPhase === 'closed') return null;
 
   const activeId = snapshot.activeWorld;
-  const meta = WORLD_METADATA[activeId];
-  const script = CHRONICLE_SCRIPTS[activeId];
-  const portalTargetMeta = WORLD_METADATA[meta.portal.targetWorld];
-  const worldState = snapshot.worlds[activeId];
-  const personas = narrationEngine.getPersonas();
-
+  const manifest = FOLIO_BY_WORLD[activeId];
+  const folioRuntime = snapshot.worlds[activeId];
+  const activeDraxis = snapshot.activeDraxisId ? DRAXIS_BY_ID[snapshot.activeDraxisId] : null;
   const folioSecrets = MAGNIFIER_SECRETS.filter((s) => s.worldId === activeId);
-  const discoveredFolioSecrets = folioSecrets.filter((s) =>
-    worldState.discoveredSecrets.includes(s.id),
-  );
-
-  const quest = computeMeridianQuestProgress(snapshot.worlds, snapshot.mendedMeridian);
-  const influence = computeCrossWorldInfluence(snapshot.worlds);
-  const isStamped = snapshot.stampedWorlds.includes(activeId);
-
-  const totalConstellations = snapshot.worlds.filter(
-    (w) => w.constellationComplete,
-  ).length;
-  const totalVaults = snapshot.worlds.filter((w) =>
-    w.hiddenLayers.some((hl) => hl.revealed),
-  ).length;
-  const totalSecretsFound = snapshot.worlds.reduce(
-    (acc, w) => acc + w.discoveredSecrets.length,
-    0,
-  );
-
-  const vaultOpen = worldState.hiddenLayers.some((hl) => hl.revealed);
 
   return (
     <aside
       role="dialog"
-      aria-label="Cartographer's Tenfold Chronicle"
-      className="fixed top-16 right-4 bottom-24 z-30 flex w-[min(430px,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border border-[#D4AF6E]/35 bg-[#16100C]/96 shadow-2xl sm:right-6"
+      aria-label="Transcript, Mechanisms, and Source Notes"
+      className="fixed top-14 right-3 bottom-24 z-30 flex w-[min(460px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-lg border border-[#8CA6B8]/35 bg-[#11151D]/97 shadow-2xl sm:right-5"
     >
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 border-b border-[#D4AF6E]/20 px-4 py-3.5">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#D4AF6E]">
-            The Unbound Meridian
+      <div className="flex items-start justify-between gap-2 border-b border-[#8CA6B8]/20 px-4 py-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8CA6B8]">
+            {BOOK_TITLE}
           </p>
-          <h2 className="font-display text-xl font-bold text-[#F4ECDC]">
-            Cartographer&rsquo;s Chronicle
+          <h2 className="font-display text-lg font-bold text-[#F3ECE0] truncate">
+            {manifest.code} · {manifest.title}
           </h2>
+          <p className="text-[11px] text-[#9FA6B2]">{manifest.temporalMarker}</p>
         </div>
+
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close Chronicle"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#D4AF6E]/25 bg-[#211812] text-[#C8BBA4] transition-colors hover:border-[#D4AF6E]/60 hover:text-[#F4ECDC] cursor-pointer"
+          aria-label="Close transcript and sources drawer"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[#8CA6B8]/25 text-[#C8C2B6] hover:border-[#8CA6B8]/65 hover:text-[#F3ECE0] cursor-pointer"
         >
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      {/* Pilgrimage Summary Strip */}
-      <div className="grid grid-cols-4 divide-x divide-[#D4AF6E]/15 border-b border-[#D4AF6E]/15 bg-[#120D0A] text-center">
-        <div className="px-2 py-2">
-          <div className="font-mono text-xs font-semibold tabular-nums text-[#E2C996]">
-            {snapshot.visitedWorlds.length}/{TOTAL_WORLDS}
-          </div>
-          <div className="text-[10px] text-[#A89A84]">Folios</div>
-        </div>
-        <div className="px-2 py-2">
-          <div className="font-mono text-xs font-semibold tabular-nums text-[#E2C996]">
-            {totalConstellations}/{TOTAL_WORLDS}
-          </div>
-          <div className="text-[10px] text-[#A89A84]">Stars</div>
-        </div>
-        <div className="px-2 py-2">
-          <div className="font-mono text-xs font-semibold tabular-nums text-[#E2C996]">
-            {totalVaults}/{TOTAL_WORLDS}
-          </div>
-          <div className="text-[10px] text-[#A89A84]">Vaults</div>
-        </div>
-        <div className="px-2 py-2">
-          <div className="font-mono text-xs font-semibold tabular-nums text-[#E2C996]">
-            {totalSecretsFound}/{MAGNIFIER_SECRETS.length}
-          </div>
-          <div className="text-[10px] text-[#A89A84]">Notes</div>
-        </div>
+      {/* Tabs */}
+      <div
+        role="tablist"
+        aria-label="Archival reading sections"
+        className="grid grid-cols-3 border-b border-[#8CA6B8]/18 bg-[#161B25] text-xs font-medium"
+      >
+        {(
+          [
+            ['transcript', 'Transcript (6+)', FileText],
+            ['sources', 'Sources & DRAXIS', Layers],
+            ['folios', 'F01–F12 Index', BookOpen],
+          ] as const
+        ).map(([id, label, Icon]) => {
+          const selected = tab === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => setTab(id)}
+              className={`flex items-center justify-center gap-1.5 border-b-2 px-2 py-2.5 transition-colors cursor-pointer ${
+                selected
+                  ? 'border-[#3D95B5] bg-[#1C2432] text-[#F3ECE0]'
+                  : 'border-transparent text-[#9FA6B2] hover:text-[#DDD6C6]'
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              <span>{label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Scrollable Body */}
-      <div className="atlas-scroll flex-1 overflow-y-auto px-4 py-3.5 space-y-4">
-        {/* Current Chapter Prose */}
-        <section className="rounded-md border border-[#D4AF6E]/22 bg-[#1D1510] p-3.5">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#D4AF6E]">
-            <span className="font-mono">{meta.folioCode}</span>
-            <span>{meta.act}</span>
-          </div>
-
-          <h3 className="mt-1 font-display text-lg font-bold leading-snug text-[#F4ECDC]">
-            {meta.chapterTitle}
-          </h3>
-
-          <div className="mt-1 text-[11px] text-[#B8A98E]">
-            <span>{meta.biome}</span>
-          </div>
-
-          <p className="mt-2 font-display text-[15px] italic leading-relaxed text-[#E9DEC8]">
-            &ldquo;{meta.narrativeLead}&rdquo;
-          </p>
-
-          <p className="mt-2 text-xs leading-relaxed text-[#C8BBA4]">
-            {meta.narrativeBody}
-          </p>
-
-          {/* Voiced Chapter Narration Bar */}
-          <div className="mt-3 rounded border border-[#D4AF6E]/25 bg-[#140F0B] p-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#D4AF6E]">
-                  <Headphones className="h-3 w-3 shrink-0" />
-                  <span>Voiced Reading &middot; {script.motif}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5">
+      <div className="flex-1 atlas-scroll p-4 space-y-4">
+        {tab === 'transcript' && (
+          <>
+            {/* Reading controls */}
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#8CA6B8]/25 bg-[#171C26] p-2.5">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={onToggleNarration}
-                  className="inline-flex items-center gap-1 rounded border border-[#D4AF6E]/45 bg-[#2A1D14] px-2.5 py-1 text-[11px] font-medium text-[#E2C996] hover:bg-[#3A281B] cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded border border-[#3D95B5]/55 bg-[#192D3B] px-2.5 py-1 text-[11px] font-medium text-[#F3ECE0] hover:bg-[#213B4D] cursor-pointer"
                 >
                   {snapshot.narrationStatus === 'speaking' ? (
-                    <>
-                      <Pause className="h-3 w-3" />
-                      <span>Pause</span>
-                    </>
+                    <Pause className="h-3 w-3 text-[#8CE0FA]" />
                   ) : (
-                    <>
-                      <Play className="h-3 w-3" />
-                      <span>
-                        {snapshot.narrationStatus === 'paused' ? 'Resume' : 'Listen'}
-                      </span>
-                    </>
+                    <Play className="h-3 w-3 text-[#8CE0FA]" />
                   )}
+                  <span>
+                    {snapshot.narrationStatus === 'speaking'
+                      ? 'Pause Reader'
+                      : snapshot.narrationStatus === 'paused'
+                        ? 'Resume Reader'
+                        : 'Step Read Folio'}
+                  </span>
                 </button>
                 <button
                   type="button"
-                  onClick={onReplayNarration}
-                  aria-label="Replay voiced chapter reading"
-                  title="Replay voiced chapter reading"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-[#D4AF6E]/25 bg-[#211812] text-[#C8BBA4] hover:border-[#D4AF6E]/60 hover:text-[#F4ECDC] cursor-pointer"
-                >
-                  <RotateCcw className="h-3 w-3" />
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[#D4AF6E]/12 pt-2 text-[11px]">
-              <label className="inline-flex items-center gap-1.5 text-[#C8BBA4] cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={snapshot.narrationEnabled}
-                  onChange={onToggleAutoNarrate}
-                  className="accent-[#D4AF6E] cursor-pointer"
-                />
-                <span>Auto-narrate chapters on turn</span>
-              </label>
-
-              <select
-                aria-label="Narrator voice persona"
-                value={snapshot.narratorVoiceId}
-                onChange={(e) => {
-                  narrationEngine.setSelectedVoiceId(e.target.value as GeminiNarratorVoiceId);
-                  onReplayNarration();
-                }}
-                className="max-w-[200px] rounded border border-[#D4AF6E]/25 bg-[#1B140F] px-2 py-0.5 text-[10px] text-[#E2C996] cursor-pointer"
-              >
-                {personas.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Bespoke Paper-Geometry Assets */}
-          <div className="mt-3 border-t border-[#D4AF6E]/15 pt-2.5">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#D4AF6E]">
-              Paper-Geometry Landmarks
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#E2D6C1]">
-              {meta.paperAssets.map((asset, i) => (
-                <span key={asset}>
-                  {i > 0 && <span className="mr-2 text-[#8C7A61]">&middot;</span>}
-                  {asset}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Dynamic Narrative Chronicle Beats */}
-          <div className="mt-3 space-y-1.5 border-t border-[#D4AF6E]/15 pt-2.5 text-[11px]">
-            <div className="flex items-start gap-2 text-[#E2C996]">
-              <Compass className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#D4AF6E]" />
-              <span>{meta.storyBeatCue}</span>
-            </div>
-
-            <div className="space-y-1 pt-1">
-              <div className={vaultOpen ? 'text-[#E9DEC8]' : 'text-[#8B7D68]'}>
-                <span className="font-mono mr-1.5">{vaultOpen ? '[✓]' : '[ ]'}</span>
-                {vaultOpen ? meta.storyBeats.vault : 'Unseal the hidden subterranean vault to log its secret.'}
-              </div>
-              <div className={worldState.constellationComplete ? 'text-[#E9DEC8]' : 'text-[#8B7D68]'}>
-                <span className="font-mono mr-1.5">{worldState.constellationComplete ? '[✓]' : '[ ]'}</span>
-                {worldState.constellationComplete
-                  ? meta.storyBeats.stars
-                  : `Align all 5 star threads (${worldState.constellationEdges.length}/5) to unlock celestial lore.`}
-              </div>
-              <div className={discoveredFolioSecrets.length > 0 ? 'text-[#E9DEC8]' : 'text-[#8B7D68]'}>
-                <span className="font-mono mr-1.5">{discoveredFolioSecrets.length > 0 ? '[✓]' : '[ ]'}</span>
-                {discoveredFolioSecrets.length > 0
-                  ? meta.storyBeats.notes
-                  : 'Sweep the brass Magnifier to recover margin notes.'}
-              </div>
-            </div>
-
-            <div className="mt-2 grid grid-cols-3 gap-1.5 pt-1 text-[11px]">
-              <div
-                className={`flex items-center gap-1 rounded border px-2 py-1 ${
-                  worldState.constellationComplete
-                    ? 'border-[#D4AF6E]/55 bg-[#2A1F16] text-[#F4ECDC]'
-                    : 'border-[#D4AF6E]/15 bg-[#15100C] text-[#A89A84]'
-                }`}
-              >
-                <Sparkles className="h-3 w-3 shrink-0 text-[#D4AF6E]" />
-                <span className="truncate">
-                  {worldState.constellationEdges.length}/5 Stars
-                </span>
-              </div>
-              <div
-                className={`flex items-center gap-1 rounded border px-2 py-1 ${
-                  vaultOpen
-                    ? 'border-[#D4AF6E]/55 bg-[#2A1F16] text-[#F4ECDC]'
-                    : 'border-[#D4AF6E]/15 bg-[#15100C] text-[#A89A84]'
-                }`}
-              >
-                <Eye className="h-3 w-3 shrink-0 text-[#D4AF6E]" />
-                <span className="truncate">
-                  {vaultOpen ? 'Vault Open' : 'Vault Sealed'}
-                </span>
-              </div>
-              <div
-                className={`flex items-center gap-1 rounded border px-2 py-1 ${
-                  discoveredFolioSecrets.length === folioSecrets.length
-                    ? 'border-[#D4AF6E]/55 bg-[#2A1F16] text-[#F4ECDC]'
-                    : 'border-[#D4AF6E]/15 bg-[#15100C] text-[#A89A84]'
-                }`}
-              >
-                <Search className="h-3 w-3 shrink-0 text-[#D4AF6E]" />
-                <span className="truncate">
-                  {discoveredFolioSecrets.length}/{folioSecrets.length} Notes
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Linked Portal Landmark Passage */}
-          <div className="mt-3 rounded border border-[#D4AF6E]/30 bg-[#140F0B] p-2.5">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#D4AF6E]">
-                  Portal Threshold &middot; {meta.portal.label}
-                </div>
-                <p className="mt-1 text-[11px] leading-snug text-[#D6C8B0]">
-                  {meta.portal.passageText}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={onCrossPortal}
-                disabled={Boolean(snapshot.portalTransition?.active)}
-                className="shrink-0 whitespace-nowrap rounded border border-[#D4AF6E]/55 bg-[#2A1D14] px-2.5 py-1 text-[11px] font-medium text-[#E2C996] hover:bg-[#3A281B] disabled:opacity-50 cursor-pointer"
-              >
-                Enter &rarr; {portalTargetMeta.roman}
-              </button>
-            </div>
-          </div>
-
-          {/* Archival Chronicle Staining, Wax Seal Stamp & Postcard */}
-          <div className="mt-2.5 rounded border border-[#D4AF6E]/18 bg-[#140F0B] px-2.5 py-2 text-[11px]">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#D4AF6E]">
-                  Chronicle Staining &middot; {Math.round(worldState.stainLevel * 100)}%
-                </div>
-                <div className="truncate text-[#A89A84]">
-                  {worldState.stainLevel > 0.65
-                    ? 'Deep weather ink-bleed across folio borders'
-                    : worldState.stainLevel > 0.28
-                      ? 'Weathered ink tendrils creeping inward'
-                      : 'Subtle archival patina along page margins'}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={onBlotMargins}
-                disabled={worldState.stainLevel <= 0.08}
-                className="shrink-0 whitespace-nowrap rounded border border-[#D4AF6E]/30 bg-[#211812] px-2 py-1 text-[10px] font-medium text-[#E2C996] hover:border-[#D4AF6E]/60 disabled:opacity-40 cursor-pointer"
-              >
-                Blot Margins
-              </button>
-            </div>
-
-            <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-[#D4AF6E]/12 pt-2">
-              <button
-                type="button"
-                onClick={onStampFolio}
-                className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-[10px] font-medium transition-colors cursor-pointer ${
-                  isStamped
-                    ? 'border-[#B8433E]/80 bg-[#3B1815] text-[#F4ECDC]'
-                    : 'border-[#D4AF6E]/30 bg-[#211812] text-[#E2C996] hover:border-[#D4AF6E]/60'
-                }`}
-              >
-                <Award className="h-3 w-3 text-[#D4AF6E]" />
-                <span>{isStamped ? 'Wax Seal Stamped' : 'Stamp Wax Seal'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={onExportPostcard}
-                className="inline-flex items-center gap-1 rounded border border-[#D4AF6E]/30 bg-[#211812] px-2 py-1 text-[10px] font-medium text-[#E2C996] hover:border-[#D4AF6E]/60 cursor-pointer"
-              >
-                <Camera className="h-3 w-3 text-[#D4AF6E]" />
-                <span>Export Postcard</span>
-              </button>
-
-              {!confirmReset ? (
-                <button
-                  type="button"
-                  onClick={() => setConfirmReset(true)}
-                  className="ml-auto inline-flex items-center gap-1 rounded border border-[#D4AF6E]/20 bg-[#1B130E] px-2 py-1 text-[10px] text-[#B8A98E] hover:border-[#B8433E]/60 hover:text-[#F4ECDC] cursor-pointer"
-                  title="Erase saved chronicle progress"
-                >
-                  <Trash2 className="h-3 w-3" />
-                  <span>Reset</span>
-                </button>
-              ) : (
-                <div className="ml-auto flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onResetChronicle();
-                      setConfirmReset(false);
-                    }}
-                    className="rounded border border-[#B8433E]/80 bg-[#5C1F1B] px-2 py-1 text-[10px] font-semibold text-[#F4ECDC] hover:bg-[#7A2924] cursor-pointer"
-                  >
-                    Confirm Reset
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmReset(false)}
-                    className="rounded border border-[#D4AF6E]/25 bg-[#211812] px-1.5 py-1 text-[10px] text-[#C8BBA4] cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Tenfold Meridian Quest Tracker */}
-          <div className="mt-2.5 rounded border border-[#D4AF6E]/28 bg-[#150F0B] p-2.5 text-[11px]">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.11em] text-[#D4AF6E]">
-                Meridian Shards Quest &middot; {quest.shardsCollected}/3
-              </span>
-              {quest.mendedMeridian && (
-                <span className="font-mono text-[10px] text-[#E2C996]">
-                  HEART RESTORED
-                </span>
-              )}
-            </div>
-
-            <div className="mt-1.5 grid grid-cols-3 gap-1.5 text-[10px]">
-              <button
-                type="button"
-                onClick={() => onSelectWorld(0)}
-                className={`rounded border px-2 py-1 text-left transition-colors cursor-pointer ${
-                  quest.shard1Verdant
-                    ? 'border-[#D4AF6E]/60 bg-[#291F14] text-[#F4ECDC]'
-                    : 'border-[#D4AF6E]/15 bg-[#120D0A] text-[#8B7D68] hover:border-[#D4AF6E]/40'
-                }`}
-              >
-                <div className="font-mono font-semibold">Shard I</div>
-                <div className="truncate">Folio I Vault</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => onSelectWorld(3)}
-                className={`rounded border px-2 py-1 text-left transition-colors cursor-pointer ${
-                  quest.shard2Frost
-                    ? 'border-[#D4AF6E]/60 bg-[#291F14] text-[#F4ECDC]'
-                    : 'border-[#D4AF6E]/15 bg-[#120D0A] text-[#8B7D68] hover:border-[#D4AF6E]/40'
-                }`}
-              >
-                <div className="font-mono font-semibold">Shard II</div>
-                <div className="truncate">Folio IV Vault</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => onSelectWorld(5)}
-                className={`rounded border px-2 py-1 text-left transition-colors cursor-pointer ${
-                  quest.shard3Ember
-                    ? 'border-[#D4AF6E]/60 bg-[#291F14] text-[#F4ECDC]'
-                    : 'border-[#D4AF6E]/15 bg-[#120D0A] text-[#8B7D68] hover:border-[#D4AF6E]/40'
-                }`}
-              >
-                <div className="font-mono font-semibold">Shard III</div>
-                <div className="truncate">Folio VI Vault</div>
-              </button>
-            </div>
-
-            {quest.mendedMeridian ? (
-              <div className="mt-2 rounded border border-[#D4AF6E]/55 bg-[#2A1F14] px-2.5 py-1.5 text-[11px] text-[#F4ECDC]">
-                Tenfold Meridian Restored &mdash; The golden beacon in Folio X binds all ten worlds.
-              </div>
-            ) : quest.canMendMeridian ? (
-              <button
-                type="button"
-                onClick={() => {
-                  if (activeId !== 9) onSelectWorld(9);
-                  onMendMeridian();
-                }}
-                className="mt-2 w-full rounded border border-[#D4AF6E]/75 bg-[#3A2716] px-3 py-1.5 text-xs font-semibold text-[#F4ECDC] hover:bg-[#4B321C] cursor-pointer"
-              >
-                Mend the Meridian Heart (Folio X Finale)
-              </button>
-            ) : (
-              <p className="mt-1.5 text-[10px] text-[#A89A84]">
-                Unseal the hidden vaults in Folios I, IV, and VI to recover all 3 Meridian Shards and mend Folio X.
-              </p>
-            )}
-          </div>
-
-          {/* Cross-Chapter Consequences ("The Ink Remembers") */}
-          <div className="mt-2.5 rounded border border-[#D4AF6E]/18 bg-[#140F0B] px-2.5 py-2 text-[10px]">
-            <div className="mb-1.5 font-semibold uppercase tracking-[0.11em] text-[#D4AF6E]">
-              The Ink Remembers &middot; Cross-Chapter Echoes
-            </div>
-            <div className="grid grid-cols-2 gap-1.5 text-[#C8BBA4]">
-              <div className="flex items-center gap-1.5 rounded bg-[#1B140F] px-2 py-1">
-                <Waves className="h-3 w-3 shrink-0 text-[#D4AF6E]" />
-                <span className="truncate">
-                  Valley Flow {Math.round(influence.riverFlowRatio * 100)}% &rarr; II
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 rounded bg-[#1B140F] px-2 py-1">
-                <Flame className="h-3 w-3 shrink-0 text-[#D4AF6E]" />
-                <span className="truncate">
-                  Forge Heat {Math.round(influence.emberHeatFactor * 100)}% &rarr; IV
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 rounded bg-[#1B140F] px-2 py-1">
-                <Trees className="h-3 w-3 shrink-0 text-[#D4AF6E]" />
-                <span className="truncate">
-                  {influence.totalTreesPlanted} Flora &rarr; IX Saplings
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 rounded bg-[#1B140F] px-2 py-1">
-                <Wind className="h-3 w-3 shrink-0 text-[#D4AF6E]" />
-                <span className="truncate">
-                  Sky Winds {Math.round(influence.skyWindBoost * 100)}% &rarr; II
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Chapter Turn Controls */}
-          <div className="mt-3 flex items-center justify-between gap-2 border-t border-[#D4AF6E]/15 pt-2.5">
-            <button
-              type="button"
-              onClick={() =>
-                onSelectWorld(
-                  ((activeId + TOTAL_WORLDS - 1) % TOTAL_WORLDS) as WorldId,
-                )
-              }
-              className="inline-flex items-center gap-1 rounded border border-[#D4AF6E]/25 bg-[#241A13] px-2.5 py-1 text-[11px] font-medium text-[#E2C996] hover:border-[#D4AF6E]/55 whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-              <span>Prev Chapter</span>
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                onSelectWorld(((activeId + 1) % TOTAL_WORLDS) as WorldId)
-              }
-              className="inline-flex items-center gap-1 rounded border border-[#D4AF6E]/25 bg-[#241A13] px-2.5 py-1 text-[11px] font-medium text-[#E2C996] hover:border-[#D4AF6E]/55 whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              <span>Next Chapter</span>
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </section>
-
-        {/* Discovered Journal Marginalia for Active Folio */}
-        <section className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h4 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#D4AF6E]">
-              Recovered Journal Marginalia
-            </h4>
-            <span className="font-mono text-[11px] text-[#A89A84]">
-              {discoveredFolioSecrets.length}/{folioSecrets.length}
-            </span>
-          </div>
-
-          {discoveredFolioSecrets.length > 0 ? (
-            <div className="space-y-2">
-              {discoveredFolioSecrets.map((sec) => (
-                <div
-                  key={sec.id}
-                  className="rounded border border-[#D4AF6E]/25 bg-[#1B140F] p-2.5"
-                >
-                  <div className="text-[11px] font-semibold text-[#E2C996]">
-                    {sec.title}
-                  </div>
-                  <p className="mt-1 font-display text-sm italic leading-snug text-[#E9DEC8]">
-                    {sec.inscription}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="rounded border border-[#D4AF6E]/12 bg-[#120D0A] px-3 py-2 text-[11px] text-[#A89A84]">
-              Sweep the brass Magnifier over Folio {meta.roman} to uncover hidden Cartographer inscriptions.
-            </p>
-          )}
-        </section>
-
-        {/* Tenfold Chapter Index */}
-        <section className="space-y-1.5">
-          <h4 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#D4AF6E]">
-            Atlas Folios I &ndash; X &middot; Ten Biomes
-          </h4>
-          <div className="divide-y divide-[#D4AF6E]/12 rounded-md border border-[#D4AF6E]/18 bg-[#120D0A]">
-            {WORLD_IDS.map((wId) => {
-              const item = WORLD_METADATA[wId];
-              const isActive = wId === activeId;
-              const visited = snapshot.visitedWorlds.includes(wId);
-              const wState = snapshot.worlds[wId];
-              const complete =
-                wState.constellationComplete &&
-                wState.hiddenLayers.some((h) => h.revealed);
-
-              return (
-                <button
-                  key={wId}
-                  type="button"
-                  onClick={() => onSelectWorld(wId)}
-                  className={`flex w-full items-center justify-between gap-2.5 px-3 py-2 text-left transition-colors cursor-pointer ${
-                    isActive
-                      ? 'bg-[#2A1D15] text-[#F4ECDC]'
-                      : 'hover:bg-[#1D1510] text-[#C8BBA4]'
+                  onClick={onToggleCaptions}
+                  aria-pressed={snapshot.captionsVisible}
+                  className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] cursor-pointer ${
+                    snapshot.captionsVisible
+                      ? 'border-[#3D95B5] bg-[#1F3142] text-[#F3ECE0]'
+                      : 'border-[#8CA6B8]/30 bg-[#12161E] text-[#C8C2B6]'
                   }`}
                 >
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <span
-                      className={`inline-flex h-6 w-7 shrink-0 items-center justify-center rounded border font-mono text-[11px] font-semibold ${
-                        isActive
-                          ? 'border-[#D4AF6E]/70 bg-[#B8433E] text-[#FAF4E8]'
-                          : 'border-[#D4AF6E]/20 bg-[#1B140F] text-[#D4AF6E]'
+                  Captions: {snapshot.captionsVisible ? 'On' : 'Off'}
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setFullBookTranscript((v) => !v)}
+                aria-pressed={fullBookTranscript}
+                className="rounded border border-[#8CA6B8]/30 bg-[#12161E] px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-[#8CA6B8] hover:text-[#F3ECE0] cursor-pointer"
+              >
+                {fullBookTranscript ? 'Active Folio Only' : 'Read Full F01–F12'}
+              </button>
+            </div>
+
+            <p className="text-[11px] text-[#9FA6B2]">
+              {snapshot.narrationCapability === 'browser-speech'
+                ? 'Speech synthesis available on this device; full verbatim script is always readable below.'
+                : 'Transcript-first archival mode (no pre-recorded audio stems or third-party voice calls used).'}
+            </p>
+
+            {/* Imprint & Opening Prologue */}
+            {(activeId === 0 || fullBookTranscript) && (
+              <div className="space-y-2 rounded-md border border-[#8CA6B8]/25 bg-[#151A23] p-3">
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8CA6B8]">
+                  Inside-Front-Cover Imprint &amp; Prologue
+                </p>
+                {BOOK_IMPRINT_CUE.paragraphs.map((p, idx) => (
+                  <p key={`imp-${idx}`} className="text-xs font-medium text-[#D8D0C0]">
+                    {p}
+                  </p>
+                ))}
+                <div className="border-t border-[#8CA6B8]/15 pt-2 space-y-1.5">
+                  {BOOK_PROLOGUE_CUE.paragraphs.map((p, idx) => (
+                    <p key={`pro-${idx}`} className="text-xs leading-relaxed text-[#E7DFCE]">
+                      {p}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Verbatim Cue List */}
+            {(fullBookTranscript ? FOLIO_MANIFESTS : [manifest]).map((fm) => (
+              <section key={fm.id} className="space-y-2.5">
+                {fullBookTranscript && (
+                  <div className="flex items-center justify-between border-b border-[#8CA6B8]/25 pb-1 pt-2">
+                    <h3 className="font-display text-base font-bold text-[#F3ECE0]">
+                      {fm.code} · {fm.title}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => onSelectWorld(fm.worldId)}
+                      className="text-[11px] font-mono text-[#3D95B5] hover:underline cursor-pointer"
+                    >
+                      Open spread
+                    </button>
+                  </div>
+                )}
+
+                {CUE_ORDER.map((slot) => {
+                  const seg = fm.cues[slot];
+                  const isPlayingThis =
+                    snapshot.narrationStatus !== 'idle' &&
+                    snapshot.narrationCueId === seg.cueId;
+                  return (
+                    <article
+                      key={seg.cueId}
+                      className={`rounded-md border p-3 ${
+                        isPlayingThis
+                          ? 'border-[#3D95B5]/80 bg-[#182634]'
+                          : 'border-[#8CA6B8]/20 bg-[#151A23]'
                       }`}
                     >
-                      {item.roman}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="truncate text-xs font-medium text-[#F4ECDC]">
-                        {item.chapterTitle}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#8CA6B8]">
+                          {seg.cueId} · {seg.heading}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onPlayCueSlot(fm.worldId, slot)}
+                          className="inline-flex items-center gap-1 rounded border border-[#8CA6B8]/28 bg-[#12161E] px-2 py-0.5 text-[10px] text-[#DDD6C6] hover:border-[#3D95B5] cursor-pointer"
+                          title={`Step highlight for ${seg.cueId}`}
+                        >
+                          <Volume2 className="h-3 w-3 text-[#8CA6B8]" />
+                          <span>Cue</span>
+                        </button>
                       </div>
-                      <div className="truncate text-[11px] text-[#A89A84]">
-                        {item.biome}
+                      <div className="mt-1.5 space-y-1.5">
+                        {seg.paragraphs.map((line, i) => (
+                          <p key={i} className="text-xs leading-relaxed text-[#EBE3D2]">
+                            {line}
+                          </p>
+                        ))}
                       </div>
+                    </article>
+                  );
+                })}
+              </section>
+            ))}
+
+            {/* Closing Endcard Transcript */}
+            {(activeId === TOTAL_WORLDS - 1 || fullBookTranscript) && (
+              <div className="space-y-1.5 rounded-md border border-[#B89860]/35 bg-[#1B1A16] p-3">
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#B89860]">
+                  Closing Endcard ({BOOK_ENDCARD_CUE.cueId})
+                </p>
+                {BOOK_ENDCARD_CUE.paragraphs.map((p, i) => (
+                  <p key={i} className="text-xs leading-relaxed text-[#F3ECE0]">
+                    {p}
+                  </p>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {tab === 'sources' && (
+          <>
+            {/* Three Interactive Teaching Mechanisms for Active Folio */}
+            <section className="space-y-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8CA6B8]">
+                Three Interactive Teaching Demonstrations ({manifest.code})
+              </p>
+              {manifest.interactions.map((def) => {
+                const st = folioRuntime.interactions[def.slot];
+                return (
+                  <div
+                    key={def.id}
+                    className={`rounded-md border p-3 ${
+                      st.active
+                        ? 'border-[#3D95B5]/65 bg-[#172532]'
+                        : 'border-[#8CA6B8]/22 bg-[#151A23]'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[#8CA6B8]">
+                          Mechanism {def.slot} ({def.keyboardLabel}) · {def.type}
+                        </span>
+                        <h3 className="text-sm font-semibold text-[#F3ECE0]">{def.label}</h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onTriggerInteraction(def.slot)}
+                        className={`shrink-0 rounded border px-2.5 py-1 text-[11px] font-medium cursor-pointer ${
+                          st.locked
+                            ? 'border-[#B35D53]/70 bg-[#2E1A1A] text-[#F3ECE0]'
+                            : st.active
+                              ? 'border-[#3D95B5] bg-[#1F3A4D] text-[#F3ECE0]'
+                              : 'border-[#8CA6B8]/40 bg-[#1C2330] text-[#E6DFD0] hover:border-[#3D95B5]'
+                        }`}
+                      >
+                        {st.locked
+                          ? 'Collapsed (Locked)'
+                          : def.persistPolicy === 'stepped'
+                            ? `Step ${st.step}/${st.maxSteps}`
+                            : st.active
+                              ? 'Active'
+                              : 'Activate'}
+                      </button>
                     </div>
+                    <p className="mt-1.5 text-xs text-[#C8C2B6]">{def.description}</p>
+                    <p className="mt-1 text-[11px] text-[#8CA6B8]">
+                      <span className="font-semibold text-[#D8D2C5]">Output:</span>{' '}
+                      {def.textEquivalent}
+                    </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-1.5 text-[10px]">
-                    {complete ? (
-                      <Check className="h-3.5 w-3.5 text-[#D4AF6E]" />
-                    ) : visited ? (
-                      <BookOpen className="h-3 w-3 text-[#A89A84]" />
-                    ) : null}
+                );
+              })}
+            </section>
+
+            {/* Evidence & Uncertainty Notes */}
+            <section className="space-y-2">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8CA6B8]">
+                Historical Classification &amp; Editorial Notes
+              </p>
+              {manifest.sourceNotes.map((note) => {
+                const badge = EVIDENCE_STYLES[note.kind];
+                return (
+                  <div
+                    key={note.id}
+                    className="rounded-md border border-[#8CA6B8]/20 bg-[#151A23] p-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-1.5">
+                      <span
+                        className={`rounded border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider ${badge.cls}`}
+                      >
+                        {badge.label}
+                      </span>
+                      <span className="font-mono text-[10px] text-[#8B929E]">{note.sourceRef}</span>
+                    </div>
+                    <h4 className="mt-1.5 text-xs font-semibold text-[#F3ECE0]">{note.heading}</h4>
+                    <p className="mt-1 text-xs leading-relaxed text-[#D8D0C0]">{note.body}</p>
                   </div>
+                );
+              })}
+
+              {manifest.uncertaintyNotes.length > 0 && (
+                <div className="rounded-md border border-[#B35D53]/40 bg-[#22171A] p-3">
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#E8ACA4]">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    <span>Recorded Source Silences &amp; Limits</span>
+                  </div>
+                  <ul className="mt-1.5 list-disc pl-4 space-y-1 text-xs text-[#E2CBC5]">
+                    {manifest.uncertaintyNotes.map((u, idx) => (
+                      <li key={idx}>{u}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Chronology IDs & External Source Pointers */}
+              <div className="rounded-md border border-[#8CA6B8]/20 bg-[#151A23] p-3 space-y-2">
+                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#8CA6B8]">
+                  Chronology Event IDs: {manifest.chronologyEventIds.join(', ')}
+                </p>
+                <p className="text-[11px] text-[#C8C2B6]">
+                  <span className="font-semibold text-[#F3ECE0]">Actors:</span>{' '}
+                  {manifest.historicalActors.join(' · ')}
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {manifest.sourcePointers.map((ptr) => (
+                    <a
+                      key={ptr.url + ptr.label}
+                      href={ptr.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 rounded border border-[#8CA6B8]/30 bg-[#12161E] px-2 py-1 text-[10px] text-[#8CA6B8] hover:border-[#3D95B5] hover:text-[#F3ECE0]"
+                    >
+                      <span>{ptr.label}</span>
+                      <ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* Archival Lens Records for active folio */}
+            <section className="space-y-1.5">
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8CA6B8]">
+                Lens Marginalia ({folioRuntime.discoveredSecrets.length}/{folioSecrets.length})
+              </p>
+              {folioSecrets.map((sec) => {
+                const found = folioRuntime.discoveredSecrets.includes(sec.id);
+                return (
+                  <div
+                    key={sec.id}
+                    className="rounded border border-[#8CA6B8]/18 bg-[#141821] px-3 py-2 text-xs"
+                  >
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="flex items-center gap-1.5 font-medium text-[#F3ECE0]">
+                        <Search className="h-3 w-3 text-[#8CA6B8]" />
+                        {sec.title}
+                      </span>
+                      <span className="font-mono text-[10px] text-[#8CA6B8]">
+                        {found ? 'Inspected' : 'Use Lens (F)'}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-[#C8C2B6]">{sec.inscription}</p>
+                  </div>
+                );
+              })}
+            </section>
+
+            {/* Complete 21-Subject DRAXIS Specimen Registry */}
+            <section className="space-y-2 border-t border-[#8CA6B8]/20 pt-3">
+              <div className="flex items-center justify-between">
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8CA6B8]">
+                  21 Original DRAXIS Subjects
+                </p>
+                <span className="font-mono text-[10px] text-[#3D95B5]">
+                  Selected: #{snapshot.activeDraxisId ?? '060'}
+                </span>
+              </div>
+
+              {activeDraxis && (
+                <div className="rounded-md border border-[#3D95B5]/45 bg-[#16232F] p-2.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-[#F3ECE0]">
+                      DRAXIS {activeDraxis.id} — {activeDraxis.name}
+                    </span>
+                    <span className="font-mono text-[10px] text-[#8CE0FA]">
+                      {activeDraxis.thesis}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-[#D8D2C5]">{activeDraxis.silhouetteNote}</p>
+                  <p className="mt-1 text-[11px] text-[#9EB7C8]">
+                    {activeDraxis.operationalRole}
+                  </p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                {DRAXIS_21_LIST.map((item) => {
+                  const selected = snapshot.activeDraxisId === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onSelectDraxis(item.id)}
+                      className={`rounded border px-2 py-1.5 text-left transition-colors cursor-pointer ${
+                        selected
+                          ? 'border-[#3D95B5] bg-[#1D3244] text-[#F3ECE0]'
+                          : 'border-[#8CA6B8]/20 bg-[#141821] text-[#C8C2B6] hover:border-[#8CA6B8]/55'
+                      }`}
+                    >
+                      <div className="font-mono text-[9px] text-[#8CA6B8]">
+                        {item.id} · {item.thesis}
+                      </div>
+                      <div className="truncate text-[11px] font-medium">{item.name}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          </>
+        )}
+
+        {tab === 'folios' && (
+          <>
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                disabled={activeId === 0}
+                onClick={() => onSelectWorld((activeId - 1) as WorldId)}
+                className="inline-flex items-center gap-1 rounded border border-[#8CA6B8]/30 bg-[#171C26] px-2.5 py-1.5 text-xs text-[#DDD6C6] disabled:opacity-40 cursor-pointer"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Prev Folio
+              </button>
+              <span className="font-mono text-[11px] text-[#8CA6B8]">
+                Visited {snapshot.visitedWorlds.length}/{TOTAL_WORLDS} · Studied{' '}
+                {snapshot.completedFolios.length}/{TOTAL_WORLDS}
+              </span>
+              <button
+                type="button"
+                disabled={activeId === TOTAL_WORLDS - 1}
+                onClick={() => onSelectWorld((activeId + 1) as WorldId)}
+                className="inline-flex items-center gap-1 rounded border border-[#8CA6B8]/30 bg-[#171C26] px-2.5 py-1.5 text-xs text-[#DDD6C6] disabled:opacity-40 cursor-pointer"
+              >
+                Next Folio
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              {FOLIO_MANIFESTS.map((fm) => {
+                const isCurrent = fm.worldId === activeId;
+                const runtime = snapshot.worlds[fm.worldId];
+                const activeCount = (['A', 'B', 'C'] as const).filter(
+                  (s) => runtime.interactions[s].active,
+                ).length;
+
+                return (
+                  <button
+                    key={fm.id}
+                    type="button"
+                    onClick={() => onSelectWorld(fm.worldId)}
+                    className={`w-full rounded-md border px-3 py-2 text-left transition-colors cursor-pointer ${
+                      isCurrent
+                        ? 'border-[#3D95B5] bg-[#182836]'
+                        : 'border-[#8CA6B8]/20 bg-[#151A23] hover:border-[#8CA6B8]/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-[#F3ECE0]">
+                        {fm.code} · {fm.title}
+                      </span>
+                      <span className="inline-flex items-center gap-1 font-mono text-[10px] text-[#8CA6B8]">
+                        {activeCount === 3 && <Check className="h-3 w-3 text-[#3D95B5]" />}
+                        {activeCount}/3 demos
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-[#9FA6B2]">
+                      {fm.temporalMarker} — {fm.subtitle}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="space-y-2 border-t border-[#8CA6B8]/20 pt-3">
+              <button
+                type="button"
+                onClick={onOpenEndcard}
+                className="flex w-full items-center justify-center gap-2 rounded-md border border-[#B89860]/55 bg-[#20242C] px-3 py-2 text-xs font-medium text-[#F3ECE0] hover:bg-[#2A303B] cursor-pointer"
+              >
+                <Flag className="h-3.5 w-3.5 text-[#B89860]" />
+                <span>View Administration Closing Endcard</span>
+              </button>
+
+              {!confirmRestart ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmRestart(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-md border border-[#8CA6B8]/25 bg-[#151A23] px-3 py-2 text-xs text-[#C8C2B6] hover:border-[#B35D53]/60 hover:text-[#F3ECE0] cursor-pointer"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Restart Reading Session</span>
                 </button>
-              );
-            })}
-          </div>
-        </section>
+              ) : (
+                <div className="rounded-md border border-[#B35D53]/55 bg-[#28181A] p-3 text-xs">
+                  <p className="text-[#F3ECE0]">
+                    Reset current session state back to F01? (Historical records remain intact;{' '}
+                    {ADMINISTRATION_SLOGAN})
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmRestart(false);
+                        onRestartSession();
+                      }}
+                      className="rounded border border-[#B35D53] bg-[#5E2825] px-3 py-1 font-medium text-[#F3ECE0] cursor-pointer"
+                    >
+                      Confirm Reset
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmRestart(false)}
+                      className="rounded border border-[#8CA6B8]/35 px-3 py-1 text-[#C8C2B6] cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </aside>
   );

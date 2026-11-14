@@ -1,664 +1,392 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import {
-  Anchor,
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  ArrowUp,
-  BookOpen,
+  Camera,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
-  Cloud,
-  CloudLightning,
-  CloudRain,
-  Compass,
-  Eye,
-  GitBranch,
-  Layers,
-  Pause,
-  Play,
+  EyeOff,
+  Monitor,
   Search,
+  Sliders,
   Sparkles,
-  Sprout,
-  Sun,
-  Trees,
-  Waves,
-  Wind,
 } from 'lucide-react';
+import { FOLIO_BY_WORLD, FOLIO_MANIFESTS } from '../story/historyManifest';
 import {
   AtlasSnapshot,
   CameraMode,
-  INTERACTION_TOOLS,
-  InteractionTool,
+  FolioInteractionSlot,
   QualityTier,
   TOTAL_WORLDS,
-  WORLD_METADATA,
-  WeatherPreset,
   WorldId,
 } from '../types/atlas';
-
-type DockTab = 'tools' | 'atmosphere' | 'camera';
 
 interface ControlDockProps {
   snapshot: AtlasSnapshot;
   onSelectWorld: (world: WorldId) => void;
-  onSelectTool: (tool: InteractionTool) => void;
-  onSetTime: (hours: number) => void;
-  onToggleAutoTime: () => void;
-  onSetWeather: (weather: WeatherPreset) => void;
+  onTriggerInteraction: (slot: FolioInteractionSlot) => void;
   onSetCameraMode: (mode: CameraMode) => void;
-  onToggleHud: () => void;
-  onSetQuality: (tier: QualityTier) => void;
+  onToggleMagnifier: () => void;
+  onToggleNonWebgl: () => void;
   onToggleReducedMotion: () => void;
-  onTogglePopup: (popupId: string) => void;
-  onToggleBridge: (bridgeId: string) => void;
-  onPlantQuickSeed: () => void;
-  onConnectNextStar: () => void;
-  onToggleCreature: (creatureId: string) => void;
-  onToggleHiddenLayer: (layerId: string) => void;
+  onToggleNoFlash: () => void;
+  onSetQuality: (tier: QualityTier) => void;
+  onToggleHud: () => void;
   onNudgeMagnifier: (dx: number, dz: number) => void;
   onNudgeImmersion: (dx: number, dz: number) => void;
-  onNudgeRiver: (dx: number, dz: number) => void;
-  onCrossPortal: () => void;
 }
 
-const TOOL_ICONS: Record<InteractionTool, typeof Compass> = {
-  explore: Compass,
-  pageTurn: BookOpen,
-  popup: Layers,
-  river: Waves,
-  bridge: GitBranch,
-  trees: Trees,
-  sailing: Anchor,
-  constellation: Sparkles,
-  creature: Sprout,
-  hiddenLayer: Eye,
-  magnifier: Search,
-};
-
-const WEATHER_OPTIONS: { id: WeatherPreset; label: string; icon: typeof Sun }[] = [
-  { id: 'clear', label: 'Clear', icon: Sun },
-  { id: 'overcast', label: 'Overcast', icon: Cloud },
-  { id: 'rain', label: 'Rain', icon: CloudRain },
-  { id: 'thunderstorm', label: 'Storm', icon: CloudLightning },
-  { id: 'windy', label: 'Windy', icon: Wind },
-  { id: 'mist', label: 'Mist', icon: Waves },
-];
-
-function formatClock(hours: number): string {
-  const totalMins = Math.floor(((hours % 24) + 24) % 24 * 60);
-  const h = Math.floor(totalMins / 60);
-  const m = totalMins % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-export function ControlDock(props: ControlDockProps) {
-  const { snapshot } = props;
-  const [tab, setTab] = useState<DockTab>('tools');
-  const [isHovering, setIsHovering] = useState(false);
-  const [isFocusedInside, setIsFocusedInside] = useState(false);
-  const leaveTimerRef = useRef<number | null>(null);
+export function ControlDock({
+  snapshot,
+  onSelectWorld,
+  onTriggerInteraction,
+  onSetCameraMode,
+  onToggleMagnifier,
+  onToggleNonWebgl,
+  onToggleReducedMotion,
+  onToggleNoFlash,
+  onSetQuality,
+  onToggleHud,
+  onNudgeMagnifier,
+  onNudgeImmersion,
+}: ControlDockProps) {
+  const activePillRef = useRef<HTMLButtonElement | null>(null);
+  const activeWorld = snapshot.activeWorld;
 
   useEffect(() => {
-    if (snapshot.hudCollapsed) {
-      setIsHovering(false);
-      setIsFocusedInside(false);
-    }
-  }, [snapshot.hudCollapsed]);
-
-  useEffect(() => {
-    return () => {
-      if (leaveTimerRef.current !== null) {
-        window.clearTimeout(leaveTimerRef.current);
-      }
-    };
-  }, []);
+    if (snapshot.bookPhase === 'closed' || snapshot.hudCollapsed) return;
+    activePillRef.current?.scrollIntoView({
+      behavior: snapshot.reducedMotion ? 'auto' : 'smooth',
+      block: 'nearest',
+      inline: 'center',
+    });
+  }, [activeWorld, snapshot.bookPhase, snapshot.hudCollapsed, snapshot.reducedMotion]);
 
   if (snapshot.bookPhase === 'closed') return null;
 
-  const activeWorldState = snapshot.worlds[snapshot.activeWorld];
-  const activeMeta = WORLD_METADATA[snapshot.activeWorld];
-  const portalTargetMeta = WORLD_METADATA[activeMeta.portal.targetWorld];
-  const isVisible = isHovering || isFocusedInside || !snapshot.hudCollapsed;
+  const manifest = FOLIO_BY_WORLD[activeWorld];
+  const runtime = snapshot.worlds[activeWorld];
 
-  const handleMouseEnter = () => {
-    if (leaveTimerRef.current !== null) {
-      window.clearTimeout(leaveTimerRef.current);
-      leaveTimerRef.current = null;
-    }
-    setIsHovering(true);
-  };
-
-  const handleMouseLeave = () => {
-    if (leaveTimerRef.current !== null) {
-      window.clearTimeout(leaveTimerRef.current);
-    }
-    leaveTimerRef.current = window.setTimeout(() => {
-      setIsHovering(false);
-    }, 220);
-  };
-
-  const handleBottomReveal = () => {
-    if (snapshot.hudCollapsed) {
-      props.onToggleHud();
-    }
-    setIsHovering(true);
-  };
-
-  const handleCollapse = () => {
-    if (leaveTimerRef.current !== null) {
-      window.clearTimeout(leaveTimerRef.current);
-      leaveTimerRef.current = null;
-    }
-    setIsHovering(false);
-    setIsFocusedInside(false);
-    if (!snapshot.hudCollapsed) {
-      props.onToggleHud();
-    }
-  };
-
-  return (
-    <div
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onFocusCapture={() => setIsFocusedInside(true)}
-      onBlurCapture={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-          setIsFocusedInside(false);
-        }
-      }}
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-20 flex flex-col items-center px-3 pb-3 sm:pb-4"
-    >
-      {/* Subtle bottom hover / tap zone when the menu bar is tucked away */}
-      {!isVisible ? (
+  if (snapshot.hudCollapsed) {
+    return (
+      <div className="fixed bottom-3 left-1/2 z-20 -translate-x-1/2">
         <button
           type="button"
-          onClick={handleBottomReveal}
-          aria-label="Reveal controls menu"
-          title="Hover or tap the bottom edge to open controls (H)"
-          className="pointer-events-auto flex h-12 w-full max-w-[min(960px,96vw)] items-end justify-center pb-1.5 cursor-pointer focus-visible:outline-2 focus-visible:outline-[#D4AF6E]"
+          onClick={onToggleHud}
+          className="inline-flex items-center gap-2 rounded-full border border-[#8CA6B8]/40 bg-[#12161E]/95 px-4 py-1.5 text-xs font-medium text-[#ECE4D4] shadow-xl hover:border-[#3D95B5] cursor-pointer"
+          title="Expand bottom folio controls (H)"
         >
-          <span className="h-1 w-14 rounded-full bg-[#D4AF6E]/35 transition-colors hover:bg-[#D4AF6E]/80" />
+          <ChevronUp className="h-3.5 w-3.5 text-[#8CA6B8]" />
+          <span>
+            {manifest.code} · {manifest.title}
+          </span>
         </button>
-      ) : (
-        <>
-          {/* Collapse / Pin Handle */}
-          <button
-            type="button"
-            onClick={snapshot.hudCollapsed ? handleBottomReveal : handleCollapse}
-            className="pointer-events-auto mb-1.5 inline-flex items-center gap-1.5 rounded-t-md border border-b-0 border-[#D4AF6E]/30 bg-[#16100C]/94 px-3 py-1 text-[11px] font-medium text-[#E2C996] transition-colors hover:text-[#F4ECDC] focus-visible:outline-2 focus-visible:outline-[#D4AF6E] cursor-pointer"
-            title={snapshot.hudCollapsed ? 'Pin menu bar open (H)' : 'Hide menu bar (H)'}
-          >
-            {snapshot.hudCollapsed ? (
-              <>
-                <ChevronUp className="h-3.5 w-3.5" />
-                <span>Pin Menu</span>
-              </>
-            ) : (
-              <>
-                <ChevronDown className="h-3.5 w-3.5" />
-                <span>Hide Menu</span>
-              </>
-            )}
-          </button>
+      </div>
+    );
+  }
 
-          <div className="pointer-events-auto w-full max-w-[min(960px,96vw)] rounded-lg border border-[#D4AF6E]/28 bg-[#16100C]/94 px-3 py-2.5 shadow-2xl sm:px-4">
-          {/* Top Slim Row: Folio Turning + Section Tabs + Camera Presets */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#D4AF6E]/15 pb-2">
-            {/* World Folio Switcher (Folios I–X) */}
-            <div className="flex items-center gap-1 max-w-full">
-              <button
-                type="button"
-                onClick={() =>
-                  props.onSelectWorld(
-                    ((snapshot.activeWorld + TOTAL_WORLDS - 1) % TOTAL_WORLDS) as WorldId,
-                  )
-                }
-                aria-label="Turn to previous folio"
-                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-[#D4AF6E]/25 bg-[#211812] text-[#E2C996] hover:border-[#D4AF6E]/55 cursor-pointer"
-                title="Previous folio ([)"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </button>
-              <div className="atlas-scroll flex items-center gap-1 overflow-x-auto max-w-[230px] sm:max-w-[340px]">
-                {Array.from({ length: TOTAL_WORLDS }, (_, idx) => idx as WorldId).map((wId) => {
-                  const active = snapshot.activeWorld === wId;
-                  return (
-                    <button
-                      key={wId}
-                      type="button"
-                      onClick={() => props.onSelectWorld(wId)}
-                      title={`${WORLD_METADATA[wId].folioCode}: ${WORLD_METADATA[wId].title}`}
-                      className={`h-7 rounded px-2 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                        active
-                          ? 'border border-[#D4AF6E]/60 bg-[#B8433E] text-[#FAF4E8]'
-                          : 'border border-[#D4AF6E]/15 bg-[#211812] text-[#C8BBA4] hover:text-[#F4ECDC]'
-                      }`}
-                    >
-                      {WORLD_METADATA[wId].roman}
-                    </button>
-                  );
-                })}
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  props.onSelectWorld(((snapshot.activeWorld + 1) % TOTAL_WORLDS) as WorldId)
-                }
-                aria-label="Turn to next folio"
-                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-[#D4AF6E]/25 bg-[#211812] text-[#E2C996] hover:border-[#D4AF6E]/55 cursor-pointer"
-                title="Next folio (])"
-              >
-                <ChevronRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            {/* Dock Section Segmented Tabs */}
-            <div className="flex items-center gap-1 rounded-md border border-[#D4AF6E]/15 bg-[#110C09] p-0.5">
-              {(
-                [
-                  ['tools', 'Paper Tools'],
-                  ['atmosphere', 'Sky & Weather'],
-                  ['camera', 'View & Quality'],
-                ] as const
-              ).map(([id, label]) => (
+  return (
+    <nav
+      aria-label="Folio navigation and teaching mechanism controls"
+      className="fixed bottom-0 left-0 right-0 z-20 border-t border-[#8CA6B8]/25 bg-[#10141C]/95 px-2.5 py-1.5 backdrop-blur-xs sm:px-5 sm:py-2"
+    >
+      <div className="mx-auto flex max-w-6xl flex-col gap-1.5 sm:gap-2">
+        {/* Top Row: Direct Folio Mechanisms [A] [B] [C] + Page Navigation */}
+        <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
+          {/* Active Folio [A] [B] [C] mechanism buttons */}
+          <div className="grid w-full grid-cols-3 gap-1 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-1.5">
+            {manifest.interactions.map((def) => {
+              const st = runtime.interactions[def.slot];
+              return (
                 <button
-                  key={id}
+                  key={def.id}
                   type="button"
-                  onClick={() => setTab(id)}
-                  className={`rounded px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                    tab === id
-                      ? 'bg-[#2C2017] text-[#F4ECDC]'
-                      : 'text-[#B4A690] hover:text-[#F4ECDC]'
+                  onClick={() => onTriggerInteraction(def.slot)}
+                  aria-pressed={st.active}
+                  title={`${def.description} (Key ${def.slot})`}
+                  className={`inline-flex min-w-0 items-center justify-center sm:justify-start gap-1 sm:gap-1.5 rounded-md border px-1.5 py-1 sm:px-2.5 text-[11px] sm:text-xs font-medium transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#3D95B5] ${
+                    st.locked
+                      ? 'border-[#B35D53]/75 bg-[#331B1C] text-[#F3ECE0]'
+                      : st.active
+                        ? 'border-[#3D95B5] bg-[#1B3345] text-[#F3ECE0]'
+                        : 'border-[#8CA6B8]/30 bg-[#171D28] text-[#D8D0C0] hover:border-[#8CA6B8]/65 hover:text-[#F3ECE0]'
                   }`}
                 >
-                  {label}
+                  <span className="shrink-0 rounded bg-[#0E1116] px-1 py-0.5 sm:px-1.5 font-mono text-[10px] font-semibold text-[#8CE0FA]">
+                    {def.slot}
+                  </span>
+                  <span className="min-w-0 truncate sm:max-w-[180px]">{def.label}</span>
+                  {def.persistPolicy === 'stepped' && (
+                    <span className="shrink-0 font-mono text-[10px] text-[#8CA6B8]">
+                      {st.step}/{st.maxSteps}
+                    </span>
+                  )}
+                  {st.locked && (
+                    <span className="shrink-0 font-mono text-[9px] uppercase text-[#E8ACA4]">Locked</span>
+                  )}
                 </button>
-              ))}
-            </div>
-
-            {/* Camera Presets */}
-            <div className="hidden md:flex items-center gap-1">
-              {(
-                [
-                  ['inspection', 'Desk'],
-                  ['diorama', 'Diorama'],
-                  ['immersion', 'Immerse'],
-                ] as const
-              ).map(([mode, label]) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => props.onSetCameraMode(mode)}
-                  className={`h-7 rounded px-2.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                    snapshot.cameraMode === mode
-                      ? 'border border-[#D4AF6E]/60 bg-[#2C2017] text-[#E2C996]'
-                      : 'border border-transparent text-[#B4A690] hover:text-[#F4ECDC]'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
 
-          {/* Tab Content */}
-          {tab === 'tools' && (
-            <div className="pt-2">
-              <div className="atlas-scroll flex items-center gap-1.5 overflow-x-auto pb-1">
-                {INTERACTION_TOOLS.map((tool) => {
-                  const Icon = TOOL_ICONS[tool.id];
-                  const active = snapshot.activeTool === tool.id;
-                  return (
-                    <button
-                      key={tool.id}
-                      type="button"
-                      onClick={() => props.onSelectTool(tool.id)}
-                      className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                        active
-                          ? 'border-[#D4AF6E]/70 bg-[#2E2118] text-[#F4ECDC]'
-                          : 'border-[#D4AF6E]/15 bg-[#1D1510] text-[#C8BBA4] hover:border-[#D4AF6E]/40 hover:text-[#F4ECDC]'
-                      }`}
-                      title={`${tool.label} (${tool.shortcut})`}
-                    >
-                      <Icon className={`h-3.5 w-3.5 ${active ? 'text-[#D4AF6E]' : 'text-[#A89A84]'}`} />
-                      <span>{tool.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+          {/* Prev / Folio Pills / Next */}
+          <div className="flex w-full items-center justify-between gap-1 sm:w-auto sm:justify-start sm:max-w-full">
+            <button
+              type="button"
+              disabled={activeWorld === 0}
+              onClick={() => onSelectWorld((activeWorld - 1) as WorldId)}
+              aria-label="Previous folio"
+              title="Previous Folio ([)"
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-[#8CA6B8]/30 bg-[#171D28] text-[#DDD6C6] hover:border-[#8CA6B8]/65 disabled:opacity-35 cursor-pointer"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
 
-              {/* Touch / Keyboard Quick Triggers for Active Tool */}
-              <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#C8BBA4]">
-                <span className="truncate max-w-full sm:max-w-[54%]">{snapshot.statusHint}</span>
-
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {(snapshot.activeTool === 'explore' || snapshot.activeTool === 'pageTurn') && (
-                    <button
-                      type="button"
-                      onClick={props.onCrossPortal}
-                      disabled={Boolean(snapshot.portalTransition?.active)}
-                      title={`${activeMeta.portal.label}: ${activeMeta.portal.description} (Enter)`}
-                      className="rounded border border-[#D4AF6E]/55 bg-[#2A1D14] px-2.5 py-0.5 text-[11px] font-medium text-[#E2C996] hover:bg-[#3A281B] disabled:opacity-50 whitespace-nowrap shrink-0 cursor-pointer"
-                    >
-                      Cross {activeMeta.portal.label} &rarr; Folio {portalTargetMeta.roman}
-                    </button>
-                  )}
-
-                  {snapshot.activeTool === 'popup' &&
-                    activeWorldState.popups.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => props.onTogglePopup(p.id)}
-                        className="rounded border border-[#D4AF6E]/35 bg-[#241A13] px-2 py-0.5 text-[11px] text-[#E2C996] hover:bg-[#32241A] whitespace-nowrap shrink-0 cursor-pointer"
-                      >
-                        {p.pullRatio > 0.5 ? `Fold ${p.label}` : `Raise ${p.label}`}
-                      </button>
-                    ))}
-
-                  {snapshot.activeTool === 'river' && (
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => props.onNudgeRiver(-0.35, 0.25)}
-                        className="rounded border border-[#D4AF6E]/35 bg-[#241A13] px-2 py-0.5 text-[11px] text-[#E2C996] hover:bg-[#32241A] cursor-pointer"
-                      >
-                        Bend West
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => props.onNudgeRiver(0.35, -0.25)}
-                        className="rounded border border-[#D4AF6E]/35 bg-[#241A13] px-2 py-0.5 text-[11px] text-[#E2C996] hover:bg-[#32241A] cursor-pointer"
-                      >
-                        Bend East
-                      </button>
-                    </div>
-                  )}
-
-                  {snapshot.activeTool === 'bridge' &&
-                    activeWorldState.bridges.map((b) => (
-                      <button
-                        key={b.id}
-                        type="button"
-                        onClick={() => props.onToggleBridge(b.id)}
-                        className="rounded border border-[#D4AF6E]/35 bg-[#241A13] px-2 py-0.5 text-[11px] text-[#E2C996] hover:bg-[#32241A] whitespace-nowrap shrink-0 cursor-pointer"
-                      >
-                        {b.unfolded ? `Fold ${b.label}` : `Unfold ${b.label}`}
-                      </button>
-                    ))}
-
-                  {snapshot.activeTool === 'trees' && (
-                    <button
-                      type="button"
-                      onClick={props.onPlantQuickSeed}
-                      className="rounded border border-[#D4AF6E]/45 bg-[#241A13] px-2.5 py-0.5 text-[11px] text-[#E2C996] hover:bg-[#32241A] whitespace-nowrap shrink-0 cursor-pointer"
-                    >
-                      + Plant Ink Seed
-                    </button>
-                  )}
-
-                  {snapshot.activeTool === 'constellation' && (
-                    <button
-                      type="button"
-                      onClick={props.onConnectNextStar}
-                      className="rounded border border-[#D4AF6E]/45 bg-[#241A13] px-2.5 py-0.5 text-[11px] text-[#E2C996] hover:bg-[#32241A] whitespace-nowrap shrink-0 cursor-pointer"
-                    >
-                      + Connect Star Thread ({activeWorldState.constellationEdges.length}/5)
-                    </button>
-                  )}
-
-                  {snapshot.activeTool === 'creature' &&
-                    activeWorldState.creatures.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => props.onToggleCreature(c.id)}
-                        className={`rounded border px-2 py-0.5 text-[11px] whitespace-nowrap shrink-0 cursor-pointer ${
-                          c.summoned
-                            ? 'border-[#D4AF6E]/60 bg-[#3B261C] text-[#F4ECDC]'
-                            : 'border-[#D4AF6E]/30 bg-[#241A13] text-[#C8BBA4]'
-                        }`}
-                      >
-                        {c.label}
-                      </button>
-                    ))}
-
-                  {snapshot.activeTool === 'hiddenLayer' &&
-                    activeWorldState.hiddenLayers.map((hl) => (
-                      <button
-                        key={hl.id}
-                        type="button"
-                        onClick={() => props.onToggleHiddenLayer(hl.id)}
-                        className="rounded border border-[#D4AF6E]/45 bg-[#241A13] px-2.5 py-0.5 text-[11px] text-[#E2C996] hover:bg-[#32241A] whitespace-nowrap shrink-0 cursor-pointer"
-                      >
-                        {hl.revealed ? `Close ${hl.label}` : `Lift ${hl.label}`}
-                      </button>
-                    ))}
-
-                  {snapshot.activeTool === 'magnifier' && (
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => props.onNudgeMagnifier(-0.55, 0)}
-                        aria-label="Move magnifier left"
-                        className="rounded border border-[#D4AF6E]/30 bg-[#241A13] p-1 text-[#E2C996] cursor-pointer"
-                      >
-                        <ArrowLeft className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => props.onNudgeMagnifier(0, -0.55)}
-                        aria-label="Move magnifier up"
-                        className="rounded border border-[#D4AF6E]/30 bg-[#241A13] p-1 text-[#E2C996] cursor-pointer"
-                      >
-                        <ArrowUp className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => props.onNudgeMagnifier(0, 0.55)}
-                        aria-label="Move magnifier down"
-                        className="rounded border border-[#D4AF6E]/30 bg-[#241A13] p-1 text-[#E2C996] cursor-pointer"
-                      >
-                        <ArrowDown className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => props.onNudgeMagnifier(0.55, 0)}
-                        aria-label="Move magnifier right"
-                        className="rounded border border-[#D4AF6E]/30 bg-[#241A13] p-1 text-[#E2C996] cursor-pointer"
-                      >
-                        <ArrowRight className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
+            <div className="flex max-w-[calc(100%-4rem)] sm:max-w-[min(420px,62vw)] items-center gap-1 overflow-x-auto py-0.5">
+              {FOLIO_MANIFESTS.map((fm) => {
+                const current = fm.worldId === activeWorld;
+                const visited = snapshot.visitedWorlds.includes(fm.worldId);
+                return (
+                  <button
+                    key={fm.id}
+                    ref={current ? activePillRef : undefined}
+                    type="button"
+                    onClick={() => onSelectWorld(fm.worldId)}
+                    aria-current={current ? 'page' : undefined}
+                    title={`${fm.code}: ${fm.title}`}
+                    className={`shrink-0 rounded border px-2 py-0.5 font-mono text-[10px] transition-colors cursor-pointer ${
+                      current
+                        ? 'border-[#3D95B5] bg-[#1F3A4D] font-bold text-[#F3ECE0]'
+                        : visited
+                          ? 'border-[#8CA6B8]/35 bg-[#171D28] text-[#D8D0C0] hover:border-[#8CA6B8]/70'
+                          : 'border-[#8CA6B8]/18 bg-[#12161E] text-[#8B929E] hover:text-[#D8D0C0]'
+                    }`}
+                  >
+                    {fm.code}
+                  </button>
+                );
+              })}
             </div>
-          )}
 
-          {tab === 'atmosphere' && (
-            <div className="flex flex-col gap-2 pt-2">
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={props.onToggleAutoTime}
-                  className="inline-flex h-7 items-center gap-1.5 rounded border border-[#D4AF6E]/35 bg-[#241A13] px-2.5 text-xs font-medium text-[#E2C996] hover:border-[#D4AF6E]/60 cursor-pointer"
-                >
-                  {snapshot.autoTime ? (
-                    <>
-                      <Pause className="h-3 w-3" />
-                      <span>Auto</span>
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-3 w-3" />
-                      <span>Manual</span>
-                    </>
-                  )}
-                </button>
+            <button
+              type="button"
+              disabled={activeWorld === TOTAL_WORLDS - 1}
+              onClick={() => onSelectWorld((activeWorld + 1) as WorldId)}
+              aria-label="Next folio"
+              title="Next Folio (])"
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-[#8CA6B8]/30 bg-[#171D28] text-[#DDD6C6] hover:border-[#8CA6B8]/65 disabled:opacity-35 cursor-pointer"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
 
-                <div className="flex flex-1 items-center gap-2.5 min-w-[160px]">
-                  <span className="font-mono text-xs tabular-nums text-[#E2C996]">
-                    {formatClock(snapshot.timeOfDay)}
+        {/* Bottom Row: Status Hint + Accessibility, Camera, Lens, and Non-WebGL Toggles */}
+        <div className="flex flex-wrap items-center justify-between gap-1.5 border-t border-[#8CA6B8]/15 pt-1 sm:pt-1.5 text-[11px]">
+          <p
+            className="sr-only sm:not-sr-only sm:max-w-[44%] sm:truncate text-[#B8B2A4]"
+            title={snapshot.statusHint}
+          >
+            {snapshot.statusHint}
+          </p>
+
+          <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
+            {!snapshot.nonWebglMode && (
+              <>
+                <div className="inline-flex items-center overflow-hidden rounded border border-[#8CA6B8]/25 bg-[#151A23]">
+                  <span className="px-1.5 text-[#8CA6B8]" aria-hidden="true">
+                    <Camera className="h-3 w-3" />
                   </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={23.95}
-                    step={0.05}
-                    value={snapshot.timeOfDay}
-                    onChange={(e) => props.onSetTime(parseFloat(e.target.value))}
-                    aria-label="24-hour time of day"
-                    className="atlas-slider w-full"
-                  />
-                </div>
-
-                <div className="hidden sm:flex items-center gap-1">
                   {(
                     [
-                      ['Dawn', 6.2],
-                      ['Noon', 12.5],
-                      ['Dusk', 18.2],
-                      ['Night', 22.5],
+                      ['inspection', 'Slate'],
+                      ['diorama', '4:3 Frame'],
+                      ['immersion', 'Close'],
                     ] as const
-                  ).map(([label, hr]) => (
+                  ).map(([mode, label]) => (
                     <button
-                      key={label}
+                      key={mode}
                       type="button"
-                      onClick={() => props.onSetTime(hr)}
-                      className="rounded border border-[#D4AF6E]/20 bg-[#1D1510] px-2 py-1 text-[11px] text-[#C8BBA4] hover:border-[#D4AF6E]/50 hover:text-[#F4ECDC] cursor-pointer"
+                      onClick={() => onSetCameraMode(mode)}
+                      className={`px-2 py-0.5 text-[10px] cursor-pointer ${
+                        snapshot.cameraMode === mode
+                          ? 'bg-[#223548] text-[#F3ECE0] font-semibold'
+                          : 'text-[#B8B2A4] hover:text-[#F3ECE0]'
+                      }`}
                     >
                       {label}
                     </button>
                   ))}
                 </div>
-              </div>
 
-              <div className="atlas-scroll flex items-center gap-1.5 overflow-x-auto">
-                {WEATHER_OPTIONS.map((w) => {
-                  const Icon = w.icon;
-                  const active = snapshot.weather === w.id;
-                  return (
+                {snapshot.cameraMode === 'immersion' && !snapshot.magnifierActive && (
+                  <div className="inline-flex items-center gap-0.5 rounded border border-[#8CA6B8]/25 bg-[#151A23] px-1 py-0.5 font-mono text-[10px]">
                     <button
-                      key={w.id}
                       type="button"
-                      onClick={() => props.onSetWeather(w.id)}
-                      className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer ${
-                        active
-                          ? 'border-[#D4AF6E]/70 bg-[#2E2118] text-[#F4ECDC]'
-                          : 'border-[#D4AF6E]/15 bg-[#1D1510] text-[#C8BBA4] hover:border-[#D4AF6E]/40'
-                      }`}
+                      onClick={() => onNudgeImmersion(-1, 0)}
+                      className="px-1 text-[#C8C2B6] hover:text-[#F3ECE0] cursor-pointer"
+                      aria-label="Pan close view left"
                     >
-                      <Icon className={`h-3.5 w-3.5 ${active ? 'text-[#D4AF6E]' : 'text-[#A89A84]'}`} />
-                      <span>{w.label}</span>
+                      &larr;
                     </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {tab === 'camera' && (
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-              <div className="flex flex-wrap items-center gap-1.5">
-                {(
-                  [
-                    ['inspection', 'Desk Inspection (1)'],
-                    ['diorama', 'Diorama Close-Up (2)'],
-                    ['immersion', 'Miniature Immersion (3)'],
-                  ] as const
-                ).map(([mode, label]) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => props.onSetCameraMode(mode)}
-                    className={`rounded-md border px-2.5 py-1 text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer ${
-                      snapshot.cameraMode === mode
-                        ? 'border-[#D4AF6E]/70 bg-[#2E2118] text-[#F4ECDC]'
-                        : 'border-[#D4AF6E]/15 bg-[#1D1510] text-[#C8BBA4] hover:border-[#D4AF6E]/40'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {snapshot.cameraMode === 'immersion' && (
-                <div className="flex items-center gap-1">
-                  <span className="text-[11px] text-[#C8BBA4] mr-1">Walk:</span>
-                  <button
-                    type="button"
-                    onClick={() => props.onNudgeImmersion(-1, 0)}
-                    aria-label="Walk left"
-                    className="rounded border border-[#D4AF6E]/30 bg-[#241A13] p-1 text-[#E2C996] cursor-pointer"
-                  >
-                    <ArrowLeft className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => props.onNudgeImmersion(0, -1)}
-                    aria-label="Walk forward"
-                    className="rounded border border-[#D4AF6E]/30 bg-[#241A13] p-1 text-[#E2C996] cursor-pointer"
-                  >
-                    <ArrowUp className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => props.onNudgeImmersion(0, 1)}
-                    aria-label="Walk back"
-                    className="rounded border border-[#D4AF6E]/30 bg-[#241A13] p-1 text-[#E2C996] cursor-pointer"
-                  >
-                    <ArrowDown className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => props.onNudgeImmersion(1, 0)}
-                    aria-label="Walk right"
-                    className="rounded border border-[#D4AF6E]/30 bg-[#241A13] p-1 text-[#E2C996] cursor-pointer"
-                  >
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 rounded border border-[#D4AF6E]/15 bg-[#110C09] p-0.5">
-                  {(['high', 'medium', 'low'] as QualityTier[]).map((tier) => (
                     <button
-                      key={tier}
                       type="button"
-                      onClick={() => props.onSetQuality(tier)}
-                      className={`rounded px-2 py-0.5 text-[11px] capitalize cursor-pointer ${
-                        snapshot.qualityTier === tier
-                          ? 'bg-[#2C2017] text-[#E2C996]'
-                          : 'text-[#A89A84] hover:text-[#F4ECDC]'
-                      }`}
+                      onClick={() => onNudgeImmersion(0, -1)}
+                      className="px-1 text-[#C8C2B6] hover:text-[#F3ECE0] cursor-pointer"
+                      aria-label="Pan close view forward"
                     >
-                      {tier}
+                      &uarr;
                     </button>
-                  ))}
-                </div>
+                    <button
+                      type="button"
+                      onClick={() => onNudgeImmersion(0, 1)}
+                      className="px-1 text-[#C8C2B6] hover:text-[#F3ECE0] cursor-pointer"
+                      aria-label="Pan close view back"
+                    >
+                      &darr;
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onNudgeImmersion(1, 0)}
+                      className="px-1 text-[#C8C2B6] hover:text-[#F3ECE0] cursor-pointer"
+                      aria-label="Pan close view right"
+                    >
+                      &rarr;
+                    </button>
+                  </div>
+                )}
 
                 <button
                   type="button"
-                  onClick={props.onToggleReducedMotion}
-                  className={`rounded border px-2.5 py-1 text-[11px] whitespace-nowrap shrink-0 cursor-pointer ${
-                    snapshot.reducedMotion
-                      ? 'border-[#D4AF6E]/60 bg-[#2E2118] text-[#E2C996]'
-                      : 'border-[#D4AF6E]/20 bg-[#1D1510] text-[#C8BBA4]'
+                  onClick={onToggleMagnifier}
+                  aria-pressed={snapshot.magnifierActive}
+                  className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] cursor-pointer ${
+                    snapshot.magnifierActive
+                      ? 'border-[#3D95B5] bg-[#1F3A4D] text-[#F3ECE0]'
+                      : 'border-[#8CA6B8]/25 bg-[#151A23] text-[#C8C2B6] hover:text-[#F3ECE0]'
                   }`}
+                  title="Inspect archival marginalia with brass lens (F)"
                 >
-                  {snapshot.reducedMotion ? 'Motion: Reduced' : 'Motion: Full'}
+                  <Search className="h-3 w-3" />
+                  <span>Lens</span>
                 </button>
-              </div>
-            </div>
-          )}
+
+                {snapshot.magnifierActive && (
+                  <div className="inline-flex items-center gap-0.5 rounded border border-[#3D95B5]/40 bg-[#151A23] px-1 py-0.5 font-mono text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => onNudgeMagnifier(-0.45, 0)}
+                      className="px-1 text-[#8CE0FA] cursor-pointer"
+                      aria-label="Move lens left"
+                    >
+                      &larr;
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onNudgeMagnifier(0, -0.45)}
+                      className="px-1 text-[#8CE0FA] cursor-pointer"
+                      aria-label="Move lens up"
+                    >
+                      &uarr;
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onNudgeMagnifier(0, 0.45)}
+                      className="px-1 text-[#8CE0FA] cursor-pointer"
+                      aria-label="Move lens down"
+                    >
+                      &darr;
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onNudgeMagnifier(0.45, 0)}
+                      className="px-1 text-[#8CE0FA] cursor-pointer"
+                      aria-label="Move lens right"
+                    >
+                      &rarr;
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            <button
+              type="button"
+              onClick={onToggleNonWebgl}
+              aria-pressed={snapshot.nonWebglMode}
+              className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] cursor-pointer ${
+                snapshot.nonWebglMode
+                  ? 'border-[#3D95B5] bg-[#1F3A4D] text-[#F3ECE0]'
+                  : 'border-[#8CA6B8]/25 bg-[#151A23] text-[#C8C2B6] hover:text-[#F3ECE0]'
+              }`}
+              title="Toggle Non-WebGL 4:3 Schematic View"
+            >
+              <Monitor className="h-3 w-3" />
+              <span>{snapshot.nonWebglMode ? '3D View' : '4:3 Schematic'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onToggleReducedMotion}
+              aria-pressed={snapshot.reducedMotion}
+              className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] cursor-pointer ${
+                snapshot.reducedMotion
+                  ? 'border-[#3D95B5] bg-[#1F3A4D] text-[#F3ECE0]'
+                  : 'border-[#8CA6B8]/25 bg-[#151A23] text-[#C8C2B6] hover:text-[#F3ECE0]'
+              }`}
+              title="Reduce motion and page turn transitions"
+            >
+              <Sparkles className="h-3 w-3" />
+              <span>Reduced Motion</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onToggleNoFlash}
+              aria-pressed={snapshot.noFlashMode}
+              className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] cursor-pointer ${
+                snapshot.noFlashMode
+                  ? 'border-[#3D95B5] bg-[#1F3A4D] text-[#F3ECE0]'
+                  : 'border-[#8CA6B8]/25 bg-[#151A23] text-[#C8C2B6] hover:text-[#F3ECE0]'
+              }`}
+              title="Disable film gate flicker and luminance shifts"
+            >
+              <EyeOff className="h-3 w-3" />
+              <span>No Flash</span>
+            </button>
+
+            {!snapshot.nonWebglMode && (
+              <button
+                type="button"
+                onClick={() => {
+                  const next: QualityTier =
+                    snapshot.qualityTier === 'high'
+                      ? 'medium'
+                      : snapshot.qualityTier === 'medium'
+                        ? 'low'
+                        : 'high';
+                  onSetQuality(next);
+                }}
+                className="inline-flex items-center gap-1 rounded border border-[#8CA6B8]/25 bg-[#151A23] px-2 py-0.5 text-[10px] text-[#C8C2B6] hover:text-[#F3ECE0] cursor-pointer"
+                title="Cycle 3D rendering quality tier"
+              >
+                <Sliders className="h-3 w-3" />
+                <span className="capitalize">{snapshot.qualityTier}</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onToggleHud}
+              aria-label="Hide bottom folio bar"
+              title="Collapse dock (H)"
+              className="inline-flex h-6 w-6 items-center justify-center rounded border border-[#8CA6B8]/25 bg-[#151A23] text-[#C8C2B6] hover:text-[#F3ECE0] cursor-pointer"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
           </div>
-        </>
-      )}
-    </div>
+        </div>
+      </div>
+    </nav>
   );
 }

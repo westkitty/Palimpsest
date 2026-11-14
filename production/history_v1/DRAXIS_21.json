@@ -1,0 +1,175 @@
+{
+  "schema": "palimpsest-draxis-reference/1",
+  "total": 21,
+  "status": "original source plate, canonical approval not established",
+  "subjects": [
+    {
+      "id": "001",
+      "name": "MAGMA PLEURON",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1uAI97yMqiCCEvVTYSzr-z3qTtKASfDdC/view",
+      "asset_path_pattern": "asset_pack/original_draxis/001_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "003",
+      "name": "FAULT-TONGUE",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1elR1NuVS1bVFJz0vCfUSvaca8sJRJRza/view",
+      "asset_path_pattern": "asset_pack/original_draxis/003_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "004",
+      "name": "OBSIDIAN GUL",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1BCPPls0M8ShTMiuDW6qi95ueEhNBw4Wd/view",
+      "asset_path_pattern": "asset_pack/original_draxis/004_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "005",
+      "name": "TREMORHOUND",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1-bYzgB5y7WhiX6GQSkURW79xKkK43SA3/view",
+      "asset_path_pattern": "asset_pack/original_draxis/005_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "008",
+      "name": "AEROKARST",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1F1tMsg43fISprsnToH-uT-2XslFtAdoF/view",
+      "asset_path_pattern": "asset_pack/original_draxis/008_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "009",
+      "name": "CLOUDMAW",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1eRuQ-9vtWHf2FiorAJpF8LcrPZH9eKe3/view",
+      "asset_path_pattern": "asset_pack/original_draxis/009_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "012",
+      "name": "VORTENBRAY",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1OEm7NDHtLDbYuiLNRKo8YTeIG_vkqGV3/view",
+      "asset_path_pattern": "asset_pack/original_draxis/012_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "015",
+      "name": "VERDGORGE",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1ApwBP4Wr9sL070h395OSURsJ7dey6A_g/view",
+      "asset_path_pattern": "asset_pack/original_draxis/015_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "019",
+      "name": "TERRAGULLET",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1csa-CgWapiidu1FT9hbN8l5Q-Vaitckp/view",
+      "asset_path_pattern": "asset_pack/original_draxis/019_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "023",
+      "name": "BRINECHOIR",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1pA1q5dhFtX1s2VfQe3JtUnqkg2_74OWa/view",
+      "asset_path_pattern": "asset_pack/original_draxis/023_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "026",
+      "name": "GLACIERTHROAT",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1S7hsU_WYhH7L9JynQJt3oLin_uYV2ZYS/view",
+      "asset_path_pattern": "asset_pack/original_draxis/026_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "029",
+      "name": "RINGTHROAT",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1YNyl7ERfVuLkybloHrsqllgMul_oqi9M/view",
+      "asset_path_pattern": "asset_pack/original_draxis/029_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "030",
+      "name": "SOLNEXUS",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1NurCOnhAW1tOhgt9NMxzZCibOWBgXs2Z/view",
+      "asset_path_pattern": "asset_pack/original_draxis/030_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "032",
+      "name": "LYRIBORIS",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1JC94ir67NM4X95RBRx7edI61UxtMA8HF/view",
+      "asset_path_pattern": "asset_pack/original_draxis/032_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "036",
+      "name": "SINGULARARCH",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1P_tNNADbr3JK4aBjZCRjaOVk8HqwDanq/view",
+      "asset_path_pattern": "asset_pack/original_draxis/036_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "037",
+      "name": "IRONCANT",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1tnBqkvoWneWm2JJhRUy7b8Iqgka4G_P4/view",
+      "asset_path_pattern": "asset_pack/original_draxis/037_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "044",
+      "name": "GOREVAULT",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1w8m2TJXEYl6MquMm82pzawTd9S4ijOX_/view",
+      "asset_path_pattern": "asset_pack/original_draxis/044_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "045",
+      "name": "LEXICLAST",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1eHwP6EuBacNk0JO76zghGoLBZp6WdWy7/view",
+      "asset_path_pattern": "asset_pack/original_draxis/045_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "055",
+      "name": "FOLDHOWL",
+      "category": "strain",
+      "source_url": "https://drive.google.com/file/d/1etAM8eYJspw24_YPgAp3-AGLiRj_wPwi/view",
+      "asset_path_pattern": "asset_pack/original_draxis/055_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "059",
+      "name": "DRAKKEN EGG",
+      "category": "genesis",
+      "source_url": "https://drive.google.com/file/d/1UR_5tleTU6TATbOquESwyVQlXoFgXVaS/view",
+      "asset_path_pattern": "asset_pack/original_draxis/059_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    },
+    {
+      "id": "060",
+      "name": "MOTHER",
+      "category": "genesis",
+      "source_url": "https://drive.google.com/file/d/13-iNBrnayxXZJoTs-SsN5z6r1jUaGL1o/view",
+      "asset_path_pattern": "asset_pack/original_draxis/060_*_starsilk_azure.png",
+      "usage": "source anatomy and operational silhouette; not a finished rig; no generic substitution"
+    }
+  ]
+}
