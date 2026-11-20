@@ -53,8 +53,10 @@ export function operateLater(state: FolioRuntimeState, slot: FolioInteractionSlo
     next.locked = true;
   } else if (def.persistPolicy === 'stepped') {
     const max = Math.max(2, def.maxSteps ?? 4);
-    next.step = def.id === 'f09_b' ? Math.min(max, next.step + 1) : (next.step + 1) % max;
-    next.active = next.step > 0 || def.id !== 'f09_b';
+    next.step = def.id === 'f09_b' ? Math.min(max, next.step + 1)
+      : def.id === 'f05_b' ? (next.step + 1) % (max + 1)
+      : (next.step + 1) % max;
+    next.active = next.step > 0 || (def.id !== 'f09_b' && def.id !== 'f05_b');
     next.locked = def.id === 'f09_b' && next.step >= max;
   } else {
     next.active = !next.active;
