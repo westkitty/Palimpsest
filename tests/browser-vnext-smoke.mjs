@@ -3,6 +3,7 @@ import {chromium} from 'playwright';
 
 const origin=process.env.PALIMPSEST_PREVIEW_URL||'http://127.0.0.1:4173';
 const browser=await chromium.launch({headless:true,executablePath:process.env.PALIMPSEST_CHROME_PATH,args:['--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader']});
+let archiveBrowser=null;
 const page=await browser.newPage({viewport:{width:1360,height:840},reducedMotion:'reduce'});
 const pageErrors=[];
 page.on('pageerror',e=>pageErrors.push(String(e)));
@@ -116,7 +117,16 @@ try {
   assert.match(await page.locator('#folio-title').textContent(),/Long Attrition/);
   assert.match(await page.locator('#mechanism-status').textContent(),/B: operated/);
   await page.close();
-  const archivePage=await browser.newPage({viewport:{width:1360,height:840},reducedMotion:'reduce'});
+  // Chrome's software WebGL backend can retain a busy GPU context across tabs.
+  // The archive route must be tested in a clean browser process so the long
+  // 12-scene render is not mistaken for an archival navigation failure.
+  await browser.close();
+  archiveBrowser=await chromium.launch({
+    headless:true,
+    executablePath:process.env.PALIMPSEST_CHROME_PATH,
+    args:['--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader'],
+  });
+  const archivePage=await archiveBrowser.newPage({viewport:{width:1360,height:840},reducedMotion:'reduce'});
   archivePage.on('pageerror',e=>pageErrors.push(String(e)));
   const home=await archivePage.goto(origin+'/',{waitUntil:'domcontentloaded'});
   assert.ok(home?.ok(),'Original twelve-folio route remains available');
@@ -173,4 +183,4 @@ try {
 
   assert.equal(pageErrors.length,0,`no uncaught browser exceptions: ${pageErrors.join('; ')}`);
   console.log('PASS: all 12 living 3D folios, authored A/B/C scenes, state continuity, modal navigation, archival counterpart and preserved reader');
-} finally {await browser.close();}
+} finally {await archiveBrowser?.close();await browser.close();}
