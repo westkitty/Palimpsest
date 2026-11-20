@@ -354,7 +354,7 @@ function buildF02():void {
   platform(root,2.27,0.55,1.86);
   const geode=new THREE.Group();geode.position.set(2.27,0.54,0.24);root.add(geode);
   const wall=put(geode,new THREE.CylinderGeometry(0.41,0.43,0.72,6,1,true),shared.blue,0,0.38,0);
-  wall.material.side=THREE.DoubleSide;
+  (wall.material as THREE.MeshStandardMaterial).side=THREE.DoubleSide;
   for(let i=0;i<6;i++){
     const a=i*Math.PI/3;
     const facet=put(geode,new THREE.ConeGeometry(0.11,0.85,5),i%2?shared.ink:shared.purple,Math.cos(a)*0.43,0.44,Math.sin(a)*0.43);
