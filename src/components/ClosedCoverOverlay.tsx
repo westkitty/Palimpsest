@@ -46,7 +46,7 @@ export function ClosedCoverOverlay({
             type="button"
             onClick={onExploreLivingFolios}
             className="inline-flex items-center gap-2 rounded-md border border-[#6FD9F1]/70 bg-[#18394C] px-4 py-2 text-xs font-semibold tracking-wide text-[#E8F8FC] hover:bg-[#24556E] focus-visible:outline-2 focus-visible:outline-[#6FD9F1] cursor-pointer"
-            title="Enter the original hand-inked F01–F03 sculptural scenes and continue through F12"
+            title="Enter all twelve hand-crafted sculptural folios in a continuous volume"
           >
             <BookOpen className="h-4 w-4 text-[#6FD9F1]" />
             <span>Enter Living Folios</span>
