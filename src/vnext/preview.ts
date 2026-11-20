@@ -69,7 +69,7 @@ const azure = new THREE.MeshStandardMaterial({color:0x6cdaf3, emissive:0x126680,
 const brass = new THREE.MeshStandardMaterial({color:0xb99a56, roughness:0.48, metalness:0.38});
 const forest = new THREE.MeshStandardMaterial({color:0x496d6b, roughness:0.85});
 const darkPage = new THREE.MeshStandardMaterial({color:0x263242, roughness:0.86, side:THREE.DoubleSide});
-const sharedMaterials = [paper,deepPaper,obsidian,indigo,lavender,azure,brass,forest,darkPage];
+const sharedMaterials: THREE.Material[] = [paper,deepPaper,obsidian,indigo,lavender,azure,brass,forest,darkPage];
 
 function mesh(parent: THREE.Object3D, shape: THREE.BufferGeometry, material: THREE.Material, x=0, y=0, z=0): THREE.Mesh {
   const object = new THREE.Mesh(shape, material);
