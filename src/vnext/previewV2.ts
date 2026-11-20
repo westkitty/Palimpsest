@@ -722,7 +722,7 @@ function goFolio(index:number):void {
   resetCamera();updateNav();
   canvas.dataset.authoredSculptures=String(authoredFigureCount);
   canvas.dataset.sourceAuthoredScene=String(index>=FIRST_LATER_FOLIO);
-  announce(`Folio ${index+1} of 12. ${index<3?overviewCopy[index]:getLaterCopy(index as LaterFolioIndex).description}`);
+  announce(`Folio ${index+1} of 12. ${index<3?(overviewCopy as readonly string[])[index]:getLaterCopy(index as LaterFolioIndex).description}`);
   sendBridge('folio',index);
 }
 function smooth(value:number,target:number,dt:number):number {
