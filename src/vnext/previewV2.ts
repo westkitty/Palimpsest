@@ -5,6 +5,7 @@ import { activateSlot, mayReveal, planetPattern, restoreFolioStudy, sourceInkReg
 import { FIRST_LATER_FOLIO, LATER_STUDY_STORAGE_KEY, isLivingIndex, operateLater, restoreLaterStudy, serializeLaterStudy, type LaterFolioIndex } from './laterFolioState.ts';
 import { activeSpecimen, createLaterFolio, getLaterCopy, makeContactShadow } from './laterFolioScenes.ts';
 import { getLaterDiagram } from './laterFolioDiagrams.ts';
+import { LivingStagecraft } from './livingStagecraft.ts';
 
 /**
  * PALIMPSEST — F01–F03 sculptural REVIEW build.
@@ -92,6 +93,7 @@ function loadLaterStudy() {
 }
 let laterStates = loadLaterStudy();
 let laterWorld: ReturnType<typeof createLaterFolio> | null = null;
+let livingStagecraft: LivingStagecraft | null = null;
 let paperShadow: THREE.CanvasTexture | null = null;
 let activeTime = 0;
 function saveLaterStudy(): void {
@@ -677,6 +679,11 @@ function disposeSubtree(root:THREE.Object3D):void {
 }
 function clear():void {
   if(inspection!=='overview')leaveMini();
+  if (livingStagecraft) {
+    rig.remove(livingStagecraft.root);
+    livingStagecraft.dispose();
+    livingStagecraft=null;
+  }
   if (laterWorld) {
     rig.remove(laterWorld.root);
     laterWorld.dispose();
@@ -750,6 +757,11 @@ function goFolio(index:number):void {
     const laterIndex=index as LaterFolioIndex;
     laterWorld=createLaterFolio(laterIndex,fiber,paperShadow,laterStates[laterIndex-FIRST_LATER_FOLIO]);
     rig.add(laterWorld.root);
+    // Build the separate physical back-stage from the same folio-specific A/B/C
+    // state, without modifying canonical figures, authored sculptures, or voice.
+    livingStagecraft=new LivingStagecraft(laterIndex);
+    livingStagecraft.sync(laterStates[laterIndex-FIRST_LATER_FOLIO]);
+    rig.add(livingStagecraft.root);
   }
   resetCamera();updateNav();
   canvas.dataset.authoredSculptures=String(authoredFigureCount);
@@ -764,6 +776,7 @@ function animate(dt:number):void {
   if(currentFolio>=FIRST_LATER_FOLIO){
     activeTime+=dt;
     laterWorld?.update(dt,activeTime,reducedMotion);
+    livingStagecraft?.update(dt,reducedMotion);
     return;
   }
   if(state.folio===0){
@@ -807,6 +820,7 @@ function handleAction(slot:Slot):void {
     const next=operateLater(laterStates[idx],slot);
     laterStates[idx]=next;saveLaterStudy();
     laterWorld?.syncState(next,activeSpecimen(next),activeTime);
+    livingStagecraft?.sync(next);
     updateNav();
     if(!renderer)fallbackPage(currentFolio);
     announce(`${getLaterCopy(currentFolio as LaterFolioIndex).actions[slot==='A'?0:slot==='B'?1:2]}. ${indicator.textContent}`);
