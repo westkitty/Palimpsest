@@ -7,6 +7,7 @@ export default defineConfig(() => {
   return {
     base: './',
     plugins: [react(), tailwindcss()],
+    build: { rollupOptions: { input: { app: path.resolve(__dirname, 'index.html'), folioPreview: path.resolve(__dirname, 'folio-vnext.html') } } },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
