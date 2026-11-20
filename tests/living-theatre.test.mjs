@@ -42,7 +42,7 @@ test('F05 shows only four documented manufacturing stages',()=>{
   }
   theatre.dispose();
 });
-test('F09 Starbinding law becomes black absence and never restores within a session',()=>{
+test('F09 model-star heliocide becomes black absence and never restores within a session',()=>{
   const theatre=new LivingStagecraft(8);
   const objects=[];
   theatre.root.traverse(o=>{if(o.name.startsWith('F09'))objects.push(o);});
