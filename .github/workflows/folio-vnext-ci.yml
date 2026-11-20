@@ -39,12 +39,12 @@ jobs:
         run: |
           mkdir -p /tmp/palimpsest-e2e
           npm install --prefix /tmp/palimpsest-e2e --no-package-lock --ignore-scripts playwright
-          /tmp/palimpsest-e2e/node_modules/.bin/playwright install --with-deps chromium
+          command -v google-chrome || command -v google-chrome-stable || command -v chromium
       - name: Exercise the built 3D folio and original site
         run: |
           bunx vite preview --host 127.0.0.1 --port 4173 > /tmp/palimpsest-preview.log 2>&1 &
           PREVIEW_PID=$!
           trap 'kill $PREVIEW_PID || true' EXIT
           cp tests/browser-vnext-smoke.mjs /tmp/palimpsest-e2e/smoke.mjs
-          node /tmp/palimpsest-e2e/smoke.mjs
+          PALIMPSEST_CHROME_PATH="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)" node /tmp/palimpsest-e2e/smoke.mjs
 

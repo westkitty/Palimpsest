@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 
 const origin=process.env.PALIMPSEST_PREVIEW_URL||'http://127.0.0.1:4173';
-const browser=await chromium.launch({headless:true,args:['--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader']});
+const browser=await chromium.launch({headless:true,executablePath:process.env.PALIMPSEST_CHROME_PATH,args:['--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader']});
 const page=await browser.newPage({viewport:{width:1360,height:840},reducedMotion:'reduce'});
 const pageErrors=[];
 page.on('pageerror',e=>pageErrors.push(String(e)));
