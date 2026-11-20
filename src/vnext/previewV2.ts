@@ -4,6 +4,7 @@ import { buildShardGodFigure, buildWordstreamerFigure, buildNiAlBuGeode } from '
 import { activateSlot, mayReveal, planetPattern, restoreFolioStudy, sourceInkRegistration, startFolio, type FolioActions, type FolioIndex, type Slot, type Inspection } from './folioLogic.ts';
 import { FIRST_LATER_FOLIO, LATER_STUDY_STORAGE_KEY, isLivingIndex, operateLater, restoreLaterStudy, serializeLaterStudy, type LaterFolioIndex } from './laterFolioState.ts';
 import { activeSpecimen, createLaterFolio, getLaterCopy, makeContactShadow } from './laterFolioScenes.ts';
+import { getLaterDiagram } from './laterFolioDiagrams.ts';
 
 /**
  * PALIMPSEST — F01–F03 sculptural REVIEW build.
@@ -1024,6 +1025,16 @@ function fallbackPage(index:number):void {
   const paragraphs=fallback.querySelectorAll<HTMLElement>('[data-folio-text]');
   paragraphs.forEach((p,i)=>p.hidden=isLater||i!==index);
   fallback.querySelectorAll<SVGGElement>('[data-fb-folio]').forEach((g,i)=>{g.style.display=!isLater&&i===index?'':'none';});
+  const originalArt=fallback.querySelector<SVGSVGElement>('svg:not(#later-plate-art)');
+  if(originalArt)originalArt.hidden=isLater;
+  const laterArt=fallback.querySelector<SVGSVGElement>('#later-plate-art');
+  if(laterArt){
+    laterArt.hidden=!isLater;
+    if(isLater){
+      const scene=laterArt.querySelector<SVGGElement>('#later-plate-scene');
+      if(scene)scene.innerHTML=getLaterDiagram(index);
+    }
+  }
   const plate=fallback.querySelector<HTMLElement>('#later-fallback');
   if(plate){
     plate.hidden=!isLater;
