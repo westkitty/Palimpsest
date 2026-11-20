@@ -1,12 +1,12 @@
 # PALIMPSEST — Operational State
 
 project_id: westkitty/Palimpsest  
-scope: integrated F01–F03 living opening plus preserved twelve-folio reader at `/`; standalone review route `/folio-vnext.html` retained  
-feature_branch: `folio-vnext/f01-f03-20261120`  
+scope: continuous sculptural Living Folios F01–F12 at `/folio-vnext.html` and inside `/`, alongside preserved original twelve-folio archival reader  
+feature_branch: `living-volume/full-twelve-20261120`  
 pre-AWE_main: `2a43ae58ac7ca13bee8ff37141225766e7653063`  
 pre-AWE_feature: `d5524c4ddd5e886cf15bb6468c1736b119bef684`  
 date: 2026-11-20  
-status: published integrated study edition; feature-branch CI, Chromium journey, Pages and live HTTP readbacks verified; device visual QA remains pending
+status: full twelve-folio living edition published and browser-tested; original archival edition retained; physical-device art/interaction polish and sustained GPU QA remain pending
 
 ## Controlling sources
 
@@ -85,4 +85,12 @@ status: published integrated study edition; feature-branch CI, Chromium journey,
 - **New isolated state:** `src/vnext/laterFolioState.ts` validates and restores F04–F12 A/B/C teaching state in `palimpsest.living.f04-f12.study.v1`, with no testimony, narration, archival session or camera tracking. F09 irreversible pull and sequential collapse locks remain preserved in-session. Original F01–F03 study state and exact testimony gates remain separately protected.
 - **Visual/source scope:** `src/vnext/laterFolioScenes.ts` mounts the source-authored folio classes from FoliosWar1/War2/Aftermath, including sourced character and Drakken assets where appropriate. Nine source-grounded SVG fallback plates in `src/vnext/laterFolioDiagrams.ts` are explanatory schematic interpretations, never new canon or source approvals. The historical manuscript is untouched.
 - **Proof gate:** `.github/workflows/living-twelve-ci.yml` checks full TypeScript, original F01–F03 canon contracts, later-state tests, original authored asset identity/ink, built dual-route Vite and a full twelve-chapter headless Chromium journey including explicit archive counterpart. Earlier browser run `44791338734` passed at `07ef48a...` before subsequent fallback changes, but **does not certify the current final branch**. The source-contract regression that expected unconditional shadows was amended to assert hardware shadows and a bounded software-GPU quality fallback. Final-head CI, physical-device visual QA, long-session GPU lifecycle and live Pages readback remain mandatory before calling full execution complete.
-- **Status:** feature implementation candidate, not an approved complete AAA visual pass; keep off `main` until latest entire CI passes, with non-force fast-forward and exact Pages SHA verification.
+- **Status update:** the continuous Living Folios implementation is now merged and published to `main` after green full-head browser CI and exact Pages SHA verification. This closes the navigation and functional-continuity gate, **not** the full AAA visual-parity gate; physical-device artwork, gesture ergonomics and sustained GPU lifecycle remain unverified.
+
+## 2026-11-20 F01–F12 release verification
+
+- Full twelve-scene feature branch head `1463fbfed828e59e8f06a9029ec5377ebd2668f6` passed dedicated CI `44793125679` after the complete TypeScript, source/canon/state-contract tests, dual-route build, and software-Chromium F01–F12 journey, including F03→F04 within the embedded Living Folios, F12 selection and explicit archival counterpart navigation.
+- The feature branch was verified **30 commits ahead of** and **zero behind** `main` `ff7ca41f39e48882d039a738a92c61febe1c525d`. `main` then fast-forwarded **non-forced** to `1463fbfed828e59e8f06a9029ec5377ebd2668f6` with expected old SHA.
+- GitHub Pages release workflow `44793719370` reported **success** for exact SHA `1463fbfed828e59e8f06a9029ec5377ebd2668f6`. Independent live readback from MacBook reached HTTP 200 at both `https://westkitty.github.io/Palimpsest/` and `https://westkitty.github.io/Palimpsest/folio-vnext.html`. HTML referenced newly built JS assets `app-C6t_Cpnf.js` and `folioPreview-DJGFG81Y.js`, and the direct route identified itself as “PALIMPSEST — Twelve Living Folios”.
+- Confirmed: one authored physical living 3D route for all twelve, 27 later source-specific mechanisms, explicit (not automatic) historical archive counterpart, private study-only state, source-based SVG fallback, software GPU safeguards, hardware shadow path, no rewrite of canonical narration/manuscript or originally approved art.
+- Remaining: hands-on mobile and desktop image-by-image visual parity, art direction refinement for each spread, direct pointer/touch hit-area ergonomics on real devices, extended GPU lifecycle, frame pacing and final accessibility review. Do not label those verified just because CI passed.
