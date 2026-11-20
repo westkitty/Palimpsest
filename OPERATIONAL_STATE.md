@@ -5,7 +5,7 @@ scope: standalone F01–F03 review experience at `/folio-vnext.html`
 source_branch_baseline: main `2a43ae58ac7ca13bee8ff37141225766e7653063`
 feature_branch: `folio-vnext/f01-f03-20261120`
 updated: 2026-11-20
-status: high-fidelity prototype V3 implementation; local interface QA PASSED, full application/cloud CI pending
+status: high-fidelity prototype V3 implemented on feature branch; focused local interface QA and GitHub cloud build PASS; real 3D browser review pending
 
 ## Authority and locks
 
@@ -34,8 +34,9 @@ status: high-fidelity prototype V3 implementation; local interface QA PASSED, fu
 - Local: 20 original preview source contracts PASS; 20 new panel/papercraft contracts PASS; 4 pure folio-logic tests PASS; TypeScript syntax/transpilation with no parser diagnostics PASS.
 - Browser tests on independent HTML+panel JS, **not** the full Three.js renderer: 41 viewport/pointer/keyboard/collapse/reset checks at 1440x900, 390x844, 375x667 PASS. Touch-pointer drag and layout session restore PASS.
 - HTML authorship lint PASS.
-- **Still unknown:** the V3 full application's TypeScript/build result until GitHub Actions completes; actual WebGL visual outcome; mobile 3D camera and hardware perf; model identity fidelity; end-to-end runtime secret accessibility; repeated GPU/texture disposal.
-- No assertion that the live Pages site was updated to V3; it remains on the previously verified `2a43ae58ac7ca13bee8ff37141225766e7653063` unless checked again.
+- **GitHub Actions PASS:** run `44732105807` against commit `5b425cef75e119205dc9f12811a83b413415a295` completed successfully: locked dependencies, full TypeScript check, existing source contracts, new floating HUD contracts, finite template tests, and both Vite entrypoints built. The preceding run `44732024161` failed TypeScript TS2339; corrected by narrowing the Geode wall's material type. This confirms the build, not rendered quality.
+- **Still unknown:** real Three.js WebGL visual outcome and comparison with the other folios; actual 3D camera/touch behavior and mobile hardware performance; identity fidelity; end-to-end secret discoverability inside rendered scenes; repeated GPU/texture disposal.
+- Main and live Pages were not changed by this V3 development run. A standalone review branch is available at `folio-vnext/f01-f03-20261120`; do not claim it is published to Pages.
 
 ## Release gate
 
