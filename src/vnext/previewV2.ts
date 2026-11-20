@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildShardGodFigure, buildWordstreamerFigure, buildNiAlBuGeode } from '../engine/drakken/CharacterFigures';
 import { activateSlot, mayReveal, planetPattern, restoreFolioStudy, sourceInkRegistration, startFolio, type FolioActions, type FolioIndex, type Slot, type Inspection } from './folioLogic.ts';
+import { FIRST_LATER_FOLIO, LATER_STUDY_STORAGE_KEY, isLivingIndex, operateLater, restoreLaterStudy, serializeLaterStudy, type LaterFolioIndex } from './laterFolioState.ts';
+import { activeSpecimen, createLaterFolio, getLaterCopy, makeContactShadow } from './laterFolioScenes.ts';
 
 /**
  * PALIMPSEST — F01–F03 sculptural REVIEW build.
@@ -33,8 +35,7 @@ const actionButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const bridgeEmbedded = new URLSearchParams(window.location.search).get('embedded') === '1' && window.parent !== window;
 const requestedFolio = Number(new URLSearchParams(window.location.search).get('folio'));
-const initialFolio: FolioIndex = Number.isInteger(requestedFolio) && requestedFolio >= 1 && requestedFolio <= 3
-  ? (requestedFolio - 1) as FolioIndex : 0;
+const initialFolio = Number.isInteger(requestedFolio) && requestedFolio >= 1 && requestedFolio <= 12 ? requestedFolio - 1 : 0;
 function sendBridge(action: 'folio' | 'continue' | 'exit', folio: number): void {
   if (bridgeEmbedded) window.parent.postMessage({ channel: 'palimpsest-living', action, folio }, window.location.origin);
 }
@@ -83,6 +84,19 @@ function loadStudy():FolioActions[]{
 }
 let studyStates:FolioActions[]=loadStudy();
 let state:FolioActions=studyStates[0];
+let currentFolio = initialFolio;
+function loadLaterStudy() {
+  try { return restoreLaterStudy(JSON.parse(sessionStorage.getItem(LATER_STUDY_STORAGE_KEY) ?? 'null')); }
+  catch { return restoreLaterStudy(null); }
+}
+let laterStates = loadLaterStudy();
+let laterWorld: ReturnType<typeof createLaterFolio> | null = null;
+let paperShadow: THREE.CanvasTexture | null = null;
+let activeTime = 0;
+function saveLaterStudy(): void {
+  try { sessionStorage.setItem(LATER_STUDY_STORAGE_KEY, JSON.stringify(serializeLaterStudy(laterStates))); }
+  catch { /* Unavailable storage never blocks reading or physical mechanisms. */ }
+}
 function saveStudy():void{
   // No private testimony, narrator, camera, or official session data in this payload.
   try{sessionStorage.setItem(STUDY_STORAGE_KEY,JSON.stringify({version:1,folios:studyStates}));}
@@ -631,6 +645,11 @@ function disposeSubtree(root:THREE.Object3D):void {
 }
 function clear():void {
   if(inspection!=='overview')leaveMini();
+  if (laterWorld) {
+    rig.remove(laterWorld.root);
+    laterWorld.dispose();
+    laterWorld = null;
+  }
   disposeSubtree(rig);
   for(const texture of textTextures)texture.dispose();
   textTextures=[];rig.clear();
@@ -638,11 +657,38 @@ function clear():void {
   discovered=false;
 }
 function updateNav():void {
-  progress.textContent=`F0${state.folio+1} / F03`;
+  if (currentFolio >= FIRST_LATER_FOLIO) {
+    const index=currentFolio as LaterFolioIndex;
+    const copy=getLaterCopy(index);
+    const study=laterStates[index-FIRST_LATER_FOLIO];
+    progress.textContent=`F${String(index+1).padStart(2,'0')} / F12`;
+    document.querySelectorAll('.chapter-lines span').forEach((line,i)=>line.classList.toggle('active',i<=Math.min(2,Math.floor(index/4))));
+    prevButton.disabled=false;
+    nextButton.disabled=index===11;
+    nextButton.textContent=index===11?'Final Folio':'Next →';
+    title.textContent=copy.title;
+    description.textContent=copy.description;
+    for(const btn of actionButtons){
+      const slot=btn.dataset.mechanism as Slot;
+      const idx=slot==='A'?0:slot==='B'?1:2;
+      btn.textContent=`${slot} · ${copy.actions[idx]}`;
+      btn.setAttribute('aria-label',`${slot}: ${copy.actions[idx]}`);
+      btn.setAttribute('aria-pressed',String(study.interactions[slot].active));
+      btn.disabled=study.interactions[slot].locked;
+    }
+    const states=(['A','B','C'] as const).map(slot=>{
+      const item=study.interactions[slot];
+      return `${slot}: ${item.locked?'fixed':item.active?'operated':'resting'}${item.maxSteps>1?` (${item.step}/${item.maxSteps})`:''}`;
+    });
+    indicator.textContent=states.join(' · ');
+    setWitnessButton();return;
+  }
+  for(const btn of actionButtons)btn.disabled=false;
+  progress.textContent=`F0${state.folio+1} / F12`;
   document.querySelectorAll('.chapter-lines span').forEach((line,i)=>line.classList.toggle('active',i<=state.folio));
   prevButton.disabled=state.folio===0;
-  nextButton.disabled=state.folio===2 && !bridgeEmbedded;
-  nextButton.textContent=state.folio===2 && bridgeEmbedded ? 'F04 →' : 'Next →';
+  nextButton.disabled=false;
+  nextButton.textContent=state.folio===2 ? 'F04 →' : 'Next →';
   title.textContent=titleCopy[state.folio];
   description.textContent=overviewCopy[state.folio];
   for(const btn of actionButtons){
@@ -660,14 +706,24 @@ function updateNav():void {
     state.folio===2?`Source plate: ${state.f03.template+1} / 3  ·  Ink register: ${sourceInkRegistration(state.f03.template).join('')}  ·  Variation: ${state.f03.generation}`:
     `Physical folds: ${state.f01.fold?'opened':'closed'}  ·  Details: ${state.f01.detail?'shown':'folded'}`;
 }
-function goFolio(index:FolioIndex):void {
-  clear();authoredFigureCount=0;state=studyStates[index];
-  if(index===0)buildF01();else if(index===1)buildF02();else buildF03();
+function goFolio(index:number):void {
+  if(!isLivingIndex(index))return;
+  clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
+  if(index<FIRST_LATER_FOLIO){
+    state=studyStates[index as FolioIndex];
+    if(index===0)buildF01();else if(index===1)buildF02();else buildF03();
+  } else if(renderer){
+    book();
+    if(!paperShadow)paperShadow=makeContactShadow();
+    const laterIndex=index as LaterFolioIndex;
+    laterWorld=createLaterFolio(laterIndex,fiber,paperShadow,laterStates[laterIndex-FIRST_LATER_FOLIO]);
+    rig.add(laterWorld.root);
+  }
   resetCamera();updateNav();
   canvas.dataset.authoredSculptures=String(authoredFigureCount);
-  // Observable QA provenance; no image-register or canon-approval claim.
-  announce(`Folio ${index+1} of 3. ${overviewCopy[index]}`);
-  sendBridge('folio', index);
+  canvas.dataset.sourceAuthoredScene=String(index>=FIRST_LATER_FOLIO);
+  announce(`Folio ${index+1} of 12. ${index<3?overviewCopy[index]:getLaterCopy(index as LaterFolioIndex).description}`);
+  sendBridge('folio',index);
 }
 function smooth(value:number,target:number,dt:number):number {
   return reducedMotion?target:THREE.MathUtils.damp(value,target,5.8,Math.min(dt,0.07));
