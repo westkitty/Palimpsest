@@ -1,6 +1,16 @@
-# PALIMPSEST · The First Three Folios
+# PALIMPSEST · The Twelve Living Folios
 
-This folder is the **separate sculptural concept experience** served at `/folio-vnext.html`. It is not a replacement for the existing twelve-folio reader. The governing direction is [`production/folio_vnext/F01_F03_DIRECTION_AND_DELTA.md`](../../production/folio_vnext/F01_F03_DIRECTION_AND_DELTA.md); refer to the supplied source notes for approved/proposed/open distinctions.
+This folder provides the **continuous sculptural edition F01–F12** served at `/folio-vnext.html`. It coexists with, rather than replacing, the original archival twelve-folio manuscript. The governing direction is [`production/folio_vnext/F01_F03_DIRECTION_AND_DELTA.md`](../../production/folio_vnext/F01_F03_DIRECTION_AND_DELTA.md); refer to the supplied source notes for approved/proposed/open distinctions.
+
+## Full twelve-folio extension · 2026-11-20
+
+The current living edition is a continuous **F01–F12** sculptural book. F04–F12 no longer send the reader into a second renderer, and all twelve folios appear in one living navigation rail. The independent archival manuscript and its cue narration are accessible only through the explicit Archive / Archival counterpart controls.
+
+F04–F12 mount the existing authored `F04FolioWorld` through `F12FolioWorld` paper sculptures from `src/engine/folios/FoliosWar1.ts`, `FoliosWar2.ts`, and `FoliosAftermath.ts`, retaining their individually designed A/B/C demonstrations, figures, DRAXIS models, palettes, and exact sourced historical subject matter. No generic replacement gallery is used. Their mechanism state is validated and persisted separately in the versioned session key `palimpsest.living.f04-f12.study.v1`; maker secrets, narrator/camera data and the archival session are excluded. F09's model-star filament remains irreversible within that study until Reset study.
+
+The non-WebGL accessible route has nine unique source-grounded 4:3 schematic plates, descriptive labels and functional A/B/C state feedback. `src/vnext/laterFolioDiagrams.ts` owns the no-remote-asset SVG plates. Reduced-motion and software-GPU rendering adapt the experience without claiming visual equivalence to physical-device review.
+
+Build and validation are governed by `.github/workflows/living-twelve-ci.yml`, including original F01–F03 canon tests, all nine new mechanics, TypeScript, Vite and the full twelve-folio built-browser journey. Physical device polish, source-to-figure visual fidelity, and long-running GPU lifecycle still require review before a final AAA-quality certificate.
 
 ## Visual language
 
