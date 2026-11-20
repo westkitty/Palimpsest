@@ -153,6 +153,7 @@ try {
   assert.match(await embedded.locator('#folio-title').textContent(),/First Contact/);
   assert.equal(await joined.isVisible(),true,'F03 continues INSIDE the same living book');
   await joined.getByRole('button',{name:'Folio 12, living edition'}).click();
+  await embedded.locator('#folio-title').filter({hasText:'Unfinished Peace'}).waitFor({state:'visible',timeout:12000});
   assert.match(await embedded.locator('#folio-title').textContent(),/Unfinished Peace/);
   await joined.getByRole('button',{name:'Archival counterpart'}).click();
   await joined.waitFor({state:'hidden',timeout:12000});
