@@ -1,0 +1,52 @@
+name: PALIMPSEST Living Twelve Development Checks
+
+on:
+  push:
+    branches:
+      - living-volume/full-twelve-20261120
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+      - name: Type-check full application
+        run: bun run lint
+      - name: Verify authored early folios and history
+        run: |
+          node tests/folio-vnext-preview.test.cjs
+          node tests/preview-v2-contract.test.cjs
+          bun test tests/folio-logic.test.mjs
+          bun test tests/folio-study-continuity.test.mjs
+      - name: Verify all twelve and physical scene contracts
+        run: |
+          bun test tests/living-twelve.test.mjs
+          node tests/panel-layout-contract.test.cjs
+          node tests/awe-signature.test.cjs
+          node tests/authored-assets-ink.test.cjs
+          node tests/living-folios-bridge.test.cjs
+      - name: Build both standalone and integrated routes
+        run: |
+          bun run build
+          test -s dist/index.html && test -s dist/folio-vnext.html
+      - name: Setup Chromium
+        run: |
+          mkdir -p /tmp/palimpsest-e2e
+          npm install --prefix /tmp/palimpsest-e2e --no-package-lock --ignore-scripts playwright
+          command -v google-chrome || command -v google-chrome-stable || command -v chromium
+      - name: Exercise all twelve living folios in built Chromium
+        run: |
+          bunx vite preview --host 127.0.0.1 --port 4173 > /tmp/palimpsest-preview.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID || true' EXIT
+          cp tests/browser-vnext-smoke.mjs /tmp/palimpsest-e2e/smoke.mjs
+          PALIMPSEST_CHROME_PATH="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)" node /tmp/palimpsest-e2e/smoke.mjs
