@@ -80,48 +80,53 @@ try {
   await page.locator('#toggle-panels').click();
   await page.locator('#reset-panels').click();
   assert.equal(await page.locator('#window-layer').getAttribute('class'),'');
-  const home=await page.goto(origin+'/',{waitUntil:'domcontentloaded'});
+  // Isolate independent routes: a completed WebGL study should not keep an old
+  // document's GPU work alive while Chromium boots the archival reader.
+  await page.close();
+  const archivePage=await browser.newPage({viewport:{width:1360,height:840},reducedMotion:'reduce'});
+  archivePage.on('pageerror',e=>pageErrors.push(String(e)));
+  const home=await archivePage.goto(origin+'/',{waitUntil:'domcontentloaded'});
   assert.ok(home?.ok(),'Original twelve-folio route remains available');
   // The same volume now opens the source-authored opening folios without a new tab.
-  const livingEntry=page.getByRole('button',{name:'Enter Living Folios'});
+  const livingEntry=archivePage.getByRole('button',{name:'Enter Living Folios'});
   try { await livingEntry.waitFor({state:'visible',timeout:10000}); } catch (error) {
     console.error('LIVING_ENTRY_DEBUG', JSON.stringify({
-      url:page.url(),
+      url:archivePage.url(),
       pageErrors,
-      documentTitle:await page.title(),
-      bodyText:(await page.locator('body').innerText().catch(()=>'' )).slice(0,2800),
-      renderedButtons:await page.locator('button').allTextContents(),
-      reactRoot:(await page.locator('#root').innerHTML().catch(()=>'' )).slice(0,1200),
+      documentTitle:await archivePage.title(),
+      bodyText:(await archivePage.locator('body').innerText().catch(()=>'' )).slice(0,2800),
+      renderedButtons:await archivePage.locator('button').allTextContents(),
+      reactRoot:(await archivePage.locator('#root').innerHTML().catch(()=>'' )).slice(0,1200),
     },null,2));
     throw error;
   }
   await livingEntry.click();
-  const joined=page.getByRole('dialog',{name:'PALIMPSEST integrated twelve-folio volume'});
+  const joined=archivePage.getByRole('dialog',{name:'PALIMPSEST integrated twelve-folio volume'});
   await joined.waitFor({state:'visible',timeout:10000});
-  const embedded=page.frameLocator('iframe[title^="F01–F03 sculptural"]');
+  const embedded=archivePage.frameLocator('iframe[title^="F01–F03 sculptural"]');
   await embedded.locator('#stage').waitFor({state:'visible',timeout:12000});
-  await page.waitForTimeout(600);
+  await archivePage.waitForTimeout(600);
   assert.equal(await embedded.locator('#stage').getAttribute('data-authored-sculptures'),'3','unified opening uses original three figures');
   assert.equal(await joined.locator('nav button').count(),12,'one twelve-folio navigation rail');
   await joined.getByRole('button',{name:'Folio 02, sculptural edition'}).click();
-  await page.waitForTimeout(400);
+  await archivePage.waitForTimeout(400);
   assert.match(await embedded.locator('#folio-title').textContent(),/All Unfolds/);
   assert.equal(await embedded.locator('#stage').getAttribute('data-authored-sculptures'),'1','unified F02 reuses Geode');
   await joined.getByRole('button',{name:'Folio 03, sculptural edition'}).click();
-  await page.waitForTimeout(400);
+  await archivePage.waitForTimeout(400);
   assert.match(await embedded.locator('#folio-title').textContent(),/Notebook Program/);
   assert.equal(await embedded.locator('#stage').getAttribute('data-authored-sculptures'),'0','no early Drakken');
   await embedded.locator('#next').click();
   await joined.waitFor({state:'hidden',timeout:12000});
-  await page.waitForTimeout(700);
-  assert.match(await page.locator('header h1').first().textContent(),/F04/,'end of F03 continues into original Folio IV');
-  const resumeEntry=page.getByRole('button',{name:'Living Folios'});
+  await archivePage.waitForTimeout(700);
+  assert.match(await archivePage.locator('header h1').first().textContent(),/F04/,'end of F03 continues into original Folio IV');
+  const resumeEntry=archivePage.getByRole('button',{name:'Living Folios'});
   await resumeEntry.waitFor({state:'visible'});
   await resumeEntry.click();
   await joined.waitFor({state:'visible'});
   await joined.getByRole('button',{name:'Return to the archival reader'}).click();
   await joined.waitFor({state:'hidden'});
-  assert.match(await page.locator('header h1').first().textContent(),/F04/,'return preserves the archival position');
+  assert.match(await archivePage.locator('header h1').first().textContent(),/F04/,'return preserves the archival position');
 
   assert.equal(pageErrors.length,0,`no uncaught browser exceptions: ${pageErrors.join('; ')}`);
   console.log('PASS: integrated WebGL scene, movable controls, F02 explicit signature, Escape return, F03 generator, 12-folio route');
