@@ -1065,15 +1065,19 @@ function destroy():void {
 wireButtons();
 window.addEventListener('message',onBridgeMessage);
 try{
-  renderer=new THREE.WebGLRenderer({canvas,antialias:true});
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.6));
+  renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
+  const gl=renderer.getContext();
+  const gpuInfo=gl.getExtension('WEBGL_debug_renderer_info');
+  const gpuName=String(gl.getParameter(gpuInfo?gpuInfo.UNMASKED_RENDERER_WEBGL:gl.RENDERER));
+  const softwareRenderer=/SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(gpuName);
+  renderer.setPixelRatio(softwareRenderer?0.85:Math.min(window.devicePixelRatio||1,1.6));
   renderer.outputColorSpace=THREE.SRGBColorSpace;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure=1.48;
-  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.enabled=!softwareRenderer;
   renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-  keyLight.castShadow=true;
-  keyLight.shadow.mapSize.set(1024,1024);
+  keyLight.castShadow=!softwareRenderer;
+  keyLight.shadow.mapSize.set(softwareRenderer?256:1024,softwareRenderer?256:1024);
   keyLight.shadow.camera.left=-8;keyLight.shadow.camera.right=8;
   keyLight.shadow.camera.top=7;keyLight.shadow.camera.bottom=-7;
   keyLight.shadow.normalBias=0.024;
