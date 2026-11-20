@@ -74,8 +74,9 @@ export function operateLater(state: FolioRuntimeState, slot: FolioInteractionSlo
 export function restoreLaterStudy(raw: unknown): FolioRuntimeState[] {
   const defaults = Array.from({ length: 9 }, (_, i) => newLaterState((i + 3) as LaterFolioIndex));
   if (!isRecord(raw) || raw.version !== 1 || !Array.isArray(raw.folios)) return defaults;
+  const storedFolios: unknown[] = raw.folios;
   return defaults.map((base, i) => {
-    const candidate: unknown = raw.folios[i];
+    const candidate: unknown = storedFolios[i];
     if (!isRecord(candidate) || candidate.id !== base.id || !isRecord(candidate.interactions)) return base;
     const interactions = { ...base.interactions };
     for (const slot of slots) {
