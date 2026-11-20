@@ -1026,10 +1026,10 @@ function fallbackPage(index:number):void {
   paragraphs.forEach((p,i)=>p.hidden=isLater||i!==index);
   fallback.querySelectorAll<SVGGElement>('[data-fb-folio]').forEach((g,i)=>{g.style.display=!isLater&&i===index?'':'none';});
   const originalArt=fallback.querySelector<SVGSVGElement>('svg:not(#later-plate-art)');
-  if(originalArt)originalArt.hidden=isLater;
+  if(originalArt)originalArt.toggleAttribute('hidden',isLater);
   const laterArt=fallback.querySelector<SVGSVGElement>('#later-plate-art');
   if(laterArt){
-    laterArt.hidden=!isLater;
+    laterArt.toggleAttribute('hidden',!isLater);
     if(isLater){
       const scene=laterArt.querySelector<SVGGElement>('#later-plate-scene');
       if(scene)scene.innerHTML=getLaterDiagram(index);
