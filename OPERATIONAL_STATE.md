@@ -3,7 +3,7 @@
 project_id: westkitty/Palimpsest
 scope: isolated folio-vnext experimental route; not the active reader
 base_revision: 3ac3f7ae328d8b04d0641a454f16a01fc20d71cf
-status: implementation candidate; runtime visual acceptance NOT VERIFIED
+status: branch prototype compiled and bundled; interactive visual acceptance NOT VERIFIED
 last_updated: 2026-11-20
 
 ## Protected invariants
@@ -20,7 +20,8 @@ last_updated: 2026-11-20
 - Reduced-motion aware, accessible text fallback when WebGL is unavailable, finite scene resource cleanup.
 
 ## Unverified / pending
-- Full build, TypeScript and browser interaction checks; record results here after running them.
+- **Verified on GitHub Actions:** TypeScript (`bun run lint`) and Vite production bundle (`bun run build`) passed on commit `e600c8ca1d48f2f08c4e719da749e1b65eda4a17`, run https://github.com/westkitty/Palimpsest/actions/runs/44726866251 (build job **success**; deployment job **failure** because this branch is not authorized for GitHub Pages). The run's overall "failure" is NOT a build failure. 
+- **Still unverified:** targeted `node tests/folio-vnext-preview.test.cjs` runner, actual WebGL visual quality, miniature traversal/hidden-text discoverability, touch controls, accessibility interaction and renderer lifecycle. No claim of completed browser QA.
 - F01 model-sheet fidelity (current standees abstract), F02 miniature Geode interior navigation (simplified), F03 exact template geometries, truthful original text.
 - Approved public narration, chronology relocation of older F03 Drakken material, third inscription words/location, visible Vault lock and protected fallback equivalence.
-- Staging and push state should be checked against GitHub after any changes.
+- Repository branch commits were pushed and read back. `main` remains at `2cd577f8487ba640e2669c6b858119047229d48c`. No merge or live deploy was requested or performed for this branch.
