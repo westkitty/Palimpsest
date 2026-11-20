@@ -9,301 +9,265 @@ interface NonWebglFolioViewProps {
   onTriggerInteraction: (slot: FolioInteractionSlot) => void;
 }
 
+/* PALIMPSEST P0: manuscript-grounded non-WebGL SVG, F01-F12.
+ * Replace only renderFolioSvg (and its added status helper) in the pinned file.
+ * Uses the original imports: ADMINISTRATION_SLOGAN, FOLIO_BY_WORLD,
+ * DRAXIS_BY_ID, and type AtlasSnapshot. No independent interaction state.
+ */
+function getFolioVisualStatus(snapshot: AtlasSnapshot): string {
+  const w = snapshot.activeWorld;
+  const st = snapshot.worlds[w].interactions;
+  const a = st.A.active;
+  const b = st.B.active;
+  const c = st.C.active;
+  const bs = st.B.step;
+  const as = st.A.step;
+  const f03 = ['Pyric / Magma Pleuron 001', 'Aqueous / Brinechoir 023', 'Telluric / Terragullet 019', 'Aeric / Aerokarst 008', 'Umbral / Lyriboris 032'];
+  const f06 = ['Years 7-30','Years 31-60','Years 61-90','Years 91-120'];
+  const tri = (left: string, right: string, on: boolean) => on ? right : left;
+  const states: [string,string,string][] = [
+    [tri('Vellum covers instruction grid','Vellum lifted, instruction grid exposed',a), `Recursion dial position ${bs+1} of 4`, tri('Law, Memory and Rendering separated','Law, Memory and Rendering converged',c)],
+    [tri('Triarchic wings folded','Triarchic wings unfolded, three principles visible',a), tri('Redaction covers Starsilk murder evidence','Redaction moved, cyan Starsilk traces exposed',b), tri('Digital Geode sealed','Digital Geode cutaway shows NiAlBu imprisoned alive',c)],
+    [tri('Drakken Egg sealed','Egg cutaway: Descent, Activation, Ecological Rewrite',a), `Ecological thesis ${f03[bs % 5]}`, tri('Temple facade covers the terrain','Temple lifted; ecological rewriting shown underneath',c)],
+    [tri('Colony before first contact','Colony after first contact, fractured terrain',a), tri('Counter-Macro outposts unconnected','Counter-Macro response arrows deployed',b), tri('Institutional logistics strip folded','Logistics: Observe, Verify, Deploy, Record',c)],
+    [tri('Fallenstar Prime before the Blood Ring','Physical vitrified crimson Blood Ring encircles Fallenstar Prime',a), b ? `Manufacturing stage ${((bs+3)%4)+1} of 4` : 'Manufacturing cutaway closed', tri('Perpetrator doctrine visible','Archival process record visible',c)],
+    [`Chronology: ${f06[as % 4]}`, `Campaign specimen selection ${bs+1} of 7`, tri('Cumulative-loss ledger closed','Cumulative-loss ledger open; unknown totals blank',c)],
+    [tri('Pharos tactical planning overlay folded','Pharos tactical planning overlay visible, not to scale',a), tri('Clean siege maneuver projections','Attrition markers show stalled siege conditions',b), tri('Support-route inspection closed','Support-route strain exposed, unknown losses blank',c)],
+    [tri('Aureal Gate shields closed','Aureal Gate opened, weaponized Starsilk vulnerability exposed',a), tri('Divine invincibility assumed','Divine invincibility assumption fractured',b), tri('Conquered-world tray closed','Retreat arrow and 20 nongeographic conquered-world markers displayed',c)],
+    [tri('Nonhistorical model star intact','Nonhistorical model star irreversibly collapsed to a black hole',a), `Hal'Ven cluster collapse wave ${bs} of 3`, tri('Containment plan folded','Singularity enclosure plan exposed',c)],
+    [tri('Siege Wall boundary at rest','Siege Wall containment boundary raised',a), tri('Engineering schematic of the Siege Wall','Inhabited horizon with one pitch-black sky streak',b), tri('Postwar Protocols sheet closed','Prohibited heliocide replication decree open',c)],
+    [tri('Forearm-sized glass loam cylinder in barren crater','Cylinder inspection inset shows loam and wheat; crater remains barren',a), tri('Wartime Macro weapon schematic','Life-preserving loam arrangement schematic',b), tri('Attributed confrontation record closed','Full attributed Shard-god to Codec quotation visible',c)],
+    [tri('Containment and continuing harm overlaid','Containment achieved and harm not ended separated',a), tri('Starsilk circuit active','Starsilk circuit inert under symbolic Syrin-blood condition',b), tri('Syrin 4 archive leaf sealed','Syrin 4 archive leaf unsealed, Kail identified as surviving initiate',c)],
+  ];
+  return `A: ${states[w][0]}. B: ${states[w][1]}. C: ${states[w][2]}.`;
+}
+
+/* Source-catalog-derived abstract marks, not anatomical model replacements. */
+function sourceSpecimenMark(id: string, x: number, y: number) {
+  let mark = <polygon points="-22,-28 22,-28 33,14 -33,14" fill="#596675" stroke="#1F2329" strokeWidth="2"/>;
+  switch (id) {
+    case '001': // MAGMA PLEURON: wide armored mantle, side vents, central core.
+      mark = <g><path d="M-51,0 L-34,-22 L-7,-14 L0,-26 L7,-14 L34,-22 L51,0 L24,18 L-24,18 Z" fill="#565867" stroke="#1F2329" strokeWidth="2"/><circle cx="0" cy="-1" r="10" fill="#9F4E32"/>{[-34,34].map(k=><rect key={k} x={k-5} y="-4" width="10" height="4" fill="#923B32"/>)}</g>;
+      break;
+    case '023': // BRINECHOIR: tiered bell columns and saline siphon pipes.
+      mark = <g>{[-20,0,20].map((k,i)=><g key={k}><path d={`M${k-8},${-18+i*7} L${k+8},${-18+i*7} L${k+13},${4+i*4} L${k-13},${4+i*4} Z`} fill="#71818B" stroke="#1F2329" strokeWidth="1.5"/><line x1={k} y1="-28" x2={k} y2={-18+i*7} stroke="#3D95B5" strokeWidth="3"/></g>)}</g>;
+      break;
+    case '019': // TERRAGULLET: long boring cylinder and twin grinder drums.
+      mark = <g><rect x="-35" y="-14" width="51" height="28" rx="7" fill="#53616D" stroke="#1F2329" strokeWidth="2"/>{[25,43].map(k=><g key={k}><circle cx={k-12} cy="-5" r="13" fill="#3A434F" stroke="#1F2329" strokeWidth="2"/><path d={`M${k-22},-5 L${k-2},-5 M${k-12},-15 L${k-12},5`} stroke="#D2B96E" strokeWidth="2"/></g>)}</g>;
+      break;
+    case '008': // AEROKARST: headless central sphere with floating armor baffles.
+      mark = <g><circle r="16" fill="#6B7D8C" stroke="#1F2329" strokeWidth="2"/>{[-38,32].map(k=><polygon key={k} points={`${k},-22 ${k+13},-16 ${k+9},8 ${k-5},13`} fill="#CDD0C1" stroke="#1F2329" strokeWidth="1.5"/>)}<path d="M-15,-31 Q0,-38 15,-31 M-14,28 Q0,37 14,28" fill="none" stroke="#3D95B5" strokeWidth="2"/></g>;
+      break;
+    case '032': // LYRIBORIS: twin structural arches, vertical filaments.
+      mark = <g><path d="M-35,25 Q-52,-17 -17,-33 M35,25 Q52,-17 17,-33" fill="none" stroke="#5C6676" strokeWidth="9" strokeLinecap="round"/>{[-12,0,12].map(k=><line key={k} x1={k} y1="-32" x2={k} y2="24" stroke="#3D95B5" strokeWidth="2"/>)}</g>;
+      break;
+    case '003': // FAULT-TONGUE: articulated rib-spine, serrated trenching tongue.
+      mark = <g><path d="M-45,-12 Q-12,-35 30,-4" fill="none" stroke="#53616D" strokeWidth="12"/>{[-36,-23,-10,3,16].map(k=><line key={k} x1={k} y1="-27" x2={k+4} y2="-1" stroke="#1F2329" strokeWidth="3"/>)}<path d="M28,-4 L54,10 L30,18 L45,24 L20,17" fill="none" stroke="#9F4E32" strokeWidth="5"/></g>;
+      break;
+    case '004': // OBSIDIAN GUL: parted basalt hull around central intake.
+      mark = <g><path d="M-43,18 L-37,-30 L-7,-22 L-4,13 Z M43,18 L37,-30 L7,-22 L4,13 Z" fill="#3D4753" stroke="#1F2329" strokeWidth="2"/><ellipse cx="0" cy="-2" rx="10" ry="24" fill="#101417" stroke="#9F4E32" strokeWidth="2"/></g>;
+      break;
+    case '009': // CLOUDMAW: upward vortex collar, radial intake vanes.
+      mark = <g><path d="M-36,-19 L36,-19 L13,27 L-13,27 Z" fill="#5E6F81" stroke="#1F2329" strokeWidth="2"/><ellipse cx="0" cy="-20" rx="35" ry="10" fill="#18232B" stroke="#3D95B5" strokeWidth="3"/>{[-22,0,22].map(k=><path key={k} d={`M${k},-31 L${k/3},-12`} stroke="#BEC4C7" strokeWidth="3"/>)}</g>;
+      break;
+    case '012': // VORTENBRAY: stacked gyro rings around hollow bore.
+      mark = <g>{[-15,0,15].map((k,i)=><ellipse key={i} cx="0" cy={k} rx={34-i*5} ry="10" fill="none" stroke={i===1?'#3D95B5':'#546575'} strokeWidth="5"/>)}<line x1="0" y1="-32" x2="0" y2="32" stroke="#1F2329" strokeWidth="6"/></g>;
+      break;
+    case '030': // SOLNEXUS: crescent collectors and central fusion node.
+      mark = <g><circle r="13" fill="#C79658" stroke="#1F2329" strokeWidth="2"/><path d="M-23,-28 Q-47,0 -23,28 M23,-28 Q47,0 23,28" fill="none" stroke="#60596A" strokeWidth="8"/><path d="M-12,-37 Q0,-41 12,-37 M-12,37 Q0,41 12,37" fill="none" stroke="#A38753" strokeWidth="4"/></g>;
+      break;
+  }
+  return <g transform={`translate(${x},${y})`}>{mark}</g>;
+}
+
 function renderFolioSvg(snapshot: AtlasSnapshot) {
   const world = snapshot.activeWorld;
   const st = snapshot.worlds[world].interactions;
   const a = st.A.active;
-  const aStep = st.A.step;
   const b = st.B.active;
-  const bStep = st.B.step;
   const c = st.C.active;
-  const cStep = st.C.step;
-  const draxis = snapshot.activeDraxisId ? DRAXIS_BY_ID[snapshot.activeDraxisId] : null;
-
+  const aStep = st.A.step;
+  const bStep = st.B.step;
+  // Existing stepped-store behavior: first activation changes step 0 to 1.
+  // Map steps 1,2,3,0 to manufacture stages 1,2,3,4 without changing store state.
+  const f05Bay = b ? (bStep+3)%4 : -1;
   const ink = '#1F2329';
-  const slate = '#546170';
+  const slate = '#536274';
   const cyan = '#3D95B5';
   const crimson = '#8E282B';
   const brass = '#9D7F4C';
-
+  const paper = '#EEE4D2';
+  const pale = '#F8F1E4';
+  const dark = '#272E3A';
+  const manifest = FOLIO_BY_WORLD[world];
+  const status = getFolioVisualStatus(snapshot);
+  const f03Names = ['001 MAGMA PLEURON / PYRIC','023 BRINECHOIR / AQUEOUS','019 TERRAGULLET / TELLURIC','008 AEROKARST / AERIC','032 LYRIBORIS / UMBRAL'];
+  const f06Periods = ['7-30','31-60','61-90','91-120'];
+  const manufacture = ['INPUT','GOREVAULT 044','RINGTHROAT 029','VITRIFIED RING'];
+  const f06Id = snapshot.activeDraxisId;
+  const f06Name = f06Id && DRAXIS_BY_ID[f06Id] ? `${f06Id} ${DRAXIS_BY_ID[f06Id].name}` : 'SOURCE PLATE';
+  let drawing = <g/>;
   switch (world) {
-    case 0: // F01: The Initialization of Reality
-      return (
-        <svg viewBox="0 0 400 300" className="h-full w-full" role="img" aria-label="F01 Notebook Program Schematic">
-          <circle cx="200" cy="145" r={a ? 88 : 54} fill="none" stroke={ink} strokeWidth="1.6" strokeDasharray={a ? 'none' : '4 4'} />
-          <circle cx="200" cy="145" r={c ? 36 : 24} fill={c ? '#F7D786' : '#E7CA80'} stroke={ink} strokeWidth="1.5" />
-          {/* Three nodes: Law, Memory, Rendering */}
-          {[
-            [200, b ? 58 : 35, 'LAW'],
-            [b ? 124 : 96, b ? 192 : 210, 'MEMORY'],
-            [b ? 276 : 304, b ? 192 : 210, 'RENDERING'],
-          ].map(([nx, ny, lbl]) => (
-            <g key={String(lbl)}>
-              <line x1="200" y1="145" x2={Number(nx)} y2={Number(ny)} stroke={b ? cyan : slate} strokeWidth="2" />
-              <circle cx={Number(nx)} cy={Number(ny)} r="15" fill="#F2EAD8" stroke={ink} strokeWidth="1.8" />
-              <text x={Number(nx)} y={Number(ny) + 4} textAnchor="middle" fontSize="8" fill={ink} fontFamily="monospace">
-                {String(lbl).slice(0, 3)}
-              </text>
+    case 0: // Notebook Program: vellum, dial, three convergence arms.
+      drawing = <g>
+        <rect x="42" y="42" width="316" height="203" fill={pale} stroke={ink}/>
+        {[0,1,2,3].map(i => <circle key={i} cx="200" cy="135" r={42+i*15} fill="none" stroke={i===bStep ? cyan : brass} strokeWidth={i===bStep ? 3 : 1.3} strokeDasharray={i===bStep?'none':'4 5'}/>)}
+        <line x1="200" y1="135" x2={200+Math.sin(bStep*Math.PI/2)*92} y2={135-Math.cos(bStep*Math.PI/2)*92} stroke={crimson} strokeWidth="3"/>
+        {[{x:200,y:60,n:'LAW'},{x:116,y:195,n:'MEMORY'},{x:284,y:195,n:'RENDERING'}].map(({x,y,n},i)=>{
+          const tx=c ? 200+(x-200)*0.25 : x, ty=c ? 135+(y-135)*0.25:y;
+          return <g key={n}><line x1={tx} y1={ty} x2="200" y2="135" stroke={cyan} strokeWidth="2"/><circle cx={tx} cy={ty} r="15" fill={paper} stroke={ink}/><text x={tx} y={ty+3} textAnchor="middle" fontSize="8" fill={ink}>{n.slice(0,3)}</text></g>;
+        })}
+        <polygon points="200,111 225,135 200,159 175,135" fill={c?'#DABF64':'#C9C0A5'} stroke={ink}/>
+        {!a && <g><rect x="55" y="48" width="288" height="185" fill="#D4CFBFA8" stroke={slate} strokeDasharray="5 4"/><text x="200" y="103" textAnchor="middle" fill={ink} fontSize="12">TRANSLUCENT VELLUM</text><text x="200" y="226" textAnchor="middle" fill={ink} fontSize="10">LIFT A TO EXPOSE INSTRUCTIONS</text></g>}
+        {a && <text x="200" y="224" textAnchor="middle" fill={ink} fontSize="10">NOTEBOOK RECURSION GRID EXPOSED</text>}
+        <text x="200" y="263" textAnchor="middle" fill={ink} fontSize="10">RECURSION DIAL {bStep+1}/4 | TRIAD {c?'ALIGNED':'SEPARATE'}</text>
+      </g>; break;
+    case 1: // Three principles, redaction, living captivity.
+      drawing = <g>
+        <rect x="44" y="45" width="312" height="192" fill={paper} stroke={ink}/>
+        {[78,200,322].map((cx,i)=><g key={i}>
+          <rect x={cx-47} y="67" width="94" height="138" fill={a ? pale : '#B9B3A9'} stroke={ink} strokeWidth="1.7"/>
+          {a ? <g><circle cx={cx} cy="111" r="25" fill={i===1?dark:'#A7C2CD'} stroke={ink}/><text x={cx} y="174" textAnchor="middle" fill={ink} fontSize="10">{['WORDSTREAMER','SHARD-GOD','NiAlBu'][i]}</text></g> : <text x={cx} y="134" textAnchor="middle" fill={ink} fontSize="9">FOLDED PANEL {i+1}</text>}
+        </g>)}
+        {!b && <g><rect x="38" y="54" width="324" height="25" fill={dark}/><text x="200" y="71" textAnchor="middle" fontSize="10" fill={pale}>ADMINISTRATION REDACTION</text></g>}
+        {b && <g><path d="M45,88 L100,111 L150,80 L205,113 L255,89 L354,113" fill="none" stroke={cyan} strokeWidth="4"/><text x="200" y="228" textAnchor="middle" fill={ink} fontSize="9">CYAN STARSILK TRACE / WORDSTREAMER MURDER</text></g>}
+        {c && <g><rect x="265" y="76" width="108" height="137" fill="#2A3045" stroke={brass}/><path d="M319,86 L319,191" stroke={cyan} strokeWidth="2"/><polygon points="319,100 335,129 319,147 303,129" fill="#7272A1"/><path d="M293,110 L319,148 L345,110" stroke={cyan} strokeWidth="2" fill="none"/><text x="319" y="193" textAnchor="middle" fontSize="8" fill={pale}>LIVING CAPTIVE</text></g>}
+        <text x="200" y="267" textAnchor="middle" fill={ink} fontSize="10">TRIPTYCH {a?'OPEN':'CLOSED'} | REDACTION {b?'REMOVED':'IN PLACE'}</text>
+      </g>; break;
+    case 2: // Egg is not the temple; five theses are a separate selection.
+      drawing = <g>
+        <circle cx="100" cy="118" r="59" fill="#284760" stroke={ink} strokeWidth="2"/>
+        <path d="M58,123 Q103,153 145,108 M68,158 Q103,171 135,153" stroke={cyan} strokeWidth="3" fill="none"/>
+        <text x="100" y="198" textAnchor="middle" fill={ink} fontSize="10">MOTHER / HOMEWORLD</text>
+        <polygon points="218,57 264,96 252,196 211,214 170,196 158,96" fill={a?'#C4B7A4':dark} stroke={brass} strokeWidth="2"/>
+        {!a ? <text x="211" y="142" textAnchor="middle" fontSize="10" fill={pale}>EGG SEALED</text> : <g><rect x="184" y="93" width="53" height="21" fill={pale}/><rect x="184" y="119" width="53" height="21" fill={pale}/><rect x="184" y="145" width="53" height="21" fill={pale}/><text x="210" y="107" textAnchor="middle" fontSize="8">DESCENT</text><text x="210" y="133" textAnchor="middle" fontSize="8">ACTIVATE</text><text x="210" y="159" textAnchor="middle" fontSize="8">REWRITE</text></g>}
+        <rect x="271" y="67" width="110" height="126" fill={paper} stroke={ink}/>
+        {sourceSpecimenMark(['001','023','019','008','032'][bStep%5],326,128)}
+        <text x="326" y="182" textAnchor="middle" fontSize="8" fill={ink}>THESIS {bStep+1}/5</text>
+        <text x="326" y="207" textAnchor="middle" fontSize="8" fill={ink}>{f03Names[bStep%5].split(' / ')[0]}</text>
+        <text x="326" y="219" textAnchor="middle" fontSize="8" fill={ink}>{f03Names[bStep%5].split(' / ')[1]}</text>
+        <rect x="40" y="228" width="340" height="44" fill={c?'#5B3D3C':paper} stroke={ink}/>
+        {c ? <g><path d="M52,256 L76,242 L101,262 L127,242 L147,262" fill="none" stroke="#D5A8A0" strokeWidth="4"/><text x="260" y="246" textAnchor="middle" fontSize="10" fill={pale}>ECOLOGICAL REWRITE</text><text x="260" y="260" textAnchor="middle" fontSize="9" fill={pale}>UNDER TEMPLE</text></g> : <g><path d="M53,243 L144,243 L132,236 L64,236 Z" fill={brass}/>{[66,91,116,141].map(x=><rect key={x} x={x} y="244" width="8" height="18" fill={slate}/>)}<text x="260" y="246" textAnchor="middle" fontSize="10" fill={ink}>MORTAL TEMPLE FACADE</text><text x="260" y="260" textAnchor="middle" fontSize="9" fill={ink}>REWRITE OBSCURED</text></g>}
+      </g>; break;
+    case 3: // Year 0 only: settlement, response routes, logistics stages.
+      drawing = <g>
+        <rect x="28" y="38" width="344" height="202" fill={pale} stroke={ink}/>
+        <text x="200" y="58" textAnchor="middle" fill={ink} fontSize="12">YEAR 0 / FIRST CONTACT</text>
+        {a ? <g><path d="M46,157 L82,133 L109,184 L148,143 L190,195 L236,148 L280,181 L350,144" fill="none" stroke={dark} strokeWidth="8"/><path d="M51,193 L138,132 L220,188 L315,153" fill="none" stroke={crimson} strokeWidth="3"/><text x="200" y="223" textAnchor="middle" fontSize="10" fill={ink}>FRACTURED POST-CONTACT TERRAIN</text></g> : <g>{[64,121,178,235,292].map((x,i)=><g key={i}><rect x={x} y={i%2?129:146} width="27" height="31" fill="#A6B69A" stroke={ink}/><path d={`M${x-5},${i%2?129:146} l18,-16 18,16`} fill="none" stroke={brass} strokeWidth="2"/></g>)}<line x1="40" y1="179" x2="360" y2="179" stroke="#879A83" strokeWidth="6"/><text x="200" y="223" textAnchor="middle" fontSize="10" fill={ink}>INTACT REPRESENTATIVE COLONY</text></g>}
+        {b && <g>{[[56,95,160,115],[160,115,272,104],[272,104,335,139]].map(([x1,y1,x2,y2],i)=><g key={i}><line x1={x1} y1={y1} x2={x2} y2={y2} stroke={cyan} strokeWidth="3"/><polygon points={`${x2},${y2} ${x2-10},${y2-6} ${x2-10},${y2+6}`} fill={cyan}/></g>)}</g>}
+        <rect x="28" y="247" width="344" height="35" fill={c?paper:'#A6A39B'} stroke={ink}/>
+        {c ? ['OBSERVE','VERIFY','DEPLOY','RECORD'].map((step,i)=><g key={i}><rect x={35+i*84} y="254" width="78" height="21" fill={pale} stroke={ink}/><text x={74+i*84} y="268" textAnchor="middle" fontSize="9" fill={ink}>{step}</text></g>) : <text x="200" y="268" textAnchor="middle" fontSize="10" fill={ink}>FOLDED CODEC LOGISTICS STRIP</text>}
+      </g>; break;
+    case 4: // Blood Ring is matter; manufacturer stages are four distinct states.
+      drawing = <g>
+        <rect x="30" y="38" width="340" height="216" fill={paper} stroke={ink}/>
+        <circle cx="100" cy="119" r="43" fill="#73938A" stroke={ink} strokeWidth="2"/>
+        {a && <ellipse cx="100" cy="119" rx="62" ry="20" fill="none" stroke={crimson} strokeWidth="10"/>}
+        <text x="100" y="182" textAnchor="middle" fontSize="9" fill={ink}>FALLENSTAR PRIME</text>
+        <text x="100" y="195" textAnchor="middle" fontSize="8" fill={ink}>{a?'SOLID VITRIFIED RING':'PRE-CONQUEST'}</text>
+        {b ? <g>
+          {manufacture.map((label,i)=><g key={i}>
+            <rect x={177+i*45} y="72" width="40" height="125" fill={i===f05Bay?(i===3?'#78312D':'#ACBFC8'):pale} stroke={ink} strokeWidth={i===f05Bay?2.5:1}/>
+            <g transform={`translate(${197+i*45},128)`}>
+              {i===0 && <g>{[-13,-3,7].map((x,k)=><rect key={k} x={x} y={-18+k*9} width="9" height="10" fill={dark}/>)}</g>}
+              {i===1 && <path d="M-5,-30 L-15,-13 L4,3 L-13,23" stroke={crimson} strokeWidth="4" fill="none"/>}
+              {i===2 && <g><path d="M0,29 L0,-24" stroke={crimson} strokeWidth="7"/><polygon points="-9,-21 0,-38 9,-21" fill={crimson}/></g>}
+              {i===3 && <ellipse cx="0" cy="0" rx="14" ry="9" fill="none" stroke={crimson} strokeWidth="6"/>}
             </g>
-          ))}
-          <text x="200" y="276" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">
-            {a ? 'VELLUM OVERLAY LIFTED' : 'CLOSED COVER DIAGRAM'} · {b ? 'COUPLED RECURSION' : 'UNCOUPLED'}
-          </text>
-        </svg>
-      );
-
-    case 1: // F02: Wordstreamer and the Shard-god
-      return (
-        <svg viewBox="0 0 400 300" className="h-full w-full" role="img" aria-label="F02 Pantheon Triptych Schematic">
-          <g transform={`translate(${aStep === 1 ? 0 : 0}, 0)`}>
-            <rect x="28" y="42" width="102" height="190" fill={aStep === 1 ? '#DFEEF3' : '#EFE7D4'} stroke={ink} strokeWidth="1.5" />
-            <circle cx="79" cy="110" r="24" fill="#B2D9E6" stroke={cyan} strokeWidth="2" />
-            <path d="M52,186 Q79,150 106,186" fill="none" stroke={ink} strokeWidth="2" />
-            <text x="79" y="216" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">WORDSTREAMER</text>
-          </g>
-          <g>
-            <rect x="149" y="42" width="102" height="190" fill={aStep === 2 ? '#F2DFDB' : '#EFE7D4'} stroke={ink} strokeWidth="1.5" />
-            <polygon points="200,66 226,120 200,174 174,120" fill="#B67B6B" stroke={ink} strokeWidth="1.8" />
-            <line x1="178" y1="120" x2="222" y2="120" stroke="#F6E5C2" strokeWidth="1.5" />
-            <text x="200" y="216" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">THE SHARD-GOD</text>
-          </g>
-          <g>
-            <rect x="270" y="42" width="102" height="190" fill={c ? '#E7DEC8' : '#EFE7D4'} stroke={ink} strokeWidth="1.5" />
-            <polygon points="321,76 346,112 338,162 304,162 296,112" fill="#8C8375" stroke={ink} strokeWidth="1.8" />
-            {c && (
-              <>
-                <line x1="305" y1="100" x2="338" y2="148" stroke={cyan} strokeWidth="2.2" />
-                <line x1="336" y1="98" x2="306" y2="146" stroke={cyan} strokeWidth="1.6" />
-              </>
-            )}
-            <text x="321" y="216" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">NI AL&apos;BU</text>
-          </g>
-          <text x="200" y="274" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">
-            {b ? 'WORDSTREAMER DELETED BY CONSTRUCT' : 'PRE-SCHISM TRIPTYCH'} · GEODE: {c ? 'FRACTURED' : 'SEALED'}
-          </text>
-        </svg>
-      );
-
-    case 2: // F03: Mother, the Five Theses, and the Drakken Eggs
-      return (
-        <svg viewBox="0 0 400 300" className="h-full w-full" role="img" aria-label="F03 Mother and Drakken Theses">
-          <circle cx="135" cy="140" r="64" fill="#2A465C" stroke={ink} strokeWidth="2" />
-          <path d="M90,122 Q135,152 182,118" fill="none" stroke={cyan} strokeWidth={a ? 3.5 : 1.5} />
-          <path d="M95,158 Q138,184 178,162" fill="none" stroke="#8CE0FA" strokeWidth={a ? 2.5 : 1} />
-          <text x="135" y="226" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">MOTHER (PLANET)</text>
-
-          <rect x="232" y="64" width="138" height="156" fill="#EDE4D0" stroke={ink} strokeWidth="1.4" />
-          <text x="301" y="88" textAnchor="middle" fontSize="10" fontWeight="bold" fill={ink} fontFamily="monospace">
-            {draxis ? `#${draxis.id} ${draxis.name}` : 'DRAXIS SPECIMEN'}
-          </text>
-          <text x="301" y="106" textAnchor="middle" fontSize="9" fill={slate} fontFamily="monospace">
-            THESIS: {draxis?.thesis ?? 'Telluric'}
-          </text>
-          <polygon
-            points={c ? '284,126 301,116 318,126 318,176 284,176' : '291,122 311,122 315,176 287,176'}
-            fill="#474E5A"
-            stroke={c ? cyan : ink}
-            strokeWidth="2"
-          />
-          <text x="301" y="204" textAnchor="middle" fontSize="9" fill={ink} fontFamily="monospace">
-            {c ? 'EGG HATCHED' : 'TEMPLE OBELISK'}
-          </text>
-        </svg>
-      );
-
-    case 3: // F04: Year 0 to Year 3
-      return (
-        <svg viewBox="0 0 400 300" className="h-full w-full" role="img" aria-label="F04 War Declaration Schematic">
-          <rect x="34" y="42" width="144" height="190" fill="#ECE3CF" stroke={ink} strokeWidth="1.5" />
-          <circle cx="106" cy="118" r="28" fill="#B5D7E4" stroke={cyan} strokeWidth="2" />
-          {a && <path d="M72,95 L140,142" stroke={crimson} strokeWidth="2.5" />}
-          <text x="106" y="180" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">YEAR 0 · INVASION</text>
-
-          <rect x="222" y="42" width="144" height="190" fill="#ECE3CF" stroke={ink} strokeWidth="1.5" />
-          <polygon points="294,76 314,132 294,166 274,132" fill="#A57263" stroke={ink} strokeWidth="1.6" />
-          {b && <line x1="258" y1="88" x2="332" y2="88" stroke={crimson} strokeWidth="3" />}
-          <text x="294" y="180" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">
-            YEAR 3 · {c ? '40–60% LOST' : 'CRATER PLATE'}
-          </text>
-        </svg>
-      );
-
-    case 4: // F05: Gorevault, Ringthroat, and the Blood Ring
-      return (
-        <svg viewBox="0 0 400 300" className="h-full w-full" role="img" aria-label="F05 Blood Ring Cutaway">
-          <ellipse cx="200" cy="82" rx="138" ry="26" fill="none" stroke={crimson} strokeWidth={b ? 10 : 5} />
-          <ellipse cx="200" cy="82" rx="138" ry="26" fill="none" stroke="#E0B680" strokeWidth="1" strokeDasharray="3 4" />
-          <rect x="64" y="156" width="96" height="58" fill="#513638" stroke={ink} strokeWidth="1.8" />
-          <text x="112" y="189" textAnchor="middle" fontSize="10" fill="#F4ECDC" fontFamily="monospace">GOREVAULT #044</text>
-          <path d={a ? 'M160,184 L232,184 L256,88' : 'M160,184 L232,184'} fill="none" stroke={crimson} strokeWidth="4" />
-          <polygon points="236,214 276,214 264,126 248,126" fill="#462F33" stroke={ink} strokeWidth="1.8" />
-          <text x="256" y="232" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">RINGTHROAT #029</text>
-          <text x="200" y="274" textAnchor="middle" fontSize="10" fill={crimson} fontWeight="bold" fontFamily="monospace">
-            {c ? '"Your sky is built from your dead."' : 'CUTAWAY EXTRUSION MODEL'}
-          </text>
-        </svg>
-      );
-
-    case 5: // F06: The Long Attrition (Years 7 to 120)
-      return (
-        <svg viewBox="0 0 400 300" className="h-full w-full" role="img" aria-label="F06 170-Year War Dial">
-          <circle cx="122" cy="142" r="76" fill="#E8DFCA" stroke={ink} strokeWidth="2" />
-          <line x1="122" y1="142" x2={122 + Math.cos(aStep * 1.3 - 1.2) * 58} y2={142 + Math.sin(aStep * 1.3 - 1.2) * 58} stroke={crimson} strokeWidth="3" />
-          <text x="122" y="240" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">YEARS 7–120 · STEP {aStep}</text>
-
-          <rect x="226" y="64" width="144" height="156" fill="#EDE4D0" stroke={ink} strokeWidth="1.5" />
-          <text x="298" y="92" textAnchor="middle" fontSize="10" fontWeight="bold" fill={ink} fontFamily="monospace">
-            ACTIVE CAMPAIGN STRAIN
-          </text>
-          <text x="298" y="132" textAnchor="middle" fontSize="12" fontWeight="bold" fill={crimson} fontFamily="monospace">
-            #{draxis?.id ?? '003'} {draxis?.name ?? 'FAULT-TONGUE'}
-          </text>
-          <text x="298" y="156" textAnchor="middle" fontSize="9" fill={slate} fontFamily="monospace">
-            {draxis?.thesis ?? 'Telluric'}
-          </text>
-          <text x="298" y="198" textAnchor="middle" fontSize="9" fill={ink} fontFamily="monospace">
-            {c ? 'STABILITY: EXHAUSTED' : '14 CAMPAIGN STRAINS'}
-          </text>
-        </svg>
-      );
-
-    case 6: // F07: Codec and Marcel
-      return (
-        <svg viewBox="0 0 400 300" className="h-full w-full" role="img" aria-label="F07 Codec and Marcel Portraits">
-          <rect x="38" y="48" width="144" height="186" fill="#ECE3CF" stroke={ink} strokeWidth="1.5" />
-          <circle cx="110" cy="108" r="24" fill="#D4C7B2" stroke={ink} strokeWidth="1.5" />
-          <circle cx="101" cy="106" r="3" fill={a ? cyan : ink} />
-          <circle cx="119" cy="106" r="3" fill={a ? cyan : ink} />
-          <text x="110" y="176" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">CODEC (PROSTHETIC)</text>
-
-          <rect x="218" y="48" width="144" height="186" fill="#ECE3CF" stroke={ink} strokeWidth="1.5" />
-          <circle cx="290" cy="108" r="24" fill="#D4C7B2" stroke={ink} strokeWidth="1.5" />
-          {b && <path d="M276,120 Q290,148 304,120" fill="none" stroke={cyan} strokeWidth="2.5" />}
-          <text x="290" y="176" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">MARCEL (SYNCHRONIZED)</text>
-          <text x="200" y="274" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">
-            {c ? 'YEAR 121 MUTINY SPLIT' : 'FIELD COMMAND PARTNERSHIP'}
-          </text>
-        </svg>
-      );
-
-    case 7: // F08: The Unspooling and the Year 121 Mutiny
-      return (
-        <svg viewBox="0 0 400 300" className="h-full w-full" role="img" aria-label="F08 Unspooling Schematic">
-          <rect x="74" y="96" width="60" height="86" rx="8" fill="#5D646E" stroke={ink} strokeWidth="1.8" />
-          <rect x="266" y="96" width="60" height="86" rx="8" fill="#5D646E" stroke={ink} strokeWidth="1.8" />
-          <line x1="134" y1="139" x2="266" y2="139" stroke={a ? cyan : slate} strokeWidth={a ? 4 : 2} strokeDasharray={b ? '6 4' : 'none'} />
-          {a && <circle cx="200" cy="139" r="14" fill="none" stroke={cyan} strokeWidth="2" />}
-          <text x="200" y="218" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">
-            {a ? 'MNEMONIC FILAMENT DRAWN' : 'STARSILK DRUM IDLE'} · {b ? 'RECRUITABLE' : 'UNMAPPED'}
-          </text>
-          <text x="200" y="246" textAnchor="middle" fontSize="9" fill={crimson} fontFamily="monospace">
-            {c ? 'MUTINY ORDER ACCEPTED AT YEAR 121' : 'DOCTRINE THRESHOLD'}
-          </text>
-        </svg>
-      );
-
-    case 8: // F09: Year 170 — The Collapse of the Sun and Stars
-      return (
-        <svg viewBox="0 0 400 300" className="h-full w-full" role="img" aria-label="F09 Sacrificial Model Star">
-          <rect x="44" y="42" width="312" height="196" fill={a ? '#111319' : '#EAE0CA'} stroke={ink} strokeWidth="1.8" />
-          {!a ? (
-            <>
-              <circle cx="200" cy="136" r="44" fill="#E6B95E" stroke={ink} strokeWidth="2" />
-              <text x="200" y="206" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">
-                MODEL STAR (INTACT)
-              </text>
-            </>
-          ) : (
-            <>
-              <circle cx="200" cy="136" r="46" fill="none" stroke={crimson} strokeWidth="2.5" strokeDasharray="5 3" />
-              <circle cx="200" cy="136" r="26" fill="#040507" stroke="#E0A55A" strokeWidth="1.5" />
-              <text x="200" y="206" textAnchor="middle" fontSize="10" fill="#F3ECE0" fontFamily="monospace">
-                COLLAPSED TO BLACK HOLE (IRREVERSIBLE)
-              </text>
-            </>
-          )}
-          <text x="200" y="272" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">
-            CLUSTERS LOST: {bStep}/3 · SILHOUETTE: {c ? 'EXPOSED' : 'COVERED'}
-          </text>
-        </svg>
-      );
-
-    case 9: // F10: Kail, Syrin, and the Sky Beyond the Blood Ring
-      return (
-        <svg viewBox="0 0 400 300" className="h-full w-full" role="img" aria-label="F10 Horizon and Pitch-Black Sky">
-          {!b ? (
-            <>
-              <rect x="52" y="46" width="296" height="186" fill="#EAE0CA" stroke={ink} strokeWidth="1.6" />
-              <circle cx="155" cy="136" r="30" fill="#D5C8B2" stroke={ink} strokeWidth="1.6" />
-              <circle cx="248" cy="136" r="30" fill="#D5C8B2" stroke={ink} strokeWidth="1.6" />
-              <line x1="155" y1="136" x2="248" y2="136" stroke={cyan} strokeWidth={a ? 3 : 1} />
-              <text x="200" y="210" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">
-                KAIL &amp; SYRIN · ARCHITECTURAL PLATE
-              </text>
-            </>
-          ) : (
-            <>
-              <rect x="44" y="42" width="312" height="132" fill="#0B0D12" stroke={ink} strokeWidth="1.6" />
-              {/* Solid pitch-black sky streak — NO wireframe grid */}
-              <polygon points="44,108 356,92 356,112 44,124" fill="#000000" />
-              <rect x="44" y="174" width="312" height="68" fill="#D6C9B1" stroke={ink} strokeWidth="1.6" />
-              <circle cx="164" cy="174" r="10" fill={ink} />
-              <circle cx="236" cy="174" r="10" fill={ink} />
-              <text x="200" y="220" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">
-                PITCH-BLACK SKY STREAK · SILHOUETTES AT HORIZON
-              </text>
-            </>
-          )}
-          <text x="200" y="274" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">
-            {c ? 'KAIL DISMISSED — WAR CONTINUES' : '170-YEAR VICTORY THRESHOLD'}
-          </text>
-        </svg>
-      );
-
-    case 10: // F11: Nacreous VI Level 3 (31 days post-war)
-      return (
-        <svg viewBox="0 0 400 300" className="h-full w-full" role="img" aria-label="F11 Nacreous VI Level 3">
-          {/* Barren floor surrounding cylinder */}
-          <rect x="44" y="46" width="312" height="190" fill="#D6CBB7" stroke={ink} strokeWidth="1.6" />
-          <line x1="44" y1="196" x2="356" y2="196" stroke="#9B907E" strokeWidth="1.5" />
-          {/* Forearm-sized glass loam cylinder */}
-          <rect x="176" y="92" width="48" height="104" rx="6" fill="#DCECF0" stroke={ink} strokeWidth="2" opacity="0.85" />
-          <rect x="180" y="160" width="40" height="34" fill="#46372C" />
-          <line x1="200" y1="160" x2="200" y2={b ? 114 : 132} stroke="#889852" strokeWidth="2.5" />
-          <text x="200" y="222" textAnchor="middle" fontSize="9" fill={ink} fontFamily="monospace">
-            SURROUNDING FLOOR BARREN · 31 DAYS POST-WAR
-          </text>
-          <text x="200" y="274" textAnchor="middle" fontSize="10" fill={ink} fontFamily="monospace">
-            {a ? 'PLAQUE: NACREOUS VI LEVEL 3' : 'ROTATED PLAQUE'} · {c ? 'SETTLED RESIDUE' : 'OBSERVATION'}
-          </text>
-        </svg>
-      );
-
-    default: // F12: The Unfinished Peace
-      return (
-        <svg viewBox="0 0 400 300" className="h-full w-full" role="img" aria-label="F12 The Unfinished Peace">
-          <rect x="48" y="48" width="136" height="176" fill="#E8DFCA" stroke={ink} strokeWidth="1.6" />
-          <text x="116" y="110" textAnchor="middle" fontSize="10" fontWeight="bold" fill={ink} fontFamily="monospace">
-            SYRIN &amp; MARCEL
-          </text>
-          <rect x="92" y="132" width="48" height="36" fill={b ? '#6F7A82' : cyan} stroke={ink} strokeWidth="1.5" />
-          <text x="116" y="192" textAnchor="middle" fontSize="9" fill={ink} fontFamily="monospace">
-            {b ? 'STARSILK INERT (DEAD-SWITCH)' : 'STARSILK LIVE'}
-          </text>
-
-          <rect x="216" y="48" width="136" height="176" fill="#E8DFCA" stroke={ink} strokeWidth="1.6" />
-          <text x="284" y="110" textAnchor="middle" fontSize="10" fontWeight="bold" fill={ink} fontFamily="monospace">
-            KAIL (PROSE MEMORIAL)
-          </text>
-          <text x="284" y="150" textAnchor="middle" fontSize="9" fill={slate} fontFamily="monospace">
-            {c ? 'PAGE TURNED TO REPOSE' : 'UNFINISHED SETTLEMENT'}
-          </text>
-          <text x="200" y="274" textAnchor="middle" fontSize="10" fill={brass} fontFamily="monospace">
-            {a ? 'PEACE PLAQUES DIVIDED' : 'TWO-PANEL PEACE RECORD'} · {ADMINISTRATION_SLOGAN}
-          </text>
-        </svg>
-      );
+            <text x={197+i*45} y="210" textAnchor="middle" fontSize="9" fill={ink}>{i===0?'IN':i===1?'GORE':i===2?'RING':'ORBIT'}</text>
+          </g>)}
+          <text x="262" y="235" textAnchor="middle" fontSize="9" fill={ink}>STAGE {f05Bay+1}/4: {manufacture[f05Bay]}</text>
+        </g> : <g>
+          <rect x="176" y="73" width="178" height="151" fill="#B9B4A9" stroke={ink} strokeWidth="2"/>
+          <path d="M180,126 L350,126 M180,168 L350,168" stroke={brass} strokeWidth="4"/>
+          <text x="265" y="146" textAnchor="middle" fill={ink} fontSize="11">CUTAWAY CLOSED</text>
+          <text x="265" y="188" textAnchor="middle" fill={ink} fontSize="9">OPERATE B TO INSPECT</text>
+        </g>}
+        <rect x="37" y="260" width="326" height="29" fill={c?pale:dark} stroke={brass}/>
+        <text x="200" y="278" textAnchor="middle" fontSize="10" fill={c?ink:pale}>{c?'ARCHIVE: DOCUMENTED PHYSICAL MANUFACTURE':'DRAKKEN: "Your sky is built from your dead."'}</text>
+      </g>; break;
+    case 5: // Long attrition: four periods, seven source-defined B steps, blank loss boxes.
+      drawing = <g>
+        <rect x="26" y="38" width="348" height="235" fill={pale} stroke={ink}/>
+        <circle cx="101" cy="132" r="67" fill={paper} stroke={ink} strokeWidth="2"/>
+        {f06Periods.map((per,i)=><g key={per}><line x1="101" y1="132" x2={101+Math.sin(i*Math.PI/2)*58} y2={132-Math.cos(i*Math.PI/2)*58} stroke={i===aStep?crimson:brass} strokeWidth={i===aStep?4:1.5}/></g>)}
+        <text x="101" y="217" textAnchor="middle" fill={ink} fontSize="9">YEARS {f06Periods[aStep%4]}</text>
+        <rect x="193" y="57" width="160" height="142" fill={paper} stroke={ink}/>
+        {sourceSpecimenMark(f06Id || '003',273,125)}
+        <text x="273" y="185" textAnchor="middle" fill={ink} fontSize="9">SPECIMEN {bStep+1}/7</text>
+        <text x="273" y="211" textAnchor="middle" fill={ink} fontSize="9">{f06Name}</text>
+        <rect x="35" y="232" width="326" height="33" fill={c?paper:'#C4C0B7'} stroke={ink}/>
+        {c ? <g>{['BIOSPHERE','INFRASTRUCTURE','DEATH TOTAL'].map((v,i)=><g key={v}><text x={38+i*108} y="245" fontSize="8" fill={ink}>{v}</text><rect x={38+i*108} y="248" width="99" height="11" fill={pale} stroke={slate}/></g>)}</g> : <text x="200" y="251" textAnchor="middle" fontSize="10" fill={ink}>CUMULATIVE-LOSS RECORD / FOLDED</text>}
+      </g>; break;
+    case 6: // Pharos Nebula siege, not portraits or mutiny.
+      drawing = <g>
+        <rect x="30" y="39" width="340" height="230" fill={pale} stroke={ink}/>
+        <text x="200" y="59" textAnchor="middle" fontSize="12" fill={ink}>YEAR 121 / PHAROS NEBULA</text>
+        {[82,159,237,315].map((x,i)=><circle key={i} cx={x} cy={i%2?148:112} r="14" fill={paper} stroke={ink}/>)}
+        {a && <g><path d="M69,121 L145,145 L222,119 L306,145" fill="none" stroke={cyan} strokeWidth="4"/><polygon points="306,145 295,137 295,149" fill={cyan}/><text x="200" y="88" textAnchor="middle" fill={ink} fontSize="9">TACTICAL OVERLAY / NOT TO SCALE</text></g>}
+        {b && <g>{[0,1,2,3,4,5].map(i=><g key={i}><rect x={84+i*37} y={170+(i%2)*12} width="18" height="23" fill={crimson}/><line x1={84+i*37} y1="163" x2={100+i*37} y2="193" stroke={dark} strokeWidth="2"/></g>)}<text x="200" y="218" textAnchor="middle" fill={crimson} fontSize="10">ATTRITION / STALLED SIEGE</text></g>}
+        {c && <g><rect x="48" y="226" width="304" height="38" fill={paper} stroke={brass}/><path d="M56,257 L130,248 L206,257 L283,248 L335,255" fill="none" stroke={crimson} strokeWidth="1.7"/><text x="200" y="240" textAnchor="middle" fill={ink} fontSize="9">SUPPORT ROUTES / LOSSES UNRECORDED</text></g>}
+        {!c && <text x="200" y="254" textAnchor="middle" fill={ink} fontSize="10">SUPPORT ROUTE PLATE CLOSED</text>}
+      </g>; break;
+    case 7: // Year 170 Aureal Gate, vulnerability, retreat; twenty nongeographic markers.
+      drawing = <g>
+        <rect x="28" y="37" width="344" height="228" fill={pale} stroke={ink}/>
+        <text x="200" y="57" textAnchor="middle" fontSize="12" fill={ink}>YEAR 170 / AUREAL GATE</text>
+        <path d={a?'M66,177 L66,90 L122,90 M278,90 L334,90 L334,177':'M66,177 L66,90 L334,90 L334,177'} stroke={dark} strokeWidth="16" fill="none"/>
+        <polygon points="200,89 228,135 200,175 172,135" fill={dark} stroke={brass} strokeWidth="2"/>
+        {a && <g><path d="M79,145 L320,145" stroke={cyan} strokeWidth="4"/><polygon points="315,145 303,137 303,153" fill={cyan}/><text x="200" y="194" textAnchor="middle" fill={ink} fontSize="9">WEAPONIZED STARSILK / VULNERABILITY</text></g>}
+        {b ? <g><path d="M151,135 A49 49 0 0 0 174 175 M221,175 A49 49 0 0 0 249 130" fill="none" stroke={crimson} strokeWidth="5"/><text x="200" y="214" textAnchor="middle" fill={ink} fontSize="9">DIVINE IMMUNITY ASSUMPTION FRACTURED</text></g> : <g><circle cx="200" cy="135" r="50" stroke={brass} strokeWidth="4" fill="none"/><text x="200" y="214" textAnchor="middle" fill={ink} fontSize="9">INVINCIBILITY ASSUMED</text></g>}
+        {c && <g><rect x="30" y="225" width="340" height="58" fill={paper} stroke={ink}/><path d="M42,252 L78,252" stroke={cyan} strokeWidth="3"/><polygon points="42,252 54,245 54,259" fill={cyan}/>{Array.from({length:20},(_,i)=><g key={i}><circle cx={102+(i%10)*25} cy={238+Math.floor(i/10)*21} r="7" fill={dark} stroke={crimson} strokeWidth="2"/></g>)}<text x="199" y="278" textAnchor="middle" fill={ink} fontSize="8">20 CONQUERED WORLDS / NON-GEOGRAPHIC</text></g>}
+      </g>; break;
+    case 8: // Model star, three cluster waves, boundary. Never historical actor.
+      drawing = <g>
+        <rect x="31" y="38" width="338" height="234" fill={pale} stroke={ink}/>
+        <text x="130" y="58" textAnchor="middle" fill={ink} fontSize="10">NONHISTORICAL MODEL STAR</text>
+        {a ? <g><circle cx="130" cy="131" r="33" fill="#050609" stroke={brass} strokeWidth="1"/><text x="130" y="184" textAnchor="middle" fontSize="9">BLACK HOLE / LOCKED</text></g> : <g><circle cx="130" cy="131" r="35" fill="#E8C36A" stroke={brass} strokeWidth="2"/><path d="M166,131 L205,131" stroke={cyan} strokeWidth="4"/><circle cx="207" cy="131" r="10" fill="none" stroke={cyan} strokeWidth="3"/><text x="130" y="184" textAnchor="middle" fontSize="9">INTACT STAR + FILAMENT</text></g>}
+        {[0,1,2].map((i)=><g key={i}><circle cx={244+i*47} cy="114" r="17" fill={i < bStep?'#050609':'#E9C96A'} stroke={ink} strokeWidth="1.5"/><text x={244+i*47} y="147" textAnchor="middle" fontSize="8">WAVE {i+1}</text></g>)}
+        <text x="284" y="177" textAnchor="middle" fontSize="9" fill={ink}>CLUSTER STAGES {bStep}/3</text>
+        {c && <g><ellipse cx="202" cy="231" rx="139" ry="23" fill="none" stroke={dark} strokeWidth="4"/>{[0,1,2,3,4,5].map(i=><circle key={i} cx={74+i*52} cy={231+(i%2)*10} r="5" fill="#080A0B"/>)}<text x="200" y="262" textAnchor="middle" fontSize="9" fill={ink}>SINGULARITY CONTAINMENT BOUNDARY</text></g>}
+        {!c && <text x="200" y="261" textAnchor="middle" fontSize="9" fill={ink}>FOLDED CONTAINMENT PLAN</text>}
+      </g>; break;
+    case 9: // A engineering boundary; B inhabited-world sky; C protocols.
+      drawing = <g>
+        {b ? <g><rect x="30" y="39" width="340" height="142" fill="#0B0D12" stroke={ink}/>{[[76,67],[153,75],[250,58],[326,76],[90,154],[290,146]].map(([x,y],i)=><circle key={i} cx={x} cy={y} r="1.9" fill="#C7CDD4"/>)}<polygon points="30,103 370,90 370,115 30,127" fill="#000000"/><path d="M30,196 Q200,157 370,196 L370,234 L30,234 Z" fill="#B9B4A7" stroke={ink}/><text x="200" y="218" textAnchor="middle" fill={ink} fontSize="11">INHABITED HORIZON</text><text x="200" y="251" textAnchor="middle" fill={ink} fontSize="10">PITCH-BLACK SKY STREAK / SOLID DARK ABSENCE</text></g> : <g><rect x="30" y="39" width="340" height="213" fill={paper} stroke={ink}/><text x="200" y="59" textAnchor="middle" fontSize="11" fill={ink}>SIEGE WALL / ENGINEERING SCHEMATIC</text><path d="M70,206 Q200,80 330,206" fill="none" stroke={a?dark:brass} strokeWidth={a?12:6}/>{[0,1,2,3,4,5,6,7].map(i=><circle key={i} cx={70+i*37} cy={206-Math.sin(i/7*Math.PI)*86} r="5" fill="#070909"/>)}<text x="200" y="236" textAnchor="middle" fontSize="9" fill={ink}>CONTAINED INTERIOR / QUARANTINE EXTERIOR</text></g>}
+        {c && <g><rect x="60" y="259" width="280" height="31" fill={pale} stroke={crimson} strokeWidth="2"/><text x="200" y="272" textAnchor="middle" fill={crimson} fontSize="10">POSTWAR PROTOCOLS / PROHIBITED</text><text x="200" y="283" textAnchor="middle" fill={ink} fontSize="8">HELIOCIDE REPLICATION & STUDY</text></g>}
+      </g>; break;
+    case 10: // Tiny life contained; inspect without greening crater or enlarging living specimen.
+      drawing = <g>
+        <rect x="30" y="38" width="340" height="228" fill="#C4B9A5" stroke={ink}/>
+        <path d="M35,216 L115,192 L186,223 L252,187 L367,219" fill="none" stroke="#6C645E" strokeWidth="7"/>
+        <rect x="172" y="120" width="56" height="93" rx="9" fill="#D1E4E5" stroke={ink} strokeWidth="2" opacity="0.9"/>
+        <rect x="179" y="184" width="42" height="26" fill="#42392F"/>
+        <path d="M201,183 L201,162 M201,173 Q193,163 188,167 M201,170 Q210,161 216,164" stroke="#889553" strokeWidth="2.5" fill="none"/>
+        <text x="200" y="236" textAnchor="middle" fill={ink} fontSize="9">NACREOUS VI / BARREN OUTSIDE GLASS</text>
+        {a && <g><rect x="34" y="45" width="122" height="125" fill={pale} stroke={brass} strokeWidth="2.5"/><text x="95" y="60" textAnchor="middle" fill={ink} fontSize="9">OPTICAL INSET</text><rect x="55" y="106" width="80" height="47" fill="#463B31"/><path d="M98,107 L98,75 M98,93 Q80,81 74,85 M98,86 Q112,72 120,78" stroke="#7D954B" strokeWidth="4" fill="none"/><path d="M156,157 L176,151" stroke={brass} strokeWidth="2" strokeDasharray="3 3"/></g>}
+        <rect x="33" y="246" width="334" height="39" fill={paper} stroke={ink}/>
+        {b ? <g><text x="200" y="260" textAnchor="middle" fontSize="9">PRESERVATION MACRO / FILTERED LOAM</text><path d="M76,269 L324,269" stroke="#8E9E6E" strokeWidth="3"/><circle cx="200" cy="269" r="7" fill="#76965E"/></g> : <g><text x="200" y="260" textAnchor="middle" fontSize="9">WARTIME MACRO / WEAPON ARRAY</text><path d="M76,269 L130,263 L184,278 L238,261 L324,269" stroke={crimson} strokeWidth="3" fill="none"/></g>}
+        {c && <g><rect x="25" y="80" width="350" height="125" fill={pale} stroke={brass} strokeWidth="2"/><text x="200" y="96" textAnchor="middle" fontSize="9">SHARD-GOD TO CODEC / ATTRIBUTED SOURCE</text><text x="200" y="119" textAnchor="middle" fontSize="10">Your private discomfort with the shape</text><text x="200" y="136" textAnchor="middle" fontSize="10">of survival is not a license to revise</text><text x="200" y="153" textAnchor="middle" fontSize="10">the settlement.</text></g>}
+      </g>; break;
+    default: // F12 archival leaf, no invented dates or numbers.
+      drawing = <g>
+        <rect x="30" y="38" width="340" height="231" fill={pale} stroke={ink}/>
+        <rect x={a?39:89} y="57" width="168" height="45" fill={paper} stroke={brass}/>
+        <rect x={a?192:145} y="93" width="174" height="45" fill="#4B535E" stroke={ink}/>
+        <text x={a?123:173} y="76" textAnchor="middle" fontSize="9" fill={ink}>CONTAINMENT ACHIEVED</text>
+        <text x={a?279:232} y="112" textAnchor="middle" fontSize="9" fill={pale}>HARM NOT ENDED</text>
+        <rect x="58" y="155" width="106" height="68" fill={paper} stroke={ink}/>
+        <path d="M73,183 Q100,162 127,183 Q101,207 73,183" fill="none" stroke={b?slate:cyan} strokeWidth="5"/>
+        <rect x="116" y="176" width="25" height="13" fill={crimson} stroke={ink}/>
+        <text x="111" y="215" textAnchor="middle" fontSize="9" fill={ink}>STARSILK {b?'INERT':'ACTIVE'}</text>
+        {c ? <g><rect x="174" y="153" width="187" height="88" fill={paper} stroke={brass} strokeWidth="2"/><text x="266" y="169" textAnchor="middle" fontSize="10" fill={ink}>SYRIN 4 / ARCHIVAL RECORD</text><text x="266" y="188" textAnchor="middle" fontSize="9" fill={ink}>DESTRUCTION DOCUMENTED</text><text x="266" y="204" textAnchor="middle" fontSize="9" fill={ink}>KAIL / LAST SURVIVING INITIATE</text><text x="266" y="222" textAnchor="middle" fontSize="8" fill={slate}>DATES & TOTALS: UNRECORDED</text></g> : <g><rect x="180" y="160" width="170" height="78" fill="#BAC2C6" stroke={ink}/><text x="265" y="199" textAnchor="middle" fontSize="10" fill={ink}>ARCHIVAL LEAF SEALED</text></g>}
+        <text x="200" y="264" textAnchor="middle" fontSize="9" fill={ink}>{ADMINISTRATION_SLOGAN}</text>
+      </g>;
   }
+  return <svg viewBox="0 0 400 300" className="h-full w-full" role="img" aria-label={`${manifest.code}: ${status}`}>
+    <title>{`${manifest.code} - ${manifest.title} - historical teaching schematic`}</title>
+    <desc>{status}</desc>
+    <rect width="400" height="300" fill="#F3ECD9" />
+    {drawing}
+  </svg>;
 }
 
 export function NonWebglFolioView({
@@ -378,6 +342,9 @@ export function NonWebglFolioView({
           <div className="mt-2 aspect-4/3 w-full rounded border border-[#1F2329]/25 bg-[#F3ECD9] p-2">
             {renderFolioSvg(snapshot)}
           </div>
+          <p className="mt-2 text-[10px] leading-relaxed text-[#364657]" role="status" aria-live="polite" aria-atomic="true">
+            {getFolioVisualStatus(snapshot)}
+          </p>
         </div>
 
         {/* Interactive Text Equivalents & Mechanisms */}
