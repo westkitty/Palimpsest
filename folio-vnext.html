@@ -55,6 +55,8 @@
     .action-tag{display:inline-block;color:#8ee2f2;margin-right:5px;padding:2px 5px;border:1px solid rgba(111,201,226,.3);background:#0e1926}
     .instrument-bottom{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:9px;padding-top:10px;border-top:1px solid rgba(140,166,184,.18)}
     .instrument-bottom button.primary{background:#2a4655;border-color:#79b9cb}
+    #witness{background:linear-gradient(120deg,#423b2c,#1c323d);border-color:#c0a16b;color:#f6e8c5;box-shadow:inset 0 1px #e5c99928}
+    #witness:hover{border-color:#e5c88d}
     .instrument-bottom .spacer{flex:1}
     #mechanism-status{font:11px/1.5 ui-monospace,monospace;color:#9dc9d4;margin:8px 0 0}
     #folio-description{font-size:12px;line-height:1.57;margin:0;color:#c4ced2}
@@ -147,7 +149,7 @@
         <div class="window-head"><button class="drag-grip" data-panel-handle type="button" aria-label="Move camera guide. Drag or use arrow keys; Home restores."><span class="grip-mark" aria-hidden="true">⠿</span>CAMERA &amp; INSPECTION · MOVE</button><button class="fold-button" data-panel-fold type="button" aria-expanded="true" aria-controls="field-panel-body">−</button></div>
         <div class="panel-body" id="field-panel-body" data-panel-content>
           <p class="panel-text">The lesson is written in folded paper. Its smaller details are discovered by approaching the sculpture.</p>
-          <div class="direction"><div><b>ORBIT</b>Drag / swipe</div><div><b>ZOOM</b>Wheel / pinch</div><div><b>REPOSITION VIEW</b>Shift + drag / right drag</div><div><b>PAGES</b>← / →</div><div><b>MECHANISMS</b>A · B · C</div><div><b>MINIATURE</b>M · WASD</div><div><b>INSPECT</b>I · close view</div></div>
+          <div class="direction"><div><b>ORBIT</b>Drag / swipe</div><div><b>ZOOM</b>Wheel / pinch</div><div><b>REPOSITION VIEW</b>Shift + drag / right drag</div><div><b>PAGES</b>← / →</div><div><b>MECHANISMS</b>A · B · C</div><div><b>MINIATURE</b>M · WASD</div><div><b>INSPECT</b>I · close view</div><div><b>ENTER THE ALL</b>G · after C on F02</div></div>
         </div>
       </section>
       <section class="window" data-panel-id="notes" data-mobile-fold="true" aria-label="Folio description and mechanism status">
@@ -159,7 +161,7 @@
         <div class="panel-body" id="instruments-panel-body" data-panel-content>
           <div class="instruments-shell"><div class="folio-controls" aria-label="Page navigation"><button id="prev" type="button" disabled>← Prev</button><span class="chapter-tag" id="folio-progress">F01 / F03</span><button id="next" type="button">Next →</button></div>
             <div class="interaction-buttons" role="group" aria-label="Physical paper mechanisms"><button type="button" data-mechanism="A" aria-pressed="false">A · Lift the three paper leaves</button><button type="button" data-mechanism="B" aria-pressed="false">B · Inspect folded detail</button><button type="button" data-mechanism="C" aria-pressed="false">C · Compare roles</button></div></div>
-          <div class="instrument-bottom"><button id="mini" type="button" class="primary" aria-pressed="false">Enter miniature inspection (M)</button><button id="inspect" type="button" disabled>Inspect (I)</button><div class="spacer"></div>
+          <div class="instrument-bottom"><button id="mini" type="button" class="primary" aria-pressed="false">Enter miniature inspection (M)</button><button id="inspect" type="button" disabled>Inspect (I)</button><button id="witness" type="button" aria-pressed="false" hidden>Enter the All (G)</button><div class="spacer"></div>
             <div class="move-controls" aria-label="Miniature movement buttons"><button data-move="w" type="button" aria-label="Move forward">↑</button><button data-move="a" type="button" aria-label="Move left">←</button><button data-move="s" type="button" aria-label="Move backward">↓</button><button data-move="d" type="button" aria-label="Move right">→</button></div>
           </div>
         </div>

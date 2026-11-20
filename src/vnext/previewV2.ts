@@ -24,6 +24,7 @@ const prevButton = byId<HTMLButtonElement>('prev');
 const nextButton = byId<HTMLButtonElement>('next');
 const miniButton = byId<HTMLButtonElement>('mini');
 const inspectButton = byId<HTMLButtonElement>('inspect');
+const witnessButton = byId<HTMLButtonElement>('witness');
 const fallback = byId<HTMLElement>('webgl-fallback');
 const moveButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-move]'));
 const actionButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-mechanism]'));
@@ -73,8 +74,15 @@ let secretTarget: THREE.Vector3 | null = null;
 let paperHinges: THREE.Group[] = [];
 let f01DetailMarks: THREE.Group[] = [];
 let galaxyLayers: {group: THREE.Group; stage: 1 | 2 | 3}[] = [];
+let galaxyPaperLoom: THREE.Group | null = null;
+let witnessActive = false;
+let witnessCamera: {position: THREE.Vector3; target: THREE.Vector3} | null = null;
+type CameraFlight = {from: THREE.Vector3; to: THREE.Vector3; lookFrom: THREE.Vector3; lookTo: THREE.Vector3; elapsed: number; seconds: number; destination: 'witness' | 'overhead'};
+let cameraFlight: CameraFlight | null = null;
 let vaultLeaf: THREE.Group | null = null;
 let sourceWheel: THREE.Group | null = null;
+let programDie: THREE.Group | null = null;
+let printPulse = 0;
 let planets: THREE.Group | null = null;
 let textTextures: THREE.Texture[] = [];
 let activeMove = new Set<string>();
@@ -314,6 +322,60 @@ function spiralInstances(group:THREE.Group,count:number,rad:number,depth:number,
   }
   m.instanceMatrix.needsUpdate=true;group.add(m);
 }
+/**
+ * The All exists as paper: four suspended die-cut spiral ribbons, each physically
+ * raised from a V-fold at the rear of the open book. Editorial sculpture, not a
+ * claim that the universe has four arms or that Zentrum is its geometric center.
+ */
+function buildAllPaperLoom(root: THREE.Object3D): THREE.Group {
+  const loom = new THREE.Group();
+  loom.position.set(0,0.24,-1.92);
+  root.add(loom);
+  const colors = [shared.bone, shared.cyan, shared.backing, shared.gold];
+  for (let arm=0;arm<4;arm++) {
+    const vertices:number[]=[];
+    const indices:number[]=[];
+    const edgePath:THREE.Vector3[]=[];
+    const sections=86;
+    for (let j=0;j<=sections;j++) {
+      const t=j/sections;
+      const a=arm*Math.PI/2+t*Math.PI*2.85;
+      const radius=0.15+2.94*Math.pow(t,0.80);
+      const x=Math.cos(a)*radius;
+      const z=Math.sin(a)*radius*0.45;
+      const y=0.13+2.15*t;
+      const width=0.018+0.085*t;
+      vertices.push(x-width,y,z,x+width,y,z);
+      edgePath.push(new THREE.Vector3(x+width,y+0.012,z));
+      if(j<sections) {
+        const q=2*j;
+        indices.push(q,q+1,q+2,q+1,q+3,q+2);
+      }
+    }
+    const geometry=new THREE.BufferGeometry();
+    geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+    geometry.setIndex(indices);geometry.computeVertexNormals();
+    const strip=put(loom,geometry,colors[arm]);strip.receiveShadow=true;
+    const curve=new THREE.CatmullRomCurve3(edgePath);
+    put(loom,new THREE.TubeGeometry(curve,116,0.009,3,false),arm%2?shared.gold:shared.cyan);
+    // Tiny registration diamonds printed on the rising cardstock, not new star bodies.
+    for(let j=9;j<84;j+=15){
+      const v=edgePath[j];
+      const marker=put(loom,new THREE.OctahedronGeometry(0.045+j*0.00055,0),shared.bone,v.x,v.y+0.04,v.z);
+      marker.rotation.z=j*0.09;
+    }
+  }
+  // Physical rear fold feet connect the rising star-lace to the actual manuscript.
+  for(let i=0;i<7;i++){
+    const x=-3.3+i*1.1;
+    slab(loom,0.15,0.03,0.90,shared.backing,x,0.12,-0.18);
+    slab(loom,0.11,0.035,0.55,shared.gold,x,0.19,-0.48).rotation.x=-0.42;
+  }
+  loom.scale.y=0.001;
+  loom.visible=false;
+  return loom;
+}
+
 function buildF02():void {
   const root=book();
   const frame=cutArch(root,0,-2.66,7.85,2.0,shared.navy);
@@ -347,6 +409,7 @@ function buildF02():void {
     }
     galaxyLayers.push({group:leaf,stage});
   }
+  galaxyPaperLoom=buildAllPaperLoom(root);
   // An architectural landmark, intentionally not placed at the literal center of all space.
   platform(root,-2.30,0.55,1.79);
   for(const r of [0.29,0.48,0.63]){const g=ring(root,r,0.018,shared.brass,-2.30,0.83,0.27);g.rotation.z=r*0.65;}
@@ -409,12 +472,33 @@ function buildF03():void {
     const a=(j/9)*Math.PI*2;
     slab(sourceWheel,0.035,0.018,0.13,shared.bone,Math.sin(a)*0.64,0.185,Math.cos(a)*0.64).rotation.y=a;
   }
+  // A visible print die makes source-to-world inheritance tangible. Its movement is
+  // an educational analogy only: not a newly declared canonical Notebook mechanism.
+  programDie=new THREE.Group();programDie.position.set(0,0.51,-0.15);root.add(programDie);
+  const dieStem=put(programDie,new THREE.CylinderGeometry(0.13,0.17,0.43,10),shared.navy,0,0.39,0);
+  dieStem.castShadow=true;
+  slab(programDie,0.58,0.06,0.58,shared.bone,0,0.17,0);
+  for(const edge of [-0.25,0.25])slab(programDie,0.04,0.045,0.58,shared.gold,edge,0.215,0);
+  plaque(programDie,'SOURCE',0,0.236,0,0.40,true);
   const loom=paperHinge(root,0,-1.65,1.94,1.98,shared.paper);paperHinges.push(loom);
   plaque(root,'TEMPLATES TO WORLDS',0,0.34,1.15,2.30);
   planets=new THREE.Group();root.add(planets);
   redrawPlanets();
   plaque(root,'CONTROLLED VARIATION',2.68,0.25,1.40,2.30);
   for(const x of [-3.95,3.95])filigree(root,x,0.26,2.09,0.15,shared.gold);
+  // Three folded transmission bands show a shared inherited source, not spontaneous creation.
+  for(let i=0;i<3;i++){
+    const destX=1.63+i*1.06;
+    const ribbon=new THREE.Group();ribbon.position.set(0.70,0.29,-0.16+i*0.17);root.add(ribbon);
+    const points=[new THREE.Vector3(0,0,0),new THREE.Vector3(0.42,0.36,0.08),new THREE.Vector3(destX-0.83,0.10,0.03),new THREE.Vector3(destX-0.70,0.01,0.03)];
+    const curve=new THREE.CatmullRomCurve3(points);
+    put(ribbon,new THREE.TubeGeometry(curve,26,0.012,3,false),i===1?shared.cyan:shared.brass);
+    for(let k=0;k<3;k++){
+      const point=curve.getPoint((k+1)/4);
+      const tab=slab(ribbon,0.09,0.024,0.13,shared.paper,point.x,point.y,point.z);
+      tab.rotation.z=-0.31;
+    }
+  }
   // Folded compiler guide rails connect the archived source to the resulting models.
   for(const z of [-0.74,0.23]){
     slab(root,2.16,0.035,0.044,shared.gold,0.65,0.28,z);
@@ -466,7 +550,7 @@ function clear():void {
   disposeSubtree(rig);
   for(const texture of textTextures)texture.dispose();
   textTextures=[];rig.clear();
-  focusText=null;secretTarget=null;paperHinges=[];f01DetailMarks=[];galaxyLayers=[];vaultLeaf=null;sourceWheel=null;planets=null;
+  focusText=null;secretTarget=null;paperHinges=[];f01DetailMarks=[];galaxyLayers=[];galaxyPaperLoom=null;vaultLeaf=null;sourceWheel=null;programDie=null;printPulse=0;planets=null;
   discovered=false;
 }
 function updateNav():void {
@@ -486,6 +570,7 @@ function updateNav():void {
       slot==='A'?state.f03.vaultOpen:slot==='B'?state.f03.template>0:state.f03.generation>0;
     btn.setAttribute('aria-pressed',String(on));
   }
+  setWitnessButton();
   indicator.textContent=state.folio===1?`Stellar assembly: ${state.f02.reveal} / 3 stages`:
     state.folio===2?`Source plate: ${state.f03.template+1} / 3  ·  Variation: ${state.f03.generation}`:
     `Physical folds: ${state.f01.fold?'opened':'closed'}  ·  Details: ${state.f01.detail?'shown':'folded'}`;
@@ -515,11 +600,23 @@ function animate(dt:number):void {
       group.scale.y=smooth(group.scale.y,open?1:0.001,dt);
       if(!open&&group.scale.y<0.02)group.visible=false;
     }
+    if(galaxyPaperLoom){
+      const expanded=state.f02.reveal===3;
+      if(expanded)galaxyPaperLoom.visible=true;
+      galaxyPaperLoom.scale.y=smooth(galaxyPaperLoom.scale.y,expanded?1:0.001,dt);
+      if(!expanded&&galaxyPaperLoom.scale.y<0.018)galaxyPaperLoom.visible=false;
+    }
     if(paperHinges[0])paperHinges[0].rotation.x=smooth(paperHinges[0].rotation.x,state.f02.reveal>0?-0.24:0,dt);
   } else {
     if(vaultLeaf)vaultLeaf.rotation.x=smooth(vaultLeaf.rotation.x,state.f03.vaultOpen?-0.81:0,dt);
     if(paperHinges[1])paperHinges[1].rotation.x=smooth(paperHinges[1].rotation.x,-0.47,dt);
     if(sourceWheel)sourceWheel.rotation.y=smooth(sourceWheel.rotation.y,-(state.f03.template*Math.PI*2)/3,dt);
+    if(programDie){
+      const phase=printPulse;
+      const displacement=(!reducedMotion&&phase>0)?Math.sin((1-phase)*Math.PI)*0.23:0;
+      programDie.position.y=0.51-displacement;
+      printPulse=Math.max(0,printPulse-dt/0.82);
+    }
   }
 }
 function handleAction(slot:Slot):void {
@@ -527,7 +624,9 @@ function handleAction(slot:Slot):void {
     announce('Return to the book overview before operating a paper mechanism.');return;
   }
   const before=state;state=activateSlot(state,slot);
-  if(state.folio===2&&(slot==='B'||slot==='C'))redrawPlanets();
+  if(state.folio===2&&(slot==='B'||slot==='C')){
+    redrawPlanets();if(slot==='C')printPulse=reducedMotion?0:1;
+  }
   updateNav();
   if(state.folio===1)announce(`Stellar assembly now shows stage ${state.f02.reveal} of 3.`);
   else if(state.folio===2)announce(`Source plate ${state.f03.template+1}; bounded variation ${state.f03.generation}.`);
@@ -535,12 +634,63 @@ function handleAction(slot:Slot):void {
   if(before===state)throw Error('Folio state failed to advance');
 }
 function announce(s:string):void {status.textContent=s;globalAnnouncer.textContent=s;}
-function resetCamera():void {
+function setWitnessButton():void {
+  const available=Boolean(renderer && state.folio===1 && state.f02.reveal===3 && inspection==='overview');
+  witnessButton.hidden=!available;
+  witnessButton.setAttribute('aria-pressed',String(witnessActive));
+  witnessButton.textContent=witnessActive?'Return to the page (G)':'Enter the All (G)';
+}
+function beginFlight(to: THREE.Vector3, lookTo: THREE.Vector3, destination: 'witness'|'overhead'):void {
   if(!controls)return;
+  const from=camera.position.clone();
+  const lookFrom=controls.target.clone();
+  cameraFlight={from,to,lookFrom,lookTo,elapsed:0,seconds:reducedMotion?0:2.25,destination};
+  controls.enabled=false;
+  if(reducedMotion)advanceFlight(1);
+}
+function advanceFlight(dt:number):void {
+  if(!cameraFlight || !controls)return;
+  const f=cameraFlight;
+  f.elapsed=Math.min(f.seconds, f.elapsed+dt);
+  const t=f.seconds===0?1:THREE.MathUtils.clamp(f.elapsed/f.seconds,0,1);
+  const eased=t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+  camera.position.copy(f.from).lerp(f.to,eased);
+  controls.target.copy(f.lookFrom).lerp(f.lookTo,eased);
+  controls.update();
+  if(t>=1){
+    const inside=f.destination==='witness';
+    controls.minDistance=inside?0.48:1.2;
+    controls.maxDistance=inside?9:19;
+    controls.maxPolarAngle=inside?Math.PI-0.12:1.51;
+    controls.enabled=true;
+    cameraFlight=null;
+  }
+}
+function toggleWitness():void {
+  if(!renderer||!controls||inspection!=='overview'||state.folio!==1||state.f02.reveal!==3)return;
+  if(!witnessActive){
+    witnessCamera={position:camera.position.clone(),target:controls.target.clone()};
+    witnessActive=true;
+    beginFlight(new THREE.Vector3(1.12,1.75,1.05),new THREE.Vector3(0,1.36,-1.83),'witness');
+    announce('Entering the paper galaxy. The first stars are held between the folds of the book. Return with G.');
+  }else{
+    witnessActive=false;
+    beginFlight(witnessCamera?.position.clone()??new THREE.Vector3(0,6.5,9.9),witnessCamera?.target.clone()??new THREE.Vector3(0,0.25,0),'overhead');
+    witnessCamera=null;
+    announce('Returning to the open book.');
+  }
+  setWitnessButton();
+}
+function resetCamera():void {
+  cameraFlight=null;witnessActive=false;witnessCamera=null;
+  if(!controls)return;
+  controls.enabled=true;
   camera.position.set(0,6.5,9.9);controls.target.set(0,0.25,0);
   controls.minDistance=1.2;controls.maxDistance=19;controls.maxPolarAngle=1.51;controls.update();
 }
 function enterMini():void {
+  cameraFlight=null;witnessActive=false;witnessCamera=null;
+  if(controls)controls.enabled=true;
   inspection='miniature';discovered=false;
   if(focusText)focusText.visible=false;
   if(controls){
@@ -649,13 +799,17 @@ function nextFolio(direction:number):void {
 }
 function handleKeys(event:KeyboardEvent):void {
   const target=event.target as HTMLElement;
-  if(target.closest('button,input,textarea,select,[contenteditable]'))return;
   const k=event.key.toLowerCase();
+  // Escape is a universal exit, including when a movable panel button owns focus.
+  if(k==='escape' && witnessActive){toggleWitness();return;}
+  if(k==='escape' && inspection!=='overview'){leaveMini();return;}
+  if(target.closest('button,input,textarea,select,[contenteditable]'))return;
   if(['arrowleft','arrowright','a','b','c','m','i','w','s','d'].includes(k)&&event.target===canvas)event.preventDefault();
   if(event.repeat&&['m','i','arrowleft','arrowright','a','b','c'].includes(k))return;
   if(k==='arrowleft'&&inspection==='overview')nextFolio(-1);
   else if(k==='arrowright'&&inspection==='overview')nextFolio(1);
   else if(k==='m')toggleMini();
+  else if(k==='g')toggleWitness();
   else if(k==='i')inspect();
   else if(['a','b','c'].includes(k)&&inspection==='overview')handleAction(k.toUpperCase() as Slot);
   else if(['w','a','s','d'].includes(k)&&inspection!=='overview')activeMove.add(k);
@@ -672,6 +826,7 @@ function wireButtons():void {
   nextButton.addEventListener('click',()=>nextFolio(1));
   miniButton.addEventListener('click',toggleMini);
   inspectButton.addEventListener('click',inspect);
+  witnessButton.addEventListener('click',toggleWitness);
   for(const b of actionButtons)b.addEventListener('click',()=>handleAction(b.dataset.mechanism as Slot));
   for(const b of moveButtons){
     const dir=b.dataset.move??'';
@@ -722,7 +877,7 @@ try{
   function step(now:number):void {
     const dt=lastTime?Math.min(0.06,(now-lastTime)/1000):0;
     lastTime=now;
-    animate(dt);moveMini(dt);revealTick();controls?.update();renderer?.render(scene,camera);
+    animate(dt);moveMini(dt);advanceFlight(dt);revealTick();controls?.update();renderer?.render(scene,camera);
     frame=requestAnimationFrame(step);
   }
   frame=requestAnimationFrame(step);

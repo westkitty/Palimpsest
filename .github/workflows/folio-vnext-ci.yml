@@ -29,7 +29,20 @@ jobs:
         run: bun test tests/folio-logic.test.mjs
       - name: Verify movable interface, papercraft and canon boundaries
         run: node tests/panel-layout-contract.test.cjs
+      - name: Verify fold-to-cosmos signature and user agency
+        run: node tests/awe-signature.test.cjs
       - name: Build both PALIMPSEST pages
         run: bun run build
       - name: Verify both release artifacts are present
         run: test -s dist/index.html && test -s dist/folio-vnext.html
+      - name: Prepare ephemeral Chromium smoke test
+        run: |
+          npm install --no-save --ignore-scripts playwright
+          npx playwright install --with-deps chromium
+      - name: Exercise the built 3D folio and original site
+        run: |
+          bunx vite preview --host 127.0.0.1 --port 4173 > /tmp/palimpsest-preview.log 2>&1 &
+          PREVIEW_PID=$!
+          trap 'kill $PREVIEW_PID || true' EXIT
+          node tests/browser-vnext-smoke.mjs
+

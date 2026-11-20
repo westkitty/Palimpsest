@@ -42,3 +42,11 @@ bun run build
 View `folio-vnext.html` through the Vite dev/preview server. The existing `index.html`, original folios F01–F12, source manuscript, narration, DRAXIS models, source approver ledger, save/session schema and non-WebGL reader are untouched.
 
 **Remaining verification:** full application TypeScript and bundle CI at the new revision, real WebGL render inspection on desktop and mobile, repeated life-cycle and GPU disposal runs, 3D view controls under pointer/touch in the actual app, and separate narrator/manuscript approvals prior to replacing the canonical folios. Do not interpret green source tests as complete visual playtest approval.
+
+## Signature interaction — The Fold That Contains the All
+
+On F02, operate A, then B, then C. The optional **Enter the All (G)** instrument appears only after the galactic paper structures are fully unfolded. Activate it to view the anchored cardstock stellar forms from within; choose **Return to the page (G)** or press Escape to recover the exact prior camera. Reduced-motion preference snaps directly rather than animating a cinematic move. This is an educational-scale interpretation, not a new source claim about the shape of the actual All. The public narrator remains absent and unaware of maker inscriptions.
+
+On F03, triggering C advances bounded variation and gives the paper source die a short, non-flashing physical press animation. It adds no new planets or events to canon.
+
+Regression: `node tests/awe-signature.test.cjs` in addition to the prior source/folio/dock checks. Browser proof must still inspect actual geometry, keyboard/touch and hidden testimony after deployment.
