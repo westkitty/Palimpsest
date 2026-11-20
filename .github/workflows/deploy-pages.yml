@@ -33,6 +33,9 @@ jobs:
       - name: Type-check application
         run: bun run lint
 
+      - name: Verify F01-F03 preview direction contract
+        run: node tests/folio-vnext-preview.test.cjs
+
       - name: Build production bundle
         run: bun run build
 

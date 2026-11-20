@@ -4,6 +4,8 @@ An interactive twelve-folio Three.js pop-up book presenting an Administration in
 
 **Live Deployment:** https://westkitty.github.io/Palimpsest/
 
+**Unnarrated F01–F03 concept preview:** https://westkitty.github.io/Palimpsest/folio-vnext.html — a separate review route, not yet an approved replacement for the original twelve-folio reader.
+
 ## Overview
 
 - **Twelve Historical Folios (`F01`–`F12`)**: Chronicles the initialization of reality, the Triarchic Order, Mother & the 170-Year Blood Eclipse War, the Siege of the Ruby Eclipse, the Aureal Gate, the Hal'Ven Heliocide, the Siege Wall & Postwar Protocols, Nacreous VI, and the unfinished postwar peace ending with *"Your fate is in our hands."*
