@@ -125,6 +125,37 @@ let activeMove = new Set<string>();
 let authoredFigureCount = 0;
 const clockDirection = new THREE.Vector3();
 const cursorToSecret = new THREE.Vector3();
+const mechanismRaycaster = new THREE.Raycaster();
+const mechanismPointer = new THREE.Vector2();
+let paperTap: {id:number;x:number;y:number} | null = null;
+function onPaperPointerDown(e:PointerEvent):void {
+  if(currentFolio>=FIRST_LATER_FOLIO && inspection==='overview' && e.isPrimary)
+    paperTap={id:e.pointerId,x:e.clientX,y:e.clientY};
+}
+function onPaperPointerCancel():void {paperTap=null;}
+function onPaperPointerUp(e:PointerEvent):void {
+  const tap=paperTap;paperTap=null;
+  if(!tap || tap.id!==e.pointerId || !laterWorld || inspection!=='overview')return;
+  if(Math.hypot(e.clientX-tap.x,e.clientY-tap.y)>9)return;
+  const box=canvas.getBoundingClientRect();
+  if(box.width<1||box.height<1)return;
+  mechanismPointer.set((e.clientX-box.left)/box.width*2-1,-((e.clientY-box.top)/box.height*2-1));
+  mechanismRaycaster.setFromCamera(mechanismPointer,camera);
+  const targets=laterWorld.getInteractables();
+  const hits=mechanismRaycaster.intersectObjects(targets,true);
+  for(const hit of hits){
+    let obj:THREE.Object3D|null=hit.object;
+    while(obj && obj!==laterWorld.root){
+      if(obj.userData.interactionType==='folioMechanism' &&
+        obj.userData.worldId===currentFolio &&
+        ['A','B','C'].includes(obj.userData.slot)){
+        handleAction(obj.userData.slot as Slot);
+        return;
+      }
+      obj=obj.parent;
+    }
+  }
+}
 const shared = {
   ink: new THREE.MeshStandardMaterial({color:0x1a202b,roughness:0.76,side:THREE.DoubleSide}),
   paper: new THREE.MeshStandardMaterial({color:0xf0e6d2,roughness:0.92,side:THREE.DoubleSide}),
@@ -1060,6 +1091,9 @@ function destroy():void {
   window.removeEventListener('keyup',releaseKey);
   window.removeEventListener('resize',resize);
   window.removeEventListener('message',onBridgeMessage);
+  canvas.removeEventListener('pointerdown',onPaperPointerDown);
+  canvas.removeEventListener('pointerup',onPaperPointerUp);
+  canvas.removeEventListener('pointercancel',onPaperPointerCancel);
   clear();controls?.dispose();renderer?.dispose();sharedMats.forEach(m=>m.dispose());fiber.dispose();paperShadow?.dispose();
 }
 wireButtons();
@@ -1087,6 +1121,9 @@ try{
   controls.mouseButtons={LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.PAN};
   controls.touches={ONE:THREE.TOUCH.ROTATE,TWO:THREE.TOUCH.DOLLY_PAN};
   canvas.addEventListener('pointerdown',(event)=>{if(controls)controls.mouseButtons.LEFT=event.shiftKey?THREE.MOUSE.PAN:THREE.MOUSE.ROTATE;},{capture:true});
+  canvas.addEventListener('pointerdown',onPaperPointerDown);
+  canvas.addEventListener('pointerup',onPaperPointerUp);
+  canvas.addEventListener('pointercancel',onPaperPointerCancel);
   controls.minDistance=1.2;controls.maxDistance=19;
   controls.maxPolarAngle=1.51;
   window.addEventListener('keydown',handleKeys);
