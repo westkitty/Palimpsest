@@ -56,7 +56,17 @@ try {
   assert.ok(home?.ok(),'Original twelve-folio route remains available');
   // The same volume now opens the source-authored opening folios without a new tab.
   const livingEntry=page.getByRole('button',{name:'Enter Living Folios'});
-  await livingEntry.waitFor({state:'visible',timeout:10000});
+  try { await livingEntry.waitFor({state:'visible',timeout:10000}); } catch (error) {
+    console.error('LIVING_ENTRY_DEBUG', JSON.stringify({
+      url:page.url(),
+      pageErrors,
+      documentTitle:await page.title(),
+      bodyText:(await page.locator('body').innerText().catch(()=>'' )).slice(0,2800),
+      renderedButtons:await page.locator('button').allTextContents(),
+      reactRoot:(await page.locator('#root').innerHTML().catch(()=>'' )).slice(0,1200),
+    },null,2));
+    throw error;
+  }
   await livingEntry.click();
   const joined=page.getByRole('dialog',{name:'PALIMPSEST integrated twelve-folio volume'});
   await joined.waitFor({state:'visible',timeout:10000});
