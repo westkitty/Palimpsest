@@ -82,6 +82,36 @@ try {
   assert.equal(await page.locator('#window-layer').getAttribute('class'),'');
   // Isolate independent routes: a completed WebGL study should not keep an old
   // document's GPU work alive while Chromium boots the archival reader.
+  // Every later spread must be a physical 3D scene within the SAME living
+  // renderer, with source-authored A/B/C mechanisms rather than an archive jump.
+  const chapters=[
+    /First Contact/,/Standard of Conquest/,/Long Attrition/,
+    /Ruby Eclipse/,/Aureal Gate/,/Heliocide/,
+    /Siege Wall/,/First Dirt/,/Unfinished Peace/,
+  ];
+  for(let i=0;i<chapters.length;i++){
+    await page.locator('#next').click();
+    assert.match(await page.locator('#folio-title').textContent(),chapters[i]);
+    assert.equal(await page.locator('#stage').getAttribute('data-source-authored-scene'),'true',
+      `F${String(i+4).padStart(2,'0')} uses source-authored 3D world`);
+    assert.match(await page.locator('#folio-progress').textContent(),new RegExp(`F${String(i+4).padStart(2,'0')} / F12`));
+    await page.locator('[data-mechanism="A"]').click();
+    assert.match(await page.locator('#mechanism-status').textContent(),/A: (operated|fixed)/);
+    if(i===5){
+      assert.equal(await page.locator('[data-mechanism="A"]').isDisabled(),true,
+        'F09 irreversible filament remains locked');
+    }
+  }
+  assert.equal(await page.locator('#next').isDisabled(),true,'F12 is the final living leaf');
+  for(let i=0;i<6;i++)await page.locator('#prev').click();
+  assert.match(await page.locator('#folio-title').textContent(),/Long Attrition/);
+  await page.locator('[data-mechanism="B"]').click();
+  assert.match(await page.locator('#mechanism-status').textContent(),/B: operated/);
+  await page.reload({waitUntil:'domcontentloaded'});
+  // A fresh page defaults to F01 but the later folio mechanism state must persist.
+  for(let i=0;i<6;i++)await page.locator('#next').click();
+  assert.match(await page.locator('#folio-title').textContent(),/Long Attrition/);
+  assert.match(await page.locator('#mechanism-status').textContent(),/B: operated/);
   await page.close();
   const archivePage=await browser.newPage({viewport:{width:1360,height:840},reducedMotion:'reduce'});
   archivePage.on('pageerror',e=>pageErrors.push(String(e)));
@@ -103,31 +133,39 @@ try {
   await livingEntry.click();
   const joined=archivePage.getByRole('dialog',{name:'PALIMPSEST integrated twelve-folio volume'});
   await joined.waitFor({state:'visible',timeout:10000});
-  const embedded=archivePage.frameLocator('iframe[title^="F01–F03 sculptural"]');
+  const embedded=archivePage.frameLocator('iframe[title^="F01–F12 living"]');
   await embedded.locator('#stage').waitFor({state:'visible',timeout:12000});
   await archivePage.waitForTimeout(600);
   assert.equal(await embedded.locator('#stage').getAttribute('data-authored-sculptures'),'3','unified opening uses original three figures');
   assert.equal(await joined.locator('nav button').count(),12,'one twelve-folio navigation rail');
-  await joined.getByRole('button',{name:'Folio 02, sculptural edition'}).click();
+  await joined.getByRole('button',{name:'Folio 02, living edition'}).click();
   await archivePage.waitForTimeout(400);
   assert.match(await embedded.locator('#folio-title').textContent(),/All Unfolds/);
   assert.equal(await embedded.locator('#stage').getAttribute('data-authored-sculptures'),'1','unified F02 reuses Geode');
-  await joined.getByRole('button',{name:'Folio 03, sculptural edition'}).click();
+  await joined.getByRole('button',{name:'Folio 03, living edition'}).click();
   await archivePage.waitForTimeout(400);
   assert.match(await embedded.locator('#folio-title').textContent(),/Notebook Program/);
   assert.equal(await embedded.locator('#stage').getAttribute('data-authored-sculptures'),'0','no early Drakken');
   await embedded.locator('#next').click();
+  assert.match(await embedded.locator('#folio-title').textContent(),/First Contact/);
+  assert.equal(await joined.isVisible(),true,'F03 continues INSIDE the same living book');
+  await joined.getByRole('button',{name:'Folio 12, living edition'}).click();
+  assert.match(await embedded.locator('#folio-title').textContent(),/Unfinished Peace/);
+  await joined.getByRole('button',{name:'Archival counterpart'}).click();
   await joined.waitFor({state:'hidden',timeout:12000});
-  await archivePage.waitForTimeout(700);
-  assert.match(await archivePage.locator('header h1').first().textContent(),/F04/,'end of F03 continues into original Folio IV');
+  await archivePage.waitForTimeout(650);
+  assert.match(await archivePage.locator('header h1').first().textContent(),/F12/,
+    'explicit archival counterpart opens at matching folio, never automatically');
   const resumeEntry=archivePage.getByRole('button',{name:'Living Folios'});
   await resumeEntry.waitFor({state:'visible'});
   await resumeEntry.click();
   await joined.waitFor({state:'visible'});
+  assert.match(await embedded.locator('#folio-title').textContent(),/Unfinished Peace/,
+    'living volume resumes at the archivally selected folio');
   await joined.getByRole('button',{name:'Return to the archival reader'}).click();
   await joined.waitFor({state:'hidden'});
-  assert.match(await archivePage.locator('header h1').first().textContent(),/F04/,'return preserves the archival position');
+  assert.match(await archivePage.locator('header h1').first().textContent(),/F12/,'return preserves archival position');
 
   assert.equal(pageErrors.length,0,`no uncaught browser exceptions: ${pageErrors.join('; ')}`);
-  console.log('PASS: integrated WebGL scene, movable controls, F02 explicit signature, Escape return, F03 generator, 12-folio route');
+  console.log('PASS: all 12 living 3D folios, authored A/B/C scenes, state continuity, modal navigation, archival counterpart and preserved reader');
 } finally {await browser.close();}
