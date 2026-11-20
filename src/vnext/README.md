@@ -1,27 +1,44 @@
-# PALIMPSEST — F01–F03 working sculpture preview
+# PALIMPSEST · The First Three Folios
 
-**Status:** isolated, un-narrated implementation experiment, not a canonical or live twelve-folio replacement.
+This folder is the **separate sculptural concept experience** served at `/folio-vnext.html`. It is not a replacement for the existing twelve-folio reader. The governing direction is [`production/folio_vnext/F01_F03_DIRECTION_AND_DELTA.md`](../../production/folio_vnext/F01_F03_DIRECTION_AND_DELTA.md); refer to the supplied source notes for approved/proposed/open distinctions.
 
-Source of truth: [F01–F03 Creative Direction and Migration Contract](../production/folio_vnext/F01_F03_DIRECTION_AND_DELTA.md). The original submitted notes remain under production/folio_vnext/sources/.
+## Visual language
 
-## Run
-Use the current repository dependencies, then start the existing Vite dev server:
+The physical object belongs beside PALIMPSEST's existing archival folios: layered ivory/blue cardstock, slate-linen boards, multiple cut-out depth planes, brass hinge axes and rivets, engraved material indicators, deterministic paper fibre, theatrical but controlled azure/copper lighting, and a genuine 4:3 reading plate. Schematic figure markers in F01 are **not approved biological character-model replacements**. The real character registry is untouched.
+
+- **F01**: entirely starless primordial order; three symbolic hinged monuments, paper arches and delicate rule traces. Concealed maker testimony under Wordstreamer reads exactly **He murdered her.**
+- **F02**: A raises the first points, B releases clusters, C completes the folded galaxy. Zentrum and the Digital Geode remain distinct landmarks, never asserted as the literal center of the universe. Miniature exploration of the Geode reveals exactly **NiAlBu still watches her die. Again and again.** No murder animation or narrator reaction.
+- **F03**: finite archive leaves; a mechanical compiler and a trio of worlds share one selected source template but differ through bounded, repeatable variations. The third inscription, the public Vault lock, any invented named planets and revised narration are **not implemented** pending approval.
+
+## Repositionable instruments
+
+There are **four independent floating panels**: folio index, camera/inspection guide, reading notes and mechanism console. Drag their handles with mouse, finger, or pen. On a focused handle, use **arrow keys** for a 12px move, **Shift+arrows** for a 36px move, and **Home** to restore that panel's starting placement. Each panel can collapse or reopen. **Reset layout** restores all panels, while **Hide instruments** clears the viewport and remains accessible as a small fixed control.
+
+Panels are constrained to the visible viewport and automatically clamped after resizing. Layout only persists in `sessionStorage` for this tab/session and carries no folio progression, discovery, voice, or canon state. Unavailable storage never disables the controls. Keyboard and pointer input on handles is isolated from folio shortcuts and camera orbit.
+
+Outside the panels, **drag** to orbit the sculpture, **Shift+drag** or right-drag to pan/reposition the 3D view, and pinch/wheel to zoom. Miniature inspection uses **M**, **WASD** or movement buttons, with **I** for deliberate close inspection. The actual geometric secret reveal still requires the correct mode, near distance, and gaze; it does not reward, narrate or save the discovery. The independent screen-reader live region remains available even if reading notes are collapsed.
+
+## Files and validation
+
+- `previewV2.ts` is the preserved TypeScript renderer, now with high-fidelity papercraft additions and separate camera pan.
+- `folioLogic.ts` is a pure, deterministic 3-folio state and testimony gate.
+- `panelDock.js` owns pointer/keyboard floating panel layout and session-only UI positions.
+- `folio-vnext.html` owns the responsive 4:3 experience shell, panel handles, accessible reading fallback, and reset/hide controls.
+- `tests/preview-v2-contract.test.cjs` safeguards canon and state rules.
+- `tests/folio-logic.test.mjs` verifies deterministic scene behavior and discovery gates.
+- `tests/panel-layout-contract.test.cjs` checks UI interactions and papercraft boundaries without a WebGL dependency.
+- `qa/test_draggable_ui.py` and `qa/test_panel_touch.py` are optional browser-only local validation tools; the source-only CI does not pretend they test the actual Three.js framebuffer.
+
+With existing project dependencies installed, use:
+
+```bash
+node tests/preview-v2-contract.test.cjs
+node tests/panel-layout-contract.test.cjs
+bun test tests/folio-logic.test.mjs
+bun run lint
+bun run build
 ```
-bun install --frozen-lockfile
-bunx vite --host 127.0.0.1
-```
-Visit `/folio-vnext.html` in the development server. The separate root HTML is included in the Vite multi-page production build for **review artifacts only**. No preview link is added to the main reader.
 
-## Controls
-Drag and zoom to orbit the cardstock sculpture; left/right arrows or the bottom tabs turn folios. M enters/exits miniature inspection, W/A/S/D moves at miniature scale. Close inspection within the relevant physical miniature location reveals azure maker testimony on F01 and F02. No discovery is stored and no narrator, music, or game reward responds.
+View `folio-vnext.html` through the Vite dev/preview server. The existing `index.html`, original folios F01–F12, source manuscript, narration, DRAXIS models, source approver ledger, save/session schema and non-WebGL reader are untouched.
 
-## Visual content
-- F01: no stellar geometry; three **abstract** paper identity standees (not canonical character anatomy) and a miniature inscription beneath Wordstreamer's placement.
-- F02: first visible stars; folded celestial fan; Zentrum and Digital Geode features and hidden NiAlBu text.
-- F03: finite stored template leaves, a demonstration compiler wheel, and three family-related procedural world models. These are **illustrative models**, not named canon planets.
-
-## Not implemented / not authorized
-No approved public narration was supplied. The preview is therefore **silent** rather than inventing public lines. The existing manuscript, active F01–F12 runtime, original DRAXIS art, store and save formats, and non-WebGL edition are untouched. No canonical F03 inscription, Vault-lock animation policy, or rescheduled Drakken folio is invented. Not a release candidate until cross-mode integration, source-backed art, reviewed narrator cues, miniature affordances, real-browser testing, and manuscript reconciliation.
-
-## Checks
-`node tests/folio-vnext-preview.test.cjs`, `bun run lint`, and `bun run build`. On a development branch, validate in a browser; do not change `main` or GitHub Pages for this experiment.
+**Remaining verification:** full application TypeScript and bundle CI at the new revision, real WebGL render inspection on desktop and mobile, repeated life-cycle and GPU disposal runs, 3D view controls under pointer/touch in the actual app, and separate narrator/manuscript approvals prior to replacing the canonical folios. Do not interpret green source tests as complete visual playtest approval.

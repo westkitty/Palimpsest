@@ -1,0 +1,35 @@
+name: PALIMPSEST F01-F03 Development Checks
+
+on:
+  push:
+    branches:
+      - folio-vnext/f01-f03-20261120
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+      - name: Type-check entire application
+        run: bun run lint
+      - name: Preserve previous F01-F03 preview contract
+        run: node tests/folio-vnext-preview.test.cjs
+      - name: Verify review-preview geometry and hidden-testimony boundary
+        run: node tests/preview-v2-contract.test.cjs
+      - name: Verify bounded template logic and inspection gates
+        run: bun test tests/folio-logic.test.mjs
+      - name: Verify movable interface, papercraft and canon boundaries
+        run: node tests/panel-layout-contract.test.cjs
+      - name: Build both PALIMPSEST pages
+        run: bun run build
+      - name: Verify both release artifacts are present
+        run: test -s dist/index.html && test -s dist/folio-vnext.html
