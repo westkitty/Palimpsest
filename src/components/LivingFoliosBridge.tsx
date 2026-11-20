@@ -2,20 +2,23 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, BookOpen } from 'lucide-react';
 import type { WorldId } from '../types/atlas';
 
-type OpeningFolio = 0 | 1 | 2;
 interface BridgeMessage { channel?: string; action?: string; folio?: number }
 interface LivingFoliosBridgeProps {
-  initialFolio: OpeningFolio;
+  initialFolio: WorldId;
   onClose: () => void;
   onContinue: (world: WorldId) => void;
 }
 const FOLIOS = Array.from({ length: 12 }, (_, i) => i as WorldId);
+const isWorldId = (id: unknown): id is WorldId =>
+  typeof id === 'number' && Number.isInteger(id) && id >= 0 && id < FOLIOS.length;
 
-/** Keeps the authored F01-F03 sculpture inside one navigable twelve-folio volume.
- * No secret discoveries, narration, or manuscript data cross the bridge.
+/**
+ * One continuous living book, F01–F12, within a native modal. The historical
+ * reader is an explicitly selected archival reference, never a forced F04 handoff.
+ * No maker testimonies, narrator state or session data cross this boundary.
  */
 export function LivingFoliosBridge({ initialFolio, onClose, onContinue }: LivingFoliosBridgeProps) {
-  const [folio, setFolio] = useState<OpeningFolio>(initialFolio);
+  const [folio, setFolio] = useState<WorldId>(initialFolio);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const frameUrl = './folio-vnext.html?embedded=1&folio=' + (initialFolio + 1);
@@ -27,10 +30,8 @@ export function LivingFoliosBridge({ initialFolio, onClose, onContinue }: Living
       if (event.origin !== window.location.origin || event.source !== frameRef.current?.contentWindow) return;
       const data = event.data;
       if (!data || data.channel !== 'palimpsest-living') return;
-      if (data.action === 'folio' && typeof data.folio === 'number' && Number.isInteger(data.folio) && data.folio >= 0 && data.folio <= 2) {
-        setFolio(data.folio as OpeningFolio);
-      } else if (data.action === 'continue' && data.folio === 3) {
-        onContinue(3 as WorldId);
+      if (data.action === 'folio' && isWorldId(data.folio)) {
+        setFolio(data.folio);
       } else if (data.action === 'exit') {
         onClose();
       }
@@ -40,17 +41,13 @@ export function LivingFoliosBridge({ initialFolio, onClose, onContinue }: Living
       window.removeEventListener('message', onMessage);
       if (dialog?.open) dialog.close();
     };
-  }, [onClose, onContinue]);
+  }, [onClose]);
 
   const navigate = (world: WorldId) => {
-    if (world > 2) {
-      onContinue(world);
-    } else {
-      frameRef.current?.contentWindow?.postMessage(
-        { channel: 'palimpsest-living', action: 'navigate', folio: world },
-        window.location.origin,
-      );
-    }
+    frameRef.current?.contentWindow?.postMessage(
+      { channel: 'palimpsest-living', action: 'navigate', folio: world },
+      window.location.origin,
+    );
   };
 
   return (
@@ -67,7 +64,7 @@ export function LivingFoliosBridge({ initialFolio, onClose, onContinue }: Living
               <BookOpen aria-hidden="true" className="h-4 w-4 shrink-0 text-[#C4A871]" />
               <div>
                 <p className="font-serif text-sm font-semibold tracking-[0.035em] text-[#F1E7D5] sm:text-lg">PALIMPSEST · THE LIVING VOLUME</p>
-                <p className="font-mono text-[9px] tracking-[0.07em] text-[#A7BDCA] sm:text-[10px]">F01–F03 sculptural folios · F04–F12 archival continuation</p>
+                <p className="font-mono text-[9px] tracking-[0.07em] text-[#A7BDCA] sm:text-[10px]">Twelve source-authored sculptural folios · one continuous book</p>
               </div>
             </div>
             <button
@@ -86,13 +83,11 @@ export function LivingFoliosBridge({ initialFolio, onClose, onContinue }: Living
                 type="button"
                 onClick={() => navigate(world)}
                 aria-current={world === folio ? 'page' : undefined}
-                aria-label={'Folio ' + String(world + 1).padStart(2, '0') + (world < 3 ? ', sculptural edition' : ', archival continuation')}
+                aria-label={'Folio ' + String(world + 1).padStart(2, '0') + ', living edition'}
                 className={'min-h-9 min-w-[49px] shrink-0 rounded border px-2 py-1 font-mono text-[10px] font-semibold tracking-[0.06em] focus-visible:outline-2 focus-visible:outline-[#77DCFA] ' + (
                   world === folio
                     ? 'border-[#68DDF3] bg-[#1A3C4E] text-[#E4F8FD]'
-                    : world < 3
-                      ? 'border-[#758FA7]/55 bg-[#203047] text-[#DDEAF0] hover:border-[#68DDF3]'
-                      : 'border-[#937F5F]/45 bg-[#242832] text-[#D1C6AF] hover:border-[#C5A46E]'
+                    : 'border-[#758FA7]/55 bg-[#203047] text-[#DDEAF0] hover:border-[#68DDF3]'
                 )}
               >
                 {'F' + String(world + 1).padStart(2, '0')}
@@ -102,18 +97,18 @@ export function LivingFoliosBridge({ initialFolio, onClose, onContinue }: Living
         </header>
         <iframe
           ref={frameRef}
-          title="F01–F03 sculptural folios: original papercraft figures, mechanisms and draggable instruments"
+          title="F01–F12 living sculptural folios: original papercraft scenes, mechanisms and draggable instruments"
           src={frameUrl}
           className="block min-h-0 w-full flex-1 border-0 bg-[#101720]"
         />
         <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-[#B89860]/30 bg-[#111B29] px-3 py-1.5 font-mono text-[10px] text-[#B4C4CD]">
-          <span>Hand-inked paper · Drag instrument panels by their handles</span>
+          <span>Folded paper · drag panels · A/B/C for mechanisms · M for close inspection</span>
           <button
             type="button"
-            onClick={() => onContinue(3 as WorldId)}
+            onClick={() => onContinue(folio)}
             className="shrink-0 rounded border border-[#A9946B]/50 bg-[#283647] px-3 py-1.5 text-[#F1E7D5] hover:border-[#CDB987] focus-visible:outline-2 focus-visible:outline-[#77DCFA]"
           >
-            Continue to F04 →
+            Archival counterpart
           </button>
         </footer>
       </div>
