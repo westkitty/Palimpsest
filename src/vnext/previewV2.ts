@@ -729,6 +729,11 @@ function smooth(value:number,target:number,dt:number):number {
   return reducedMotion?target:THREE.MathUtils.damp(value,target,5.8,Math.min(dt,0.07));
 }
 function animate(dt:number):void {
+  if(currentFolio>=FIRST_LATER_FOLIO){
+    activeTime+=dt;
+    laterWorld?.update(dt,activeTime,reducedMotion);
+    return;
+  }
   if(state.folio===0){
     f01DetailMarks.forEach(mark=>{mark.visible=state.f01.detail;});
     paperHinges.forEach((hinge,i)=>{
@@ -764,6 +769,17 @@ function animate(dt:number):void {
   }
 }
 function handleAction(slot:Slot):void {
+  if(currentFolio>=FIRST_LATER_FOLIO){
+    if(inspection!=='overview'){announce('Return to the overview before operating a mechanism.');return;}
+    const idx=currentFolio-FIRST_LATER_FOLIO;
+    const next=operateLater(laterStates[idx],slot);
+    laterStates[idx]=next;saveLaterStudy();
+    laterWorld?.syncState(next,activeSpecimen(next),activeTime);
+    updateNav();
+    if(!renderer)fallbackPage(currentFolio);
+    announce(`${getLaterCopy(currentFolio as LaterFolioIndex).actions[slot==='A'?0:slot==='B'?1:2]}. ${indicator.textContent}`);
+    return;
+  }
   if(inspection!=='overview'){
     announce('Return to the book overview before operating a paper mechanism.');return;
   }
@@ -782,15 +798,16 @@ function handleAction(slot:Slot):void {
 function resetStudy():void{
   if(inspection!=='overview')leaveMini();
   studyStates=restoreFolioStudy(null);
-  try{sessionStorage.removeItem(STUDY_STORAGE_KEY);}catch{}
-  const current=state.folio;
+  laterStates=restoreLaterStudy(null);
+  try{sessionStorage.removeItem(STUDY_STORAGE_KEY);sessionStorage.removeItem(LATER_STUDY_STORAGE_KEY);}catch{}
+  const current=currentFolio;
   goFolio(current);
   if(!renderer)fallbackPage(current);
-  announce('Opening folio study reset. Original artworks and archival records are unchanged.');
+  announce('Living folio study reset. The original archive and panel layout are unchanged.');
 }
 function announce(s:string):void {status.textContent=s;globalAnnouncer.textContent=s;}
 function setWitnessButton():void {
-  const available=Boolean(renderer && state.folio===1 && state.f02.reveal===3 && inspection==='overview');
+  const available=Boolean(renderer && currentFolio===1 && state.f02.reveal===3 && inspection==='overview');
   witnessButton.hidden=!available;
   witnessButton.setAttribute('aria-pressed',String(witnessActive));
   witnessButton.textContent=witnessActive?'Return to the page (G)':'Enter the All (G)';
@@ -849,7 +866,7 @@ function enterMini():void {
   inspection='miniature';discovered=false;
   if(focusText)focusText.visible=false;
   if(controls){
-    const x=state.folio===1?2.27:state.folio===2?-2.6:0;
+    const x=currentFolio===1?2.27:currentFolio===2?-2.6:0;
     camera.position.set(x,0.85,2.15);controls.target.set(x,0.60,0.30);
     controls.minDistance=0.13;controls.maxDistance=4;controls.maxPolarAngle=Math.PI-0.1;
     controls.update();
@@ -879,7 +896,7 @@ function nearGeode():boolean {
   return state.folio===1&&Math.hypot(camera.position.x-2.27,camera.position.z-0.24)<1.25;
 }
 function updateInspectButton():void {
-  const enabled=inspection!=='overview'&&((state.folio===0)||state.folio===1);
+  const enabled=inspection!=='overview'&&currentFolio<=1;
   inspectButton.disabled=!enabled;
   if(inspection==='geode')inspectButton.textContent='Leave Geode (I)';
   else if(state.folio===1&&inspection==='miniature')inspectButton.textContent='Enter Geode interior (I)';
@@ -887,6 +904,7 @@ function updateInspectButton():void {
 }
 function inspect():void {
   if(inspection==='overview')return;
+  if(currentFolio>=FIRST_LATER_FOLIO){announce('No unapproved maker testimony is exposed in this folio.');return;}
   if(!renderer){
     if(state.folio===0){announce('Maker inscription beneath Wordstreamer: He murdered her.');return;}
     if(state.folio===1){
@@ -948,10 +966,10 @@ function moveMini(dt:number):void {
 }
 function nextFolio(direction:number):void {
   if(inspection!=='overview')leaveMini();
-  const next=state.folio+direction;
-  if(next<0)return;
-  if(next>2){sendBridge('continue',3);return;}
-  goFolio(next as FolioIndex);
+  const next=currentFolio+direction;
+  if(!isLivingIndex(next))return;
+  goFolio(next);
+  if(!renderer)fallbackPage(next);
 }
 function handleKeys(event:KeyboardEvent):void {
   const target=event.target as HTMLElement;
@@ -959,7 +977,7 @@ function handleKeys(event:KeyboardEvent):void {
   // Escape is a universal exit, including when a movable panel button owns focus.
   if(k==='escape' && witnessActive){toggleWitness();return;}
   if(k==='escape' && inspection!=='overview'){leaveMini();return;}
-  if(k==='escape' && bridgeEmbedded){event.preventDefault();sendBridge('exit',state.folio);return;}
+  if(k==='escape' && bridgeEmbedded){event.preventDefault();sendBridge('exit',currentFolio);return;}
   if(target.closest('button,input,textarea,select,[contenteditable]'))return;
   if(['arrowleft','arrowright','a','b','c','m','i','w','s','d'].includes(k)&&event.target===canvas)event.preventDefault();
   if(event.repeat&&['m','i','arrowleft','arrowright','a','b','c'].includes(k))return;
@@ -977,9 +995,9 @@ function onBridgeMessage(event:MessageEvent):void {
   if(!bridgeEmbedded || event.source!==window.parent || event.origin!==window.location.origin)return;
   const message=event.data;
   if(!message || message.channel!=='palimpsest-living' || message.action!=='navigate')return;
-  if(typeof message.folio!=='number' || !Number.isInteger(message.folio) || message.folio<0 || message.folio>2)return;
-  goFolio(message.folio as FolioIndex);
-  if(!fallback.hidden)fallbackPage(message.folio as FolioIndex);
+  if(typeof message.folio!=='number' || !isLivingIndex(message.folio))return;
+  goFolio(message.folio);
+  if(!fallback.hidden)fallbackPage(message.folio);
 }
 
 function resize():void {
@@ -1001,11 +1019,29 @@ function wireButtons():void {
     for(const name of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(name,()=>activeMove.delete(dir));
   }
 }
-function fallbackPage(index:FolioIndex):void {
+function fallbackPage(index:number):void {
+  const isLater=index>=FIRST_LATER_FOLIO;
   const paragraphs=fallback.querySelectorAll<HTMLElement>('[data-folio-text]');
-  paragraphs.forEach((p,i)=>p.hidden=i!==index);
-  fallback.querySelectorAll<SVGGElement>('[data-fb-folio]').forEach((g,i)=>{g.style.display=i===index?'':'none';});
-  if(state.folio===1&&state.f02.reveal===0)indicator.textContent='No stars yet. Activate A to unfold the first points.';
+  paragraphs.forEach((p,i)=>p.hidden=isLater||i!==index);
+  fallback.querySelectorAll<SVGGElement>('[data-fb-folio]').forEach((g,i)=>{g.style.display=!isLater&&i===index?'':'none';});
+  const plate=fallback.querySelector<HTMLElement>('#later-fallback');
+  if(plate){
+    plate.hidden=!isLater;
+    if(isLater){
+      const copy=getLaterCopy(index as LaterFolioIndex);
+      const heading=plate.querySelector<HTMLElement>('[data-later-heading]');
+      const summary=plate.querySelector<HTMLElement>('[data-later-summary]');
+      const cues=plate.querySelector<HTMLElement>('[data-later-cues]');
+      if(heading)heading.textContent=copy.title;
+      if(summary)summary.textContent=copy.description;
+      if(cues)cues.replaceChildren(...copy.visuals.map((cue,i)=>{
+        const p=document.createElement('p');
+        p.textContent=`${['I','II','III','IV'][i]??'·'} · ${cue}`;
+        return p;
+      }));
+    }
+  }
+  if(index===1&&state.f02.reveal===0)indicator.textContent='No stars yet. Activate A to unfold the first points.';
 }
 function destroy():void {
   cancelAnimationFrame(frame);
@@ -1013,7 +1049,7 @@ function destroy():void {
   window.removeEventListener('keyup',releaseKey);
   window.removeEventListener('resize',resize);
   window.removeEventListener('message',onBridgeMessage);
-  clear();controls?.dispose();renderer?.dispose();sharedMats.forEach(m=>m.dispose());fiber.dispose();
+  clear();controls?.dispose();renderer?.dispose();sharedMats.forEach(m=>m.dispose());fiber.dispose();paperShadow?.dispose();
 }
 wireButtons();
 window.addEventListener('message',onBridgeMessage);
@@ -1057,7 +1093,7 @@ try{
   window.addEventListener('keydown',handleKeys);
   window.addEventListener('keyup',releaseKey);
   goFolio(initialFolio);fallbackPage(initialFolio);
-  for(const button of actionButtons)button.addEventListener('click',()=>fallbackPage(state.folio));
-  prevButton.addEventListener('click',()=>fallbackPage(state.folio));
-  nextButton.addEventListener('click',()=>fallbackPage(state.folio));
+  for(const button of actionButtons)button.addEventListener('click',()=>fallbackPage(currentFolio));
+  prevButton.addEventListener('click',()=>fallbackPage(currentFolio));
+  nextButton.addEventListener('click',()=>fallbackPage(currentFolio));
 }
