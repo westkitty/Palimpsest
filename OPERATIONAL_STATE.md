@@ -1,12 +1,12 @@
 # PALIMPSEST — Operational State
 
 project_id: westkitty/Palimpsest  
-scope: standalone F01–F03 review experience at `/folio-vnext.html`; preserve twelve-folio reader at `/`  
+scope: integrated F01–F03 living opening plus preserved twelve-folio reader at `/`; standalone review route `/folio-vnext.html` retained  
 feature_branch: `folio-vnext/f01-f03-20261120`  
 pre-AWE_main: `2a43ae58ac7ca13bee8ff37141225766e7653063`  
 pre-AWE_feature: `d5524c4ddd5e886cf15bb6468c1736b119bef684`  
 date: 2026-11-20  
-status: AWE fold-to-cosmos implementation candidate; final CI, live Pages and real-browser proof pending
+status: published integrated study edition; feature-branch CI, Chromium journey, Pages and live HTTP readbacks verified; device visual QA remains pending
 
 ## Controlling sources
 
@@ -68,3 +68,11 @@ status: AWE fold-to-cosmos implementation candidate; final CI, live Pages and re
 - The new **Reset study** control clears only the experimental preview teaching state and does not clear instrument positions or the twelve-folio archival session.
 - Existing authored figures, materials, cyan hidden text, physical folds, OrbitControls, mobile movement, reduced motion, reveal gates, and twelve-folio bridge remain protected.
 - New checks: `tests/folio-study-continuity.test.mjs`, enhanced built-Chromium `tests/browser-vnext-smoke.mjs`, and full app TypeScript/build/regression workflow. Validate on the final commit; do not assert CI/Pages deployment before provider readback.
+
+## 2026-11-20 validated GitHub Pages release
+
+- The F01–F03 study-continuity work and bounded ink-register lineage were promoted from `folio-vnext/f01-f03-20261120` to `main` without rewriting the historical manuscript, narration, source figures or canonical testimony.
+- Feature CI `44779758105` passed for `371fb0ac71dec1f4b7333783707387ff863c0758`: TypeScript, existing source/canon/layout/bridge contracts, deterministic study tests, both Vite artifacts and the Chromium study-to-archive path. The browser smoke isolates the two independent top-level routes in separate pages to prevent one WebGL journey interfering with the other; this regression-harness change touched no application source.
+- GitHub `main` was fast-forwarded without force, from `c5942b6f39791a5ac7a3e1ef2a5eeaf289789165` to `371fb0ac71dec1f4b7333783707387ff863c0758` after verifying its unchanged expected head and feature branch being four commits ahead, zero behind.
+- Pages run `44780136810` completed successfully for the same commit. Independent live HTTP GET returned 200 for both `https://westkitty.github.io/Palimpsest/` and `https://westkitty.github.io/Palimpsest/folio-vnext.html`. Published asset names matched the CI-built `app-iF5JR1zD.js` and `folioPreview-5nxXkO5R.js` bundles.
+- Publication and automated browser navigation are verified; physical-device appearance, mobile gesture ergonomics, sustained GPU-resource behavior and detailed canonical visual approval are still unverified. Do not convert these open questions to verified status.
