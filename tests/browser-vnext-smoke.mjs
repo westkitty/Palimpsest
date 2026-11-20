@@ -157,13 +157,14 @@ try {
   assert.match(await embedded.locator('#folio-title').textContent(),/Unfinished Peace/);
   await joined.getByRole('button',{name:'Archival counterpart'}).click();
   await joined.waitFor({state:'hidden',timeout:12000});
-  await archivePage.waitForTimeout(650);
+  await archivePage.locator('header h1').first().filter({hasText:'F12'}).waitFor({state:'visible',timeout:15000});
   assert.match(await archivePage.locator('header h1').first().textContent(),/F12/,
     'explicit archival counterpart opens at matching folio, never automatically');
   const resumeEntry=archivePage.getByRole('button',{name:'Living Folios'});
   await resumeEntry.waitFor({state:'visible'});
   await resumeEntry.click();
   await joined.waitFor({state:'visible'});
+  await embedded.locator('#folio-title').filter({hasText:'Unfinished Peace'}).waitFor({state:'visible',timeout:15000});
   assert.match(await embedded.locator('#folio-title').textContent(),/Unfinished Peace/,
     'living volume resumes at the archivally selected folio');
   await joined.getByRole('button',{name:'Return to the archival reader'}).click();
