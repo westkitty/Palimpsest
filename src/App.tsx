@@ -31,7 +31,7 @@ export default function App() {
   const [webglFallbackReason, setWebglFallbackReason] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [livingOpen, setLivingOpen] = useState(false);
-  const [livingStart, setLivingStart] = useState<0 | 1 | 2>(0);
+  const [livingStart, setLivingStart] = useState<WorldId>(0);
 
   const useNonWebgl = snapshot.nonWebglMode || contextLost;
 
@@ -122,7 +122,7 @@ export default function App() {
   // representations inside one navigable volume. No secret or script state is copied.
   const handleOpenLivingFolios = useCallback(() => {
     const active = atlasStore.getSnapshot().activeWorld;
-    setLivingStart((active < 3 ? active : 0) as 0 | 1 | 2);
+    setLivingStart(active);
     narrationEngine.stop();
     setLivingOpen(true);
   }, []);
