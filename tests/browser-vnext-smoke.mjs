@@ -84,6 +84,9 @@ try {
   // document's GPU work alive while Chromium boots the archival reader.
   // Every later spread must be a physical 3D scene within the SAME living
   // renderer, with source-authored A/B/C mechanisms rather than an archive jump.
+  // Reset study returns to F01; advance to F03 before the nine-page sweep.
+  await page.locator('#next').click();
+  await page.locator('#next').click();
   const chapters=[
     /First Contact/,/Standard of Conquest/,/Long Attrition/,
     /Ruby Eclipse/,/Aureal Gate/,/Heliocide/,
@@ -109,7 +112,7 @@ try {
   assert.match(await page.locator('#mechanism-status').textContent(),/B: operated/);
   await page.reload({waitUntil:'domcontentloaded'});
   // A fresh page defaults to F01 but the later folio mechanism state must persist.
-  for(let i=0;i<6;i++)await page.locator('#next').click();
+  for(let i=0;i<5;i++)await page.locator('#next').click();
   assert.match(await page.locator('#folio-title').textContent(),/Long Attrition/);
   assert.match(await page.locator('#mechanism-status').textContent(),/B: operated/);
   await page.close();
