@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildShardGodFigure, buildWordstreamerFigure, buildNiAlBuGeode } from '../engine/drakken/CharacterFigures';
-import { activateSlot, mayReveal, planetPattern, startFolio, type FolioActions, type FolioIndex, type Slot, type Inspection } from './folioLogic.ts';
+import { activateSlot, mayReveal, planetPattern, restoreFolioStudy, sourceInkRegistration, startFolio, type FolioActions, type FolioIndex, type Slot, type Inspection } from './folioLogic.ts';
 
 /**
  * PALIMPSEST — F01–F03 sculptural REVIEW build.
@@ -26,6 +26,7 @@ const nextButton = byId<HTMLButtonElement>('next');
 const miniButton = byId<HTMLButtonElement>('mini');
 const inspectButton = byId<HTMLButtonElement>('inspect');
 const witnessButton = byId<HTMLButtonElement>('witness');
+const resetStudyButton = byId<HTMLButtonElement>('reset-study');
 const fallback = byId<HTMLElement>('webgl-fallback');
 const moveButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-move]'));
 const actionButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-mechanism]'));
@@ -75,7 +76,18 @@ let renderer: THREE.WebGLRenderer | null = null;
 let controls: OrbitControls | null = null;
 let frame = 0;
 let lastTime = 0;
-let state: FolioActions = startFolio(0);
+const STUDY_STORAGE_KEY='palimpsest.folio.review.study-state.v1';
+function loadStudy():FolioActions[]{
+  try{return restoreFolioStudy(JSON.parse(sessionStorage.getItem(STUDY_STORAGE_KEY)??'null'));}
+  catch{return restoreFolioStudy(null);}
+}
+let studyStates:FolioActions[]=loadStudy();
+let state:FolioActions=studyStates[0];
+function saveStudy():void{
+  // No private testimony, narrator, camera, or official session data in this payload.
+  try{sessionStorage.setItem(STUDY_STORAGE_KEY,JSON.stringify({version:1,folios:studyStates}));}
+  catch{ /* Storage refusal is non-fatal. */ }
+}
 let inspection: Inspection = 'overview';
 let discovered = false;
 let focusText: THREE.Mesh | null = null;
@@ -119,6 +131,8 @@ const sharedMats: THREE.Material[] = Object.values(shared);
 // not a glossy CGI/PBR remodel, texture replacement or new character design.
 const sourceInk = new THREE.LineBasicMaterial({color:0x111924, transparent:true, opacity:0.9, depthWrite:false});
 sharedMats.push(sourceInk);
+const registrationInk=new THREE.MeshBasicMaterial({color:0x111924,side:THREE.DoubleSide});
+sharedMats.push(registrationInk);
 function addInkedContours(authored:THREE.Object3D):void {
   const meshes:THREE.Mesh[]=[];
   authored.traverse(obj=>{
@@ -566,6 +580,20 @@ function redrawPlanets():void {
     const pat=planetPattern(state.f03.template,state.f03.generation+i);
     const px=1.63+i*1.06,py=0.72,pz=-0.38+(i%2)*0.45;
     slab(planets,0.76,0.036,0.77,shared.backing,px,0.27,pz);
+    // Identical four-square ink impressions identify their finite source family
+    // while each generated world remains visibly different. This is a book
+    // illustration of inheritance, not new canonical planetary anatomy.
+    const marks=sourceInkRegistration(state.f03.template);
+    const imprint=new THREE.Group();imprint.name='source-ink-registration';
+    imprint.userData.family=state.f03.template;
+    imprint.userData.mark=marks.join('');
+    imprint.position.set(px,0.296,pz+0.276);
+    for(let bit=0;bit<4;bit++){
+      const paint=marks[bit]===1?registrationInk:shared.paper;
+      const stamp=slab(imprint,0.104,0.007,0.104,paint,-0.166+bit*0.11,0,0);
+      stamp.name='ink-bit-'+bit;
+    }
+    planets.add(imprint);
     const surface=new THREE.MeshStandardMaterial({color:pat.hull,roughness:0.81,flatShading:true,bumpMap:fiber,bumpScale:0.004});
     const globe=put(planets,new THREE.SphereGeometry(0.32,pat.facet,Math.max(6,pat.facet-2)),surface,px,py,pz);
     globe.rotation.z=pat.tilt;globe.rotation.y=pat.seamAngle;
@@ -629,11 +657,11 @@ function updateNav():void {
   }
   setWitnessButton();
   indicator.textContent=state.folio===1?`Stellar assembly: ${state.f02.reveal} / 3 stages`:
-    state.folio===2?`Source plate: ${state.f03.template+1} / 3  ·  Variation: ${state.f03.generation}`:
+    state.folio===2?`Source plate: ${state.f03.template+1} / 3  ·  Ink register: ${sourceInkRegistration(state.f03.template).join('')}  ·  Variation: ${state.f03.generation}`:
     `Physical folds: ${state.f01.fold?'opened':'closed'}  ·  Details: ${state.f01.detail?'shown':'folded'}`;
 }
 function goFolio(index:FolioIndex):void {
-  clear();authoredFigureCount=0;state=startFolio(index);
+  clear();authoredFigureCount=0;state=studyStates[index];
   if(index===0)buildF01();else if(index===1)buildF02();else buildF03();
   resetCamera();updateNav();
   canvas.dataset.authoredSculptures=String(authoredFigureCount);
@@ -684,6 +712,8 @@ function handleAction(slot:Slot):void {
     announce('Return to the book overview before operating a paper mechanism.');return;
   }
   const before=state;state=activateSlot(state,slot);
+  studyStates[state.folio]=state;
+  saveStudy();
   if(state.folio===2&&(slot==='B'||slot==='C')){
     redrawPlanets();if(slot==='C')printPulse=reducedMotion?0:1;
   }
@@ -692,6 +722,15 @@ function handleAction(slot:Slot):void {
   else if(state.folio===2)announce(`Source plate ${state.f03.template+1}; bounded variation ${state.f03.generation}.`);
   else announce(`${actionCopy[0][slot==='A'?0:slot==='B'?1:2]}: ${JSON.stringify(state.f01)}.`);
   if(before===state)throw Error('Folio state failed to advance');
+}
+function resetStudy():void{
+  if(inspection!=='overview')leaveMini();
+  studyStates=restoreFolioStudy(null);
+  try{sessionStorage.removeItem(STUDY_STORAGE_KEY);}catch{}
+  const current=state.folio;
+  goFolio(current);
+  if(!renderer)fallbackPage(current);
+  announce('Opening folio study reset. Original artworks and archival records are unchanged.');
 }
 function announce(s:string):void {status.textContent=s;globalAnnouncer.textContent=s;}
 function setWitnessButton():void {
@@ -898,6 +937,7 @@ function wireButtons():void {
   miniButton.addEventListener('click',toggleMini);
   inspectButton.addEventListener('click',inspect);
   witnessButton.addEventListener('click',toggleWitness);
+  resetStudyButton.addEventListener('click',resetStudy);
   for(const b of actionButtons)b.addEventListener('click',()=>handleAction(b.dataset.mechanism as Slot));
   for(const b of moveButtons){
     const dir=b.dataset.move??'';

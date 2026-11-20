@@ -35,6 +35,8 @@ jobs:
         run: node tests/authored-assets-ink.test.cjs
       - name: Verify the joined twelve-folio living-volume navigation
         run: node tests/living-folios-bridge.test.cjs
+      - name: Verify source-ink lineage and bounded study restoration
+        run: bun test tests/folio-study-continuity.test.mjs
       - name: Build both PALIMPSEST pages
         run: bun run build
       - name: Verify both release artifacts are present

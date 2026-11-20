@@ -59,3 +59,12 @@ status: AWE fold-to-cosmos implementation candidate; final CI, live Pages and re
 - The bridge validates same-origin and exact iframe `event.source` on every postMessage; navigation messages cannot mutate canon, narrator, secret state or experimental storage. The parent pauses its WebGL rendering while the bridge is active, then resumes on return.
 - Fallback handles the selected initial page and parent navigation with the same reading state (not a canon-approved public revised transcript). The original full SVG archival fallback remains untouched.
 - Must verify: React typecheck/build, existing source contracts, new bridge contract, browser end-to-end F01→F04, return to F04 position, floating panel input, both routes, Pages deployment and readback. Do not claim completed until evidence exists.
+
+## 2026-11-20 QQQ / Omni uplift — study continuity and ink lineage
+
+- Current baseline for this correction: `c5942b6f39791a5ac7a3e1ef2a5eeaf289789165`. This is a new bounded feature-branch improvement, not a change to the original historical manuscript or global character canon.
+- **Confirmed gap:** F01-F03 `goFolio` previously called `startFolio(index)` on every visit; the visual teaching state reset even when the user had just unfolded the page. Target: preserve only A/B/C preview state across navigation and reloads in a separate versioned `sessionStorage` key; keep testimony, camera, narrator, historical manuscript and archival saved state excluded.
+- **Concrete AWE moment:** In F03, the source plate's four-square black ink register is printed on all three related but visibly different model-world plinths. Each of three finite source plates has its own exact register. This is an explicit *editorial print/provenance analogy*, not a new planetary attribute or a declared Starsilk cosmological mechanism.
+- The new **Reset study** control clears only the experimental preview teaching state and does not clear instrument positions or the twelve-folio archival session.
+- Existing authored figures, materials, cyan hidden text, physical folds, OrbitControls, mobile movement, reduced motion, reveal gates, and twelve-folio bridge remain protected.
+- New checks: `tests/folio-study-continuity.test.mjs`, enhanced built-Chromium `tests/browser-vnext-smoke.mjs`, and full app TypeScript/build/regression workflow. Validate on the final commit; do not assert CI/Pages deployment before provider readback.

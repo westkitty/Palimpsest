@@ -79,3 +79,57 @@ export function mayReveal(what: 'f01-testimony' | 'f02-testimony', folio: FolioI
   return near && gaze && ((what === 'f01-testimony' && folio === 0 && mode === 'miniature') ||
     (what === 'f02-testimony' && folio === 1 && mode === 'geode'));
 }
+
+
+/**
+ * Editorial study-state only. The archive's history session, narrator, discovered
+ * testimony and camera state are intentionally NOT part of this payload.
+ */
+const FOLIOS: FolioIndex[] = [0, 1, 2];
+const registrationMarks = [
+  [1, 0, 0, 1],
+  [0, 1, 1, 0],
+  [1, 1, 0, 0],
+] as const;
+
+export function sourceInkRegistration(family: number): readonly number[] {
+  if (!Number.isInteger(family) || family < 0 || family >= TEMPLATE_COUNT) throw new RangeError('unknown source register');
+  return registrationMarks[family];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** Untrusted session data is rejected or clamped to the small approved study domain. */
+export function restoreFolioStudy(raw: unknown): FolioActions[] {
+  const result = FOLIOS.map(startFolio);
+  if (!isRecord(raw) || raw.version !== 1 || !Array.isArray(raw.folios)) return result;
+  for (const folio of FOLIOS) {
+    const record: unknown = raw.folios[folio];
+    if (!isRecord(record) || record.folio !== folio) continue;
+    const old01 = isRecord(record.f01) ? record.f01 : {};
+    const old02 = isRecord(record.f02) ? record.f02 : {};
+    const old03 = isRecord(record.f03) ? record.f03 : {};
+    const reveal = old02.reveal;
+    const template = old03.template;
+    const generation = old03.generation;
+    result[folio] = {
+      folio,
+      f01: {
+        fold: old01.fold === true,
+        detail: old01.detail === true,
+        compare: old01.compare === true,
+      },
+      f02: {
+        reveal: typeof reveal === 'number' && Number.isInteger(reveal) && reveal >= 0 && reveal <= 3 ? reveal as 0 | 1 | 2 | 3 : 0,
+      },
+      f03: {
+        vaultOpen: old03.vaultOpen === true,
+        template: typeof template === 'number' && Number.isInteger(template) && template >= 0 && template < TEMPLATE_COUNT ? template as 0 | 1 | 2 : 0,
+        generation: typeof generation === 'number' && Number.isInteger(generation) && generation >= 0 && generation < 1000 ? generation : 0,
+      },
+    };
+  }
+  return result;
+}

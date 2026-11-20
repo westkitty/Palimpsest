@@ -57,3 +57,9 @@ Regression: `node tests/awe-signature.test.cjs` in addition to the prior source/
 - Preserve the source's matte, **hand-painted cel colors** and sculptural silhouettes. Add geometry-derived dark ink contours as a separate removable layer, with no grayscale desaturation, material replacement, glossy CGI makeover, or gold-colored secret markings. Source figures retain obsidian, slate indigo, azure fissures and copper captivity rings where applicable.
 - The current Drive visual-canon contracts for Wordstreamer and NiAlBu list **no approved primary image**. These figures are existing *Palimpsest editorial sculptures*, not newly canonical reference approvals. F01 NiAlBu's pre-captivity historical state still needs a source-approved era reference. Do not invent missing limbs/appendages to resolve it.
 - The 21 DRAXIS sculptures have separate scoped visual acceptance; they should **not** be inserted into F01–F03 merely to increase asset count, because the first three folios precede their introduction.
+
+## Study continuity and source-ink lineage (2026-11-20)
+
+The three authored opening folios now retain their *teaching mechanisms* when revisited and on reload in the same browser session. This uses a separate, validated `palimpsest.folio.review.study-state.v1` session key. It does **not** store discovered maker testimony, narration, camera state, or the archival twelve-folio save.
+
+In Folio III, all three variants share a physically printed four-square dark ink register corresponding to one of the three bounded source plates. Their individual geometry and features still vary. The register describes the relationship between source and descendants in the book's archival visual language; it does not introduce new canon. Use **Reset study** in the floating mechanisms panel to restore all three opening folios to initial teaching states without disturbing the panel layout or original manuscript.
