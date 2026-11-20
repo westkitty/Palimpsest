@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - living-volume/full-twelve-20261120
+      - uplift/living-theatre-20261120
   workflow_dispatch:
 
 permissions:
@@ -35,6 +36,7 @@ jobs:
       - name: Verify all twelve and physical scene contracts
         run: |
           bun test tests/living-twelve.test.mjs
+          bun test tests/living-theatre.test.mjs
           node tests/panel-layout-contract.test.cjs
           node tests/awe-signature.test.cjs
           node tests/authored-assets-ink.test.cjs
