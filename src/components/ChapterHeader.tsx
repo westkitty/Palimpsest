@@ -70,7 +70,7 @@ export function ChapterHeader({
               type="button"
               onClick={onOpenLivingFolios}
               className="inline-flex items-center gap-1.5 rounded-md border border-[#6FD9F1]/55 bg-[#173345] px-2.5 py-1.5 text-xs font-semibold text-[#E5F9FC] hover:border-[#6FD9F1] hover:bg-[#24516A] focus-visible:outline-2 focus-visible:outline-[#6FD9F1] cursor-pointer"
-              title="Enter the F01–F03 sculptural opening and continue into the twelve-folio volume"
+              title="Enter the continuous twelve-folio sculptural volume"
             >
               <BookOpen className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Living Folios</span><span className="sm:hidden">F01–03</span>
