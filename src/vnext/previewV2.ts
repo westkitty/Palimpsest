@@ -30,6 +30,14 @@ const fallback = byId<HTMLElement>('webgl-fallback');
 const moveButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-move]'));
 const actionButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-mechanism]'));
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const bridgeEmbedded = new URLSearchParams(window.location.search).get('embedded') === '1' && window.parent !== window;
+const requestedFolio = Number(new URLSearchParams(window.location.search).get('folio'));
+const initialFolio: FolioIndex = Number.isInteger(requestedFolio) && requestedFolio >= 1 && requestedFolio <= 3
+  ? (requestedFolio - 1) as FolioIndex : 0;
+function sendBridge(action: 'folio' | 'continue' | 'exit', folio: number): void {
+  if (bridgeEmbedded) window.parent.postMessage({ channel: 'palimpsest-living', action, folio }, window.location.origin);
+}
+
 
 const titleCopy = [
   'I — Before the Stars',
@@ -605,7 +613,8 @@ function updateNav():void {
   progress.textContent=`F0${state.folio+1} / F03`;
   document.querySelectorAll('.chapter-lines span').forEach((line,i)=>line.classList.toggle('active',i<=state.folio));
   prevButton.disabled=state.folio===0;
-  nextButton.disabled=state.folio===2;
+  nextButton.disabled=state.folio===2 && !bridgeEmbedded;
+  nextButton.textContent=state.folio===2 && bridgeEmbedded ? 'F04 →' : 'Next →';
   title.textContent=titleCopy[state.folio];
   description.textContent=overviewCopy[state.folio];
   for(const btn of actionButtons){
@@ -630,6 +639,7 @@ function goFolio(index:FolioIndex):void {
   canvas.dataset.authoredSculptures=String(authoredFigureCount);
   // Observable QA provenance; no image-register or canon-approval claim.
   announce(`Folio ${index+1} of 3. ${overviewCopy[index]}`);
+  sendBridge('folio', index);
 }
 function smooth(value:number,target:number,dt:number):number {
   return reducedMotion?target:THREE.MathUtils.damp(value,target,5.8,Math.min(dt,0.07));
@@ -844,7 +854,8 @@ function moveMini(dt:number):void {
 function nextFolio(direction:number):void {
   if(inspection!=='overview')leaveMini();
   const next=state.folio+direction;
-  if(next<0||next>2)return;
+  if(next<0)return;
+  if(next>2){sendBridge('continue',3);return;}
   goFolio(next as FolioIndex);
 }
 function handleKeys(event:KeyboardEvent):void {
@@ -853,6 +864,7 @@ function handleKeys(event:KeyboardEvent):void {
   // Escape is a universal exit, including when a movable panel button owns focus.
   if(k==='escape' && witnessActive){toggleWitness();return;}
   if(k==='escape' && inspection!=='overview'){leaveMini();return;}
+  if(k==='escape' && bridgeEmbedded){event.preventDefault();sendBridge('exit',state.folio);return;}
   if(target.closest('button,input,textarea,select,[contenteditable]'))return;
   if(['arrowleft','arrowright','a','b','c','m','i','w','s','d'].includes(k)&&event.target===canvas)event.preventDefault();
   if(event.repeat&&['m','i','arrowleft','arrowright','a','b','c'].includes(k))return;
@@ -866,6 +878,15 @@ function handleKeys(event:KeyboardEvent):void {
   if(k==='escape'&&inspection!=='overview')leaveMini();
 }
 function releaseKey(event:KeyboardEvent):void {activeMove.delete(event.key.toLowerCase());}
+function onBridgeMessage(event:MessageEvent):void {
+  if(!bridgeEmbedded || event.source!==window.parent || event.origin!==window.location.origin)return;
+  const message=event.data;
+  if(!message || message.channel!=='palimpsest-living' || message.action!=='navigate')return;
+  if(typeof message.folio!=='number' || !Number.isInteger(message.folio) || message.folio<0 || message.folio>2)return;
+  goFolio(message.folio as FolioIndex);
+  if(!fallback.hidden)fallbackPage(message.folio as FolioIndex);
+}
+
 function resize():void {
   if(!renderer)return;
   const w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);
@@ -895,9 +916,11 @@ function destroy():void {
   window.removeEventListener('keydown',handleKeys);
   window.removeEventListener('keyup',releaseKey);
   window.removeEventListener('resize',resize);
+  window.removeEventListener('message',onBridgeMessage);
   clear();controls?.dispose();renderer?.dispose();sharedMats.forEach(m=>m.dispose());fiber.dispose();
 }
 wireButtons();
+window.addEventListener('message',onBridgeMessage);
 try{
   renderer=new THREE.WebGLRenderer({canvas,antialias:true});
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.6));
@@ -923,7 +946,7 @@ try{
   window.addEventListener('keyup',releaseKey);
   window.addEventListener('resize',resize);
   window.addEventListener('pagehide',destroy,{once:true});
-  goFolio(0);resize();updateInspectButton();
+  goFolio(initialFolio);resize();updateInspectButton();
   function step(now:number):void {
     const dt=lastTime?Math.min(0.06,(now-lastTime)/1000):0;
     lastTime=now;
@@ -937,7 +960,7 @@ try{
   // The fallback remains an editorial, interactive read-only review; it has no automatic secret disclosure.
   window.addEventListener('keydown',handleKeys);
   window.addEventListener('keyup',releaseKey);
-  goFolio(0);fallbackPage(0);
+  goFolio(initialFolio);fallbackPage(initialFolio);
   for(const button of actionButtons)button.addEventListener('click',()=>fallbackPage(state.folio));
   prevButton.addEventListener('click',()=>fallbackPage(state.folio));
   nextButton.addEventListener('click',()=>fallbackPage(state.folio));

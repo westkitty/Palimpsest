@@ -33,6 +33,8 @@ jobs:
         run: node tests/awe-signature.test.cjs
       - name: Verify original authored figures, ink, color and source scope
         run: node tests/authored-assets-ink.test.cjs
+      - name: Verify the joined twelve-folio living-volume navigation
+        run: node tests/living-folios-bridge.test.cjs
       - name: Build both PALIMPSEST pages
         run: bun run build
       - name: Verify both release artifacts are present

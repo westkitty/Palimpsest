@@ -4,7 +4,9 @@ An interactive twelve-folio Three.js pop-up book presenting an Administration in
 
 **Live Deployment:** https://westkitty.github.io/Palimpsest/
 
-**Unnarrated F01–F03 concept preview:** https://westkitty.github.io/Palimpsest/folio-vnext.html — a separate review route, not yet an approved replacement for the original twelve-folio reader.
+**Living opening folios:** The main twelve-folio reader now offers **Enter Living Folios** from its cover and header, opening the authored F01–F03 papercraft inside the same volume. Its F03 Next action continues into F04 in the archival reader. The separate source-review route remains at https://westkitty.github.io/Palimpsest/folio-vnext.html.
+
+**Manuscript boundary:** The official narration and historical manuscript have not been silently rewritten; until their replacement is approved, the sculptural F01–F03 edition remains unnarrated and can be exited back to the original archival reader. The historical session and approved DRAXIS assets remain intact.
 
 ## Overview
 
@@ -53,3 +55,10 @@ The earlier **ten-world prototype** (*Palimpsest — The Impossible Living Atlas
 - **Software WebGL Rendering:** Environments lacking hardware GPU acceleration fall back to software rasterization (e.g., SwiftShader) at reduced pixel ratio and frame rate; use **Quality** or **4:3 Schematic** mode if needed.
 - **Browser Speech Voices:** Spoken audio narration depends on operating-system/browser `speechSynthesis` voices; when no voice is installed, **Read Cue (`V`)** steps reading cues silently at transcript pace.
 - **Static Browser Hosting:** The static GitHub Pages build omits local-only Node server routes and runs fully client-side.
+
+## Unified living folio navigation (2026-11-20)
+
+- Open the Living Folios from the cover or the main reader's header. A single 12-folio rail navigates F01–F03 inside the handcrafted sculptural opening; choosing F04–F12 continues in the intact archival reader.
+- The F01–F03 scene keeps its original movable UI, inked authored character sculptures, A/B/C mechanisms, miniature inspection, and hidden-text rules. Closing returns to the archive without copying secrets, narration or experimental planet-template state.
+- `Escape` exits the joined view from normal overview. Keyboard focus is confined by the native modal dialogue; original page state remains unchanged until the user explicitly continues into another folio.
+- The separate `folio-vnext.html` URL remains directly accessible, including when WebGL is unavailable. No historical story text or original renderer module is replaced by this navigation bridge.

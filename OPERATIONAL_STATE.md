@@ -50,3 +50,12 @@ status: AWE fold-to-cosmos implementation candidate; final CI, live Pages and re
 - Reviewed current Drive visual-canon contracts for NiAlBu and Wordstreamer; both report `approved_primary_drive_file_ids: []`. The integration reuses Palimpsest editorial assets, not canonical image approvals.
 - Protected: the approved 21 DRAXIS sculpture roster remains excluded from pre-Drakken F01–F03. No new narrative, original figure source modifications, new character illustration, or F03 secret introduced.
 - Verification: source-contract test and integrated GitHub Actions browser pass required before main promotion; publication state unknown until final readback.
+
+## 2026-11-20 integrated navigation implementation
+
+- The user requested continuing each folio and joining the separate authored F01-F03 scene to the twelve-folio reader, plus commit, push and Pages update.
+- Integrated through a native `LivingFoliosBridge` modal overlay, using the existing `/folio-vnext.html` runtime rather than duplicating scene code or replacing the historical manuscript.
+- Cover and header provide discoverable entry. One F01-F12 rail navigates the three sculptural folios and hands off to the original reader at F04-F12. The F03 Next button also continues to F04. The original reader remains accessible using Archive.
+- The bridge validates same-origin and exact iframe `event.source` on every postMessage; navigation messages cannot mutate canon, narrator, secret state or experimental storage. The parent pauses its WebGL rendering while the bridge is active, then resumes on return.
+- Fallback handles the selected initial page and parent navigation with the same reading state (not a canon-approved public revised transcript). The original full SVG archival fallback remains untouched.
+- Must verify: React typecheck/build, existing source contracts, new bridge contract, browser end-to-end F01→F04, return to F04 position, floating panel input, both routes, Pages deployment and readback. Do not claim completed until evidence exists.

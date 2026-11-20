@@ -5,6 +5,7 @@ import { ChapterHeader } from './components/ChapterHeader';
 import { ChroniclePanel } from './components/ChroniclePanel';
 import { ClosedCoverOverlay } from './components/ClosedCoverOverlay';
 import { ControlDock } from './components/ControlDock';
+import { LivingFoliosBridge } from './components/LivingFoliosBridge';
 import { MagnifierReadout } from './components/MagnifierReadout';
 import { NarrationSubtitle } from './components/NarrationSubtitle';
 import { NonWebglFolioView } from './components/NonWebglFolioView';
@@ -29,6 +30,8 @@ export default function App() {
   const [contextLost, setContextLost] = useState(false);
   const [webglFallbackReason, setWebglFallbackReason] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [livingOpen, setLivingOpen] = useState(false);
+  const [livingStart, setLivingStart] = useState<0 | 1 | 2>(0);
 
   const useNonWebgl = snapshot.nonWebglMode || contextLost;
 
@@ -71,12 +74,12 @@ export default function App() {
   // Pause WebGL RAF loop automatically while Non-WebGL mode is toggled on
   useEffect(() => {
     if (engineRef.current) {
-      engineRef.current.setRenderingPaused(useNonWebgl);
-      if (!useNonWebgl) {
+      engineRef.current.setRenderingPaused(useNonWebgl || livingOpen);
+      if (!useNonWebgl && !livingOpen) {
         engineRef.current.syncAllWorlds();
       }
     }
-  }, [useNonWebgl]);
+  }, [useNonWebgl, livingOpen]);
 
   const handleOpenBook = useCallback(() => {
     if (engineRef.current && !useNonWebgl) {
@@ -114,6 +117,22 @@ export default function App() {
     },
     [useNonWebgl],
   );
+
+  // The opening sculptural edition and the archival manuscript are separate
+  // representations inside one navigable volume. No secret or script state is copied.
+  const handleOpenLivingFolios = useCallback(() => {
+    const active = atlasStore.getSnapshot().activeWorld;
+    setLivingStart((active < 3 ? active : 0) as 0 | 1 | 2);
+    narrationEngine.stop();
+    setLivingOpen(true);
+  }, []);
+
+  const handleCloseLivingFolios = useCallback(() => setLivingOpen(false), []);
+
+  const handleContinueFromLiving = useCallback((world: WorldId) => {
+    setLivingOpen(false);
+    handleSelectWorld(world);
+  }, [handleSelectWorld]);
 
   const handleTriggerInteraction = useCallback(
     (slot: FolioInteractionSlot) => {
@@ -285,6 +304,7 @@ export default function App() {
         onExportPostcard={handleExportPostcard}
         onOpenEndcard={handleOpenEndcard}
         onOpenHelp={() => setHelpOpen(true)}
+        onOpenLivingFolios={handleOpenLivingFolios}
       />
 
       {/* Full DOM Transcript, Mechanisms & 21 DRAXIS Source Drawer */}
@@ -314,6 +334,7 @@ export default function App() {
         <ClosedCoverOverlay
           nonWebglMode={snapshot.nonWebglMode}
           onOpenBook={handleOpenBook}
+          onExploreLivingFolios={handleOpenLivingFolios}
           onToggleNonWebgl={() => atlasStore.setNonWebglMode(!snapshot.nonWebglMode)}
         />
       )}
@@ -414,6 +435,14 @@ export default function App() {
         onNudgeMagnifier={(dx, dz) => engineRef.current?.nudgeMagnifier(dx, dz)}
         onNudgeImmersion={(dx, dz) => engineRef.current?.nudgeImmersion(dx, dz)}
       />
+
+      {livingOpen && (
+        <LivingFoliosBridge
+          initialFolio={livingStart}
+          onClose={handleCloseLivingFolios}
+          onContinue={handleContinueFromLiving}
+        />
+      )}
 
       {/* Keyboard & Touch Shortcuts modal */}
       <ShortcutsModal open={helpOpen} onClose={() => setHelpOpen(false)} />
