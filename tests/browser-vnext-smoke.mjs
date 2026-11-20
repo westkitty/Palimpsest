@@ -21,6 +21,7 @@ try {
   assert.equal(await page.locator('[data-panel-id]').count(),4,'four movable instruments');
   const title=page.locator('#folio-title');
   assert.match(await title.textContent(),/Before the Stars/);
+  assert.equal(await page.locator('#stage').getAttribute('data-authored-sculptures'),'3','F01 must load the three existing character sculptures');
   const handle=page.locator('[data-panel-id="folio"] [data-panel-handle]');
   const boxBefore=await page.locator('[data-panel-id="folio"]').boundingBox();
   await handle.focus(); await page.keyboard.press('ArrowRight');
@@ -28,6 +29,7 @@ try {
   assert.ok(boxAfter.x>boxBefore.x,'Keyboard reposition works independently from orbit');
   await page.locator('#next').click();
   assert.match(await title.textContent(),/All Unfolds/);
+  assert.equal(await page.locator('#stage').getAttribute('data-authored-sculptures'),'1','F02 must load the original Digital Geode sculpture');
   const witness=page.locator('#witness');
   assert.equal(await witness.isHidden(),true,'scale passage withheld before stage C');
   await page.locator('[data-mechanism="A"]').click();
@@ -42,6 +44,7 @@ try {
   assert.equal(await witness.getAttribute('aria-pressed'),'false','Escape restores reader to book');
   await page.locator('#next').click();
   assert.match(await title.textContent(),/Notebook Program/);
+  assert.equal(await page.locator('#stage').getAttribute('data-authored-sculptures'),'0','F03 must not introduce character or Drakken sculptures ahead of canon');
   await page.locator('[data-mechanism="C"]').click();
   assert.match(await page.locator('#mechanism-status').textContent(),/Variation: 1/);
   await page.locator('#toggle-panels').click();

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { buildShardGodFigure, buildWordstreamerFigure, buildNiAlBuGeode } from '../engine/drakken/CharacterFigures';
 import { activateSlot, mayReveal, planetPattern, startFolio, type FolioActions, type FolioIndex, type Slot, type Inspection } from './folioLogic.ts';
 
 /**
@@ -36,8 +37,8 @@ const titleCopy = [
   'III — The Notebook Program',
 ] as const;
 const overviewCopy = [
-  'Three schematic standees occupy an unlit primordial spread. The first stars have not yet appeared.',
-  'Unfold the celestial fan: first points, then clusters, then a galactic paper sculpture. Zentrum and the Digital Geode are landmarks, not coordinates of cosmic centrality.',
+  'Three existing PALIMPSEST papercraft figure sculptures occupy the primordial spread. There are no celestial stars yet; the character designs remain editorial interpretations.',
+  'Unfold the celestial fan: first points, then clusters, then a galactic paper sculpture. The Digital Geode uses PALIMPSEST’s existing NiAlBu sculpture. Zentrum is a landmark, not a literal universal centre.',
   "Open finite template leaves from the World's Vault; select a source plate and generate visibly related but distinct worlds. These are illustrative models, not named planets.",
 ] as const;
 const actionCopy = [
@@ -86,6 +87,7 @@ let printPulse = 0;
 let planets: THREE.Group | null = null;
 let textTextures: THREE.Texture[] = [];
 let activeMove = new Set<string>();
+let authoredFigureCount = 0;
 const clockDirection = new THREE.Vector3();
 const cursorToSecret = new THREE.Vector3();
 const shared = {
@@ -104,6 +106,50 @@ const shared = {
   navy: new THREE.MeshStandardMaterial({color:0x162638,roughness:0.90,side:THREE.DoubleSide}),
 };
 const sharedMats: THREE.Material[] = Object.values(shared);
+// Retain the palette on the authored sculptures. Overlay dark, independent ink linework
+// rather than recolouring the artists' cardstock. This is a physical cel-paint treatment,
+// not a glossy CGI/PBR remodel, texture replacement or new character design.
+const sourceInk = new THREE.LineBasicMaterial({color:0x111924, transparent:true, opacity:0.9, depthWrite:false});
+sharedMats.push(sourceInk);
+function addInkedContours(authored:THREE.Object3D):void {
+  const meshes:THREE.Mesh[]=[];
+  authored.traverse(obj=>{
+    if(obj instanceof THREE.Mesh && obj.geometry && obj.geometry.getAttribute('position')?.count<=3500) meshes.push(obj);
+  });
+  for(const mesh of meshes){
+    const mat=Array.isArray(mesh.material)?mesh.material[0]:mesh.material;
+    if(mat instanceof THREE.MeshStandardMaterial && (mat.transparent || (mat.emissiveIntensity>0.7 && mat.emissive.getHex()!==0)))continue;
+    const edges=new THREE.EdgesGeometry(mesh.geometry, 32);
+    if(edges.getAttribute('position').count===0){edges.dispose();continue;}
+    const strokes=new THREE.LineSegments(edges,sourceInk);
+    strokes.name='authored-ink-contour';
+    strokes.scale.setScalar(1.004);
+    strokes.renderOrder=2;
+    mesh.add(strokes);
+  }
+}
+function preCaptivityNiAlBu():THREE.Group {
+  // The published model contains the author-built NiAlBu inside his later Geode.
+  // Extract its existing figure rather than model a fourth, invented anatomy.
+  // The pre-injury era remains visually UNVERIFIED; no limbs or anatomy are invented.
+  const apparatus=buildNiAlBuGeode(fiber,1);
+  const figure=apparatus.children.find(node=>node instanceof THREE.Group && Math.abs(node.rotation.z-Math.PI)<0.00001);
+  if(!(figure instanceof THREE.Group))throw new Error('Original NiAlBu sculpture missing in Geode');
+  apparatus.remove(figure);
+  figure.rotation.z=0;
+  figure.position.set(0,0,0);
+  // The four copper prison rings belong to captivity, not the primordial tableau.
+  for(const node of [...figure.children]){
+    if(node instanceof THREE.Mesh && node.geometry instanceof THREE.TorusGeometry){
+      figure.remove(node);node.geometry.dispose();
+      const materials=Array.isArray(node.material)?node.material:[node.material];
+      materials.forEach(material=>material.dispose());
+    }
+  }
+  disposeSubtree(apparatus);
+  return figure;
+}
+
 function paperGrain():THREE.CanvasTexture {
   const c=document.createElement('canvas');c.width=256;c.height=256;
   const ctx=c.getContext('2d');if(!ctx)throw Error('Paper texture canvas unavailable');
@@ -262,35 +308,33 @@ function buildF01():void {
       slab(root,0.035,0.46+(i%2)*0.17,0.055,i===1?shared.cyan:shared.gold,x+s*0.45,0.52,-1.93);
     }
   }
-  const symbols=[shared.ink,shared.purple,shared.blue];
+  // Reuse the three published PALIMPSEST sculptural figures, not token stand-ins.
+  // Source: src/engine/drakken/CharacterFigures.ts (source-reference designs).
   const names=['THE SHARD-GOD','WORDSTREAMER','NIALBU'];
+  const portraits:THREE.Group[]=[
+    buildShardGodFigure(fiber,1.36),
+    buildWordstreamerFigure(fiber,1.24),
+    preCaptivityNiAlBu(),
+  ];
+  const scales=[1,1,1.40];
   for(let i=0;i<3;i++){
     const x=(i-1)*2.67;
     const pivot=paperHinge(root,x,-1.93,1.66,1.53,shared.paper);
-    const mark=put(pivot,new THREE.CylinderGeometry(0.30,0.44,0.80,5),symbols[i],0,0.45,0.83);
-    mark.rotation.z=i===1?0.13:0;
-    put(pivot,new THREE.OctahedronGeometry(0.27,0),symbols[i],0,0.94,0.83);
-    if(i===1){
-      ring(pivot,0.37,0.014,shared.cyan,0,0.49,0.83);
-      for(let j=0;j<6;j++){
-        const a=j*Math.PI/3;
-        slab(pivot,0.06,0.15,0.035,shared.cyan,Math.sin(a)*0.31,0.55,0.83+Math.cos(a)*0.27);
-      }
-    }
-    if(i===0){ // Faceted obsidian authority mark, deliberately not a character model.
-      for(let j=0;j<5;j++){
-        const a=(j/5)*Math.PI*2;
-        const shard=put(pivot,new THREE.TetrahedronGeometry(0.15,0),shared.ink,Math.cos(a)*0.31,0.93+Math.sin(a)*0.14,0.84);
-        shard.rotation.z=a;
-      }
-    }
+    const sculpt=portraits[i];
+    sculpt.scale.multiplyScalar(scales[i]);
+    sculpt.position.set(0,0.25,0.82);
+    sculpt.name=['palimpsest-original-tiger','palimpsest-original-wordstreamer','palimpsest-original-nialbu'][i];
+    sculpt.userData.source='src/engine/drakken/CharacterFigures.ts';
+    sculpt.userData.visualScope='existing editorial papercraft; not new canon approval';
+    addInkedContours(sculpt);
+    pivot.add(sculpt);
+    authoredFigureCount++;
     const detail=new THREE.Group();pivot.add(detail);detail.visible=false;
     for(let j=0;j<5;j++){
       slab(detail,0.024,0.02,0.22,shared.brass,-0.38+j*0.19,0.095,0.45);
       slab(detail,0.08,0.022,0.015,shared.cyan,-0.38+j*0.19,0.106,0.57);
     }
     f01DetailMarks.push(detail);
-    if(i===2)for(const q of [-1,1])slab(pivot,0.08,0.56,0.07,shared.cyan,q*0.15,0.58,0.84);
     paperHinges.push(pivot);
     platform(root,x,0.50,1.68);
     plaque(root,names[i],x,0.396,0.94,1.60);
@@ -416,14 +460,15 @@ function buildF02():void {
   plaque(root,'ZENTRUM',-2.30,0.41,1.07,1.52);
   platform(root,2.27,0.55,1.86);
   const geode=new THREE.Group();geode.position.set(2.27,0.54,0.24);root.add(geode);
-  const wall=put(geode,new THREE.CylinderGeometry(0.41,0.43,0.72,6,1,true),shared.blue,0,0.38,0);
-  (wall.material as THREE.MeshStandardMaterial).side=THREE.DoubleSide;
-  for(let i=0;i<6;i++){
-    const a=i*Math.PI/3;
-    const facet=put(geode,new THREE.ConeGeometry(0.11,0.85,5),i%2?shared.ink:shared.purple,Math.cos(a)*0.43,0.44,Math.sin(a)*0.43);
-    facet.rotation.z=Math.sin(a)*0.10;
-  }
-  ring(geode,0.39,0.02,shared.cyan,0,0.76,0);
+  // The source-authored NiAlBu-in-Geode sculpture is preserved, including its open
+  // cutaway, inverted captive, four copper rings, and cyan fissures. No substitute cage.
+  const originalGeode=buildNiAlBuGeode(fiber,1.32);
+  originalGeode.name='palimpsest-original-nialbu-geode';
+  originalGeode.userData.source='src/engine/drakken/CharacterFigures.ts';
+  originalGeode.userData.visualScope='original author-built PALIMPSEST interpretation';
+  addInkedContours(originalGeode);
+  geode.add(originalGeode);
+  authoredFigureCount++;
   plaque(root,'DIGITAL GEODE',2.27,0.41,1.14,1.90);
   plaque(root,'THE ALL UNFOLDS',0,0.25,2.17,3.15);
   for(const x of [-3.68,3.68])filigree(root,x,0.29,2.10,0.20,shared.gold);
@@ -534,6 +579,9 @@ function redrawPlanets():void {
       ribbon.rotation.set(p*0.27+pat.tilt,pat.seamAngle+p*0.45,0.19+p*0.12);
     }
   }
+  // The three generated families receive the same authored ink treatment as
+  // the figures: matte source-derived cel colors and high-angle contour lines.
+  addInkedContours(planets);
 }
 function disposeSubtree(root:THREE.Object3D):void {
   root.traverse(obj=>{
@@ -576,9 +624,11 @@ function updateNav():void {
     `Physical folds: ${state.f01.fold?'opened':'closed'}  ·  Details: ${state.f01.detail?'shown':'folded'}`;
 }
 function goFolio(index:FolioIndex):void {
-  clear();state=startFolio(index);
+  clear();authoredFigureCount=0;state=startFolio(index);
   if(index===0)buildF01();else if(index===1)buildF02();else buildF03();
   resetCamera();updateNav();
+  canvas.dataset.authoredSculptures=String(authoredFigureCount);
+  // Observable QA provenance; no image-register or canon-approval claim.
   announce(`Folio ${index+1} of 3. ${overviewCopy[index]}`);
 }
 function smooth(value:number,target:number,dt:number):number {

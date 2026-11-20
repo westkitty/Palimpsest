@@ -41,3 +41,12 @@ status: AWE fold-to-cosmos implementation candidate; final CI, live Pages and re
 - Verified locally in this work unit: **26 AWE source invariants**, **20 existing geometry/story source checks**, **20 dock/paper contracts**, **4 deterministic folio logic tests**, TypeScript syntax transpilation, and **41** independent draggable desktop/mobile layout checks with touch persistence.
 - **Still pending until proven:** headless WebGL smoke, GitHub full typecheck, production build, Pages deployment, live `/folio-vnext.html` and `/` HTTP responses, the actual rendered 3D visual quality in real browsers/hardware, secret inspection path end-to-end and sustained GPU resource lifecycle.
 - Publish to `main` **only after the feature-branch CI finishes green**, fast-forwarding non-forced from a verified unchanged `main` and keeping Git rollback. No claim of deployed state until provider deployment success and site readback.
+
+## Existing designed assets / color / ink correction (2026-11-20)
+
+- Corrected F01–F02 to instantiate published PALIMPSEST sculptural components from `src/engine/drakken/CharacterFigures.ts`, replacing generic symbolic markers and a fabricated Geode cage. The design retains source material colors and adds geometry-derived dark ink contours without modifying source authored modules.
+- F01: Tiger, Wordstreamer and an editorial NiAlBu extraction from the existing Geode representation; copper captivity rings are withheld before imprisonment. **Pre-captivity NiAlBu anatomy remains visually unverified**; a future approved era model may supersede this reuse.
+- F02: original full NiAlBu Digital Geode model, open cutaway and copper rings preserved; testimony remains miniature/Geode-only, text unchanged.
+- Reviewed current Drive visual-canon contracts for NiAlBu and Wordstreamer; both report `approved_primary_drive_file_ids: []`. The integration reuses Palimpsest editorial assets, not canonical image approvals.
+- Protected: the approved 21 DRAXIS sculpture roster remains excluded from pre-Drakken F01–F03. No new narrative, original figure source modifications, new character illustration, or F03 secret introduced.
+- Verification: source-contract test and integrated GitHub Actions browser pass required before main promotion; publication state unknown until final readback.

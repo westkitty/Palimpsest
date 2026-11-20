@@ -4,9 +4,9 @@ This folder is the **separate sculptural concept experience** served at `/folio-
 
 ## Visual language
 
-The physical object belongs beside PALIMPSEST's existing archival folios: layered ivory/blue cardstock, slate-linen boards, multiple cut-out depth planes, brass hinge axes and rivets, engraved material indicators, deterministic paper fibre, theatrical but controlled azure/copper lighting, and a genuine 4:3 reading plate. Schematic figure markers in F01 are **not approved biological character-model replacements**. The real character registry is untouched.
+The physical object belongs beside PALIMPSEST's existing archival folios: layered ivory/blue cardstock, slate-linen boards, multiple cut-out depth planes, brass hinge axes and rivets, engraved material indicators, deterministic paper fibre, theatrical but controlled azure/copper lighting, and a genuine 4:3 reading plate. F01 and F02 now reuse the authored paper sculptures from `src/engine/drakken/CharacterFigures.ts` (Tiger, Wordstreamer, NiAlBu and his Digital Geode); the character-image approval registry remains untouched. The F01 NiAlBu figure is an editorial reuse of the existing source sculpture with imprisonment rings removed; the exact pre-captivity anatomy remains unverified.
 
-- **F01**: entirely starless primordial order; three symbolic hinged monuments, paper arches and delicate rule traces. Concealed maker testimony under Wordstreamer reads exactly **He murdered her.**
+- **F01**: entirely starless primordial order; three existing ink-contoured, hand-colored sculptural figures, paper arches and delicate rule traces. Concealed maker testimony under Wordstreamer reads exactly **He murdered her.**
 - **F02**: A raises the first points, B releases clusters, C completes the folded galaxy. Zentrum and the Digital Geode remain distinct landmarks, never asserted as the literal center of the universe. Miniature exploration of the Geode reveals exactly **NiAlBu still watches her die. Again and again.** No murder animation or narrator reaction.
 - **F03**: finite archive leaves; a mechanical compiler and a trio of worlds share one selected source template but differ through bounded, repeatable variations. The third inscription, the public Vault lock, any invented named planets and revised narration are **not implemented** pending approval.
 
@@ -50,3 +50,10 @@ On F02, operate A, then B, then C. The optional **Enter the All (G)** instrument
 On F03, triggering C advances bounded variation and gives the paper source die a short, non-flashing physical press animation. It adds no new planets or events to canon.
 
 Regression: `node tests/awe-signature.test.cjs` in addition to the prior source/folio/dock checks. Browser proof must still inspect actual geometry, keyboard/touch and hidden testimony after deployment.
+
+## Source-asset and ink fidelity correction (2026-11-20)
+
+- Figure source is **existing PALIMPSEST code**, not new invented anatomy or an AI-generated approximation: `buildShardGodFigure`, `buildWordstreamerFigure`, `buildNiAlBuGeode`. F01 uses three authored figures; F02 mounts the full existing Digital Geode assembly. No original model functions were edited.
+- Preserve the source's matte, **hand-painted cel colors** and sculptural silhouettes. Add geometry-derived dark ink contours as a separate removable layer, with no grayscale desaturation, material replacement, glossy CGI makeover, or gold-colored secret markings. Source figures retain obsidian, slate indigo, azure fissures and copper captivity rings where applicable.
+- The current Drive visual-canon contracts for Wordstreamer and NiAlBu list **no approved primary image**. These figures are existing *Palimpsest editorial sculptures*, not newly canonical reference approvals. F01 NiAlBu's pre-captivity historical state still needs a source-approved era reference. Do not invent missing limbs/appendages to resolve it.
+- The 21 DRAXIS sculptures have separate scoped visual acceptance; they should **not** be inserted into F01–F03 merely to increase asset count, because the first three folios precede their introduction.
