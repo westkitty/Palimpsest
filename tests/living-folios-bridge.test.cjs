@@ -35,6 +35,7 @@ const checks = [
  ['original F01-F03 authored visuals protected',preview.includes('buildShardGodFigure(fiber,1.36)') && preview.includes('buildNiAlBuGeode(fiber,1.32)')],
  ['F04-F12 instantiate existing source classes',scenes.includes('F04FolioWorld')&&scenes.includes('F12FolioWorld')&&scenes.includes('folio.build(state)')],
  ['later scenes have separate study state',state.includes('LATER_STUDY_STORAGE_KEY')&&preview.includes('saveLaterStudy()')],
+ ['3D source levers are directly operable by a deliberate pointer tap',preview.includes('onPaperPointerUp')&&preview.includes('laterWorld.getInteractables()')&&preview.includes('mechanismRaycaster.intersectObjects(targets,true)')],
  ['later scenes use same draggable controls',html.includes('src="./src/vnext/panelDock.js"')],
  ['non-WebGL F04-F12 reading exists',html.includes('id="later-fallback"')&&preview.includes('fallbackPage(index:number)')],
  ['no invented F03 inscription',!preview.includes('He could not create. He locked away the templates.')],
