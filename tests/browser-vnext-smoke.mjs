@@ -213,6 +213,9 @@ try {
   await resumeEntry.waitFor({state:'visible'});
   await resumeEntry.click();
   await joined.waitFor({state:'visible'});
+  assert.equal(await embedded.locator('#toggle-panels').getAttribute('aria-expanded'),'false',
+    're-entering living volume again reveals only the book by default');
+  await embedded.locator('#toggle-panels').click();
   await embedded.locator('#folio-title').filter({hasText:'Unfinished Peace'}).waitFor({state:'visible',timeout:15000});
   assert.match(await embedded.locator('#folio-title').textContent(),/Unfinished Peace/,
     'living volume resumes at the archivally selected folio');
