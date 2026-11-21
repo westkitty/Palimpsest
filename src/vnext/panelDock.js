@@ -121,6 +121,9 @@ function moveKey(event, panel) {
   place(panel, rect.left-r.left+direction[0], rect.top-r.top+direction[1]);
   raise(panel); save();
 }
+// Briefly measure normal panel geometry synchronously before hiding the UI.
+// The HTML hides it before JS arrives; no browser paint occurs during this task.
+root?.classList.remove('panels-hidden');
 for (const panel of panels) {
   const handle=panel.querySelector('[data-panel-handle]');
   if (!handle) continue;
