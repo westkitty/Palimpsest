@@ -6,6 +6,7 @@ on:
       - living-volume/full-twelve-20261120
       - uplift/living-theatre-20261120
       - feat/open-book-minimal-ui-20261120
+      - fix/physical-book-gesture-20261120
   workflow_dispatch:
 
 permissions:
