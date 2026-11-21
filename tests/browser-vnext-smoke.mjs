@@ -19,7 +19,15 @@ try {
   const canvasShown=await page.locator('#stage').evaluate(e=>!e.hidden);
   // An actual WebGL scene is required for this optional signature acceptance pass.
   assert.ok(canvasShown,'WebGL must initialize in software renderer for browser smoke');
-  assert.equal(await page.locator('[data-panel-id]').count(),4,'four movable instruments');
+  assert.equal(await page.locator('[data-panel-id]').count(),4,'four movable instruments still exist');
+  assert.equal(await page.locator('#window-layer').getAttribute('class'),'panels-hidden','book-only opening hides all four panels');
+  assert.equal(await page.locator('#toggle-panels').getAttribute('aria-expanded'),'false','chevron starts collapsed');
+  assert.equal(await page.locator('#toggle-panels').isVisible(),true,'bottom reveal stays available');
+  assert.equal(await page.locator('#reset-panels').isVisible(),false,'secondary controls withheld on entry');
+  assert.equal(await page.locator('#archival-edition').isVisible(),false,'archive link withheld on entry');
+  await page.locator('#toggle-panels').click();
+  assert.equal(await page.locator('#toggle-panels').getAttribute('aria-expanded'),'true','chevron expands controls');
+  assert.equal(await page.locator('[data-panel-id="folio"]').isVisible(),true,'all existing panels can be recovered');
   const title=page.locator('#folio-title');
   assert.match(await title.textContent(),/Before the Stars/);
   assert.equal(await page.locator('#stage').getAttribute('data-authored-sculptures'),'3','F01 must load the three existing character sculptures');
@@ -62,6 +70,8 @@ try {
   assert.match(await page.locator('#mechanism-status').textContent(),/Ink register: 0110/);
   await page.reload({waitUntil:'domcontentloaded'});
   await page.waitForTimeout(950);
+  assert.equal(await page.locator('#window-layer').getAttribute('class'),'panels-hidden','reload still opens on clean book even with saved panel positions');
+  await page.locator('#toggle-panels').click();
   assert.match(await page.locator('#mechanism-status').textContent(),/Physical folds: opened/,'the separate study state survives a browser reload');
   await page.locator('#next').click();
   assert.equal(await page.locator('#witness').isVisible(),true,'F02 stage survives reload');
@@ -112,7 +122,9 @@ try {
   await page.locator('[data-mechanism="B"]').click();
   assert.match(await page.locator('#mechanism-status').textContent(),/B: operated/);
   await page.reload({waitUntil:'domcontentloaded'});
-  // A fresh page defaults to F01 but the later folio mechanism state must persist.
+  // A fresh page defaults to F01 and starts without UI; reveal controls before navigating.
+  assert.equal(await page.locator('#toggle-panels').getAttribute('aria-expanded'),'false');
+  await page.locator('#toggle-panels').click();
   for(let i=0;i<5;i++)await page.locator('#next').click();
   assert.match(await page.locator('#folio-title').textContent(),/Long Attrition/);
   assert.match(await page.locator('#mechanism-status').textContent(),/B: operated/);
@@ -121,6 +133,22 @@ try {
   // The archive route must be tested in a clean browser process so the long
   // 12-scene render is not mistaken for an archival navigation failure.
   await browser.close();
+  // Check the PUBLIC default entry, not just the direct study route.
+  const landingBrowser=await chromium.launch({
+    headless:true,
+    executablePath:process.env.PALIMPSEST_CHROME_PATH,
+    args:['--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader'],
+  });
+  try {
+    const landing=await landingBrowser.newPage({viewport:{width:1360,height:840},reducedMotion:'reduce'});
+    await landing.goto(origin+'/',{waitUntil:'domcontentloaded'});
+    await landing.waitForURL('**/folio-vnext.html',{timeout:12000});
+    assert.equal(await landing.locator('#window-layer').getAttribute('class'),'panels-hidden','homepage lands directly on Living Folios without instruments');
+    assert.equal(await landing.locator('#toggle-panels').isVisible(),true,'homepage exposes just the bottom chevron');
+    assert.equal(await landing.locator('[data-panel-id="folio"]').isVisible(),false,'no floating UI overlays book');
+    await landing.locator('#toggle-panels').click();
+    assert.equal(await landing.locator('#archival-edition').isVisible(),true,'expanded menu retains explicit archive access');
+  } finally {await landingBrowser.close();}
   archiveBrowser=await chromium.launch({
     headless:true,
     executablePath:process.env.PALIMPSEST_CHROME_PATH,
@@ -128,7 +156,7 @@ try {
   });
   const archivePage=await archiveBrowser.newPage({viewport:{width:1360,height:840},reducedMotion:'reduce'});
   archivePage.on('pageerror',e=>pageErrors.push(String(e)));
-  const home=await archivePage.goto(origin+'/',{waitUntil:'domcontentloaded'});
+  const home=await archivePage.goto(origin+'/archive.html',{waitUntil:'domcontentloaded'});
   assert.ok(home?.ok(),'Original twelve-folio route remains available');
   // The same volume now opens the source-authored opening folios without a new tab.
   const livingEntry=archivePage.getByRole('button',{name:'Enter Living Folios'});
@@ -149,6 +177,8 @@ try {
   const embedded=archivePage.frameLocator('iframe[title^="F01–F12 living"]');
   await embedded.locator('#stage').waitFor({state:'visible',timeout:12000});
   await archivePage.waitForTimeout(600);
+  assert.equal(await embedded.locator('#toggle-panels').getAttribute('aria-expanded'),'false','embedded Living Folios also start with unobstructed book');
+  await embedded.locator('#toggle-panels').click();
   assert.equal(await embedded.locator('#stage').getAttribute('data-authored-sculptures'),'3','unified opening uses original three figures');
   assert.equal(await joined.locator('nav button').count(),12,'one twelve-folio navigation rail');
   await joined.getByRole('button',{name:'Folio 02, living edition'}).click();
