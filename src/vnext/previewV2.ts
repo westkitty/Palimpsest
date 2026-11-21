@@ -166,6 +166,9 @@ function onPhysicalPointerMove(event:PointerEvent):void {
     0,1);
   turn.progress=turn.direction===1?fraction:1-fraction;
   binding.setLeafProgress(turn.progress,true);
+  // Stage sculpture folds toward its card as the material leaf lifts, without
+  // altering source-authored A/B/C state or disposing a scene mid-drag.
+  rig.scale.y=reducedMotion?1:1-0.52*Math.sin(turn.progress*Math.PI);
 }
 function onPhysicalPointerUp(event:PointerEvent):void {
   const turn=physicalTurn;
@@ -209,6 +212,7 @@ function updatePhysicalBinding(dt:number):void {
     turn.progress+=Math.sign(difference)*Math.min(Math.abs(difference),step);
   }
   binding.setLeafProgress(turn.progress,true);
+  rig.scale.y=reducedMotion?1:1-0.52*Math.sin(turn.progress*Math.PI);
   const unfolded=turn.direction===1?turn.progress:1-turn.progress;
   if(turn.commit && !turn.swapped && unfolded>=0.55){
     turn.swapped=true;
@@ -219,7 +223,7 @@ function updatePhysicalBinding(dt:number):void {
     if(turn.commit && !turn.swapped)goFolio(turn.toIndex);
     binding.setLeafProgress(turn.progress,false);
     physicalTurn=null;canvas.dataset.pageTurn='idle';
-    rig.visible=true;if(controls)controls.enabled=true;
+    rig.visible=true;rig.scale.y=1;if(controls)controls.enabled=true;
   }
 }
 
