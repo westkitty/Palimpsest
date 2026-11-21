@@ -2,6 +2,8 @@
 
 An interactive twelve-folio Three.js pop-up book presenting an Administration instructional edition spanning `F01` through `F12` in layered cream cardstock over a matte black slate table.
 
+**Governing creative direction:** [PALIMPSEST Creative Direction](PALIMPSEST_CREATIVE_DIRECTION.md) · [Prototype-Wonder Recovery Plan](PALIMPSEST_RECOVERY_PLAN.md). The Administration's history is factual but selectively framed; the primary experience is a magnificent physical-feeling pop-up book with near-invisible conventional UI. These documents govern future design planning without altering the existing manuscript or canon.
+
 **Live Deployment:** https://westkitty.github.io/Palimpsest/
 
 **Living twelve-folio volume:** The main reader offers **Enter Living Folios** from its cover and header. All twelve pages now use one continuous sculptural stage, reusing the authored F01–F03 scenes and the nine source-authored three-mechanism later folios (F04–F12). The separate direct route is https://westkitty.github.io/Palimpsest/folio-vnext.html. The original twelve-folio reader remains independently available via **Archive**, never as a forced handoff.
