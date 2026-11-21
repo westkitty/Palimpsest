@@ -78,6 +78,21 @@ function defaultPlacement(panel) {
   panel.style.right = ''; panel.style.bottom = '';
   delete panel.dataset.moved;
 }
+// Explicit initial geometry: hidden-before-JS panels must never be measured as
+// zero boxes and then piled in one corner when the chevron is first expanded.
+function defaultCoordinates(panel) {
+  const r = frame();
+  const mobile = matchMedia('(max-width:700px)').matches;
+  const narrow = matchMedia('(max-width:1030px)').matches;
+  const w = panel.offsetWidth, h = panel.offsetHeight;
+  switch (panel.dataset.panelId) {
+    case 'folio': return [mobile ? 8 : 18, mobile ? 8 : 18];
+    case 'field': return [r.width - w - (mobile ? 8 : 18), mobile ? 182 : 18];
+    case 'notes': return [r.width - w - (mobile ? 8 : 18), r.height - h - (mobile ? 270 : narrow ? 306 : 315)];
+    case 'instruments': return [(r.width - w) / 2, r.height - h - (mobile ? 55 : 64)];
+    default: return [8, 8];
+  }
+}
 function restoreDefaults() {
   try { sessionStorage.removeItem(LAYOUT_KEY); } catch {}
   stored = {};
@@ -87,9 +102,9 @@ function restoreDefaults() {
     panel.style.zIndex = '';
   }
   front=30;
-  for (const panel of panels) { // Convert CSS placement to clamped absolute pixel placement.
-    const r=panel.getBoundingClientRect(), f=frame();
-    place(panel,r.left-f.left,r.top-f.top);
+  for (const panel of panels) {
+    const [x, y] = defaultCoordinates(panel);
+    place(panel, x, y);
   }
 }
 function setVisible(value) {
@@ -135,8 +150,8 @@ for (const panel of panels) {
     place(panel, saved.x*frame().width, saved.y*frame().height);
   } else {
     fold(panel, panel.dataset.mobileFold==='true' && matchMedia('(max-width:700px)').matches, false);
-    const initial=panel.getBoundingClientRect(), r=frame();
-    place(panel,initial.left-r.left,initial.top-r.top);
+    const [x,y]=defaultCoordinates(panel);
+    place(panel,x,y);
   }
   panel.querySelector('[data-panel-fold]')?.addEventListener('click',()=> {
     raise(panel); fold(panel,!panel.classList.contains('is-folded'));
