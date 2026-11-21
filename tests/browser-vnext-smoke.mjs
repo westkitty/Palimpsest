@@ -148,6 +148,15 @@ try {
     assert.equal(await landing.locator('[data-panel-id="folio"]').isVisible(),false,'no floating UI overlays book');
     await landing.locator('#toggle-panels').click();
     assert.equal(await landing.locator('#archival-edition').isVisible(),true,'expanded menu retains explicit archive access');
+    await landing.locator('#toggle-panels').click();
+    await landing.setViewportSize({width:390,height:844});
+    assert.equal(await landing.locator('[data-panel-id="folio"]').isVisible(),false,'mobile also arrives on the unobstructed book');
+    const mobileChevron=await landing.locator('#toggle-panels').boundingBox();
+    assert.ok(mobileChevron && mobileChevron.x>=0 && mobileChevron.x+mobileChevron.width<=390,
+      'chevron stays within narrow mobile viewport');
+    await landing.locator('#toggle-panels').click();
+    assert.equal(await landing.locator('#prev').isVisible(),true,'mobile can reveal page navigation');
+    assert.equal(await landing.locator('#archival-edition').isVisible(),true,'archive still reachable on mobile');
   } finally {await landingBrowser.close();}
   archiveBrowser=await chromium.launch({
     headless:true,
