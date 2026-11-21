@@ -1,28 +1,33 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Palimpsest: An Illustrated History of the All</title>
-    <meta
-      name="description"
-      content="Administration instructional edition — twelve historical folios framed in layered cream cardstock over a matte black slate table."
-    />
-    <meta property="og:title" content="Palimpsest: An Illustrated History of the All" />
-    <meta
-      property="og:description"
-      content="Interactive twelve-folio three-dimensional history covering F01 through F12 with 21 procedural Drakken models and 36 teaching mechanisms."
-    />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <link
-      rel="icon"
-      type="image/svg+xml"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23161B24'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%23B89860' stroke-width='1.5'/%3E%3Cpath d='M16 7l2.2 6.5H25l-5.4 3.9 2.1 6.5-5.7-4-5.7 4 2.1-6.5L7 13.5h6.8z' fill='%233D95B5'/%3E%3C/svg%3E"
-    />
-  </head>
-  <body class="bg-[#0E1116] text-[#ECE4D4] antialiased selection:bg-[#4E8096]/35">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0e1116" />
+  <title>PALIMPSEST — Twelve Living Folios</title>
+  <meta name="description" content="A continuous, interactive twelve-folio sculptural pop-up book. Open directly onto the paper stage." />
+  <script>
+    // The Living Folios are the canonical entry experience; the original
+    // historical reader remains available by explicit choice at archive.html.
+    // Resolve relative to the current directory for GitHub Pages project URLs.
+    (() => {
+      const source = new URL(window.location.href);
+      const archival = source.searchParams.get('edition') === 'archive';
+      source.searchParams.delete('edition');
+      const destination = new URL(archival ? './archive.html' : './folio-vnext.html', source.href);
+      destination.search = source.search;
+      destination.hash = source.hash;
+      window.location.replace(destination.href);
+    })();
+  </script>
+</head>
+<body style="margin:0;min-height:100vh;background:#0e1116;color:#f0e8d9;font:16px/1.6 Georgia,serif">
+  <noscript>
+    <main style="padding:2rem">
+      <h1>PALIMPSEST</h1>
+      <p><a href="./folio-vnext.html" style="color:#9bd7ef">Open the twelve Living Folios</a></p>
+      <p><a href="./archive.html" style="color:#d3b587">Open the archival edition</a></p>
+    </main>
+  </noscript>
+</body>
 </html>
