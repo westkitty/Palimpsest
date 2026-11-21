@@ -8,10 +8,13 @@ const root = document.getElementById('window-layer');
 const panels = root ? [...root.querySelectorAll('[data-panel-id]')] : [];
 const reset = document.getElementById('reset-panels');
 const visibility = document.getElementById('toggle-panels');
+const layoutTools = document.getElementById('layout-tools');
 const active = new Map();
 const minInset = 8;
 let front = 30;
-let hidden = false;
+// A book-first arrival is intentional, including after reloads: panel positions
+// persist, but panel visibility does not. The chevron is the only initial UI.
+let hidden = true;
 let stored = {};
 try {
   const parsed = JSON.parse(sessionStorage.getItem(LAYOUT_KEY) || '{}');
@@ -92,10 +95,15 @@ function restoreDefaults() {
 function setVisible(value) {
   hidden = !value;
   root?.classList.toggle('panels-hidden', hidden);
+  layoutTools?.classList.toggle('controls-expanded', value);
   if (visibility) {
-    visibility.setAttribute('aria-pressed', String(hidden));
-    visibility.textContent = hidden ? 'Show instruments' : 'Hide instruments';
+    visibility.setAttribute('aria-expanded', String(value));
+    visibility.setAttribute('aria-label', value ? 'Collapse book controls' : 'Expand book controls');
+    visibility.title = value ? 'Collapse book controls' : 'Expand book controls';
   }
+  // Hidden panels are removed from keyboard navigation by display:none;
+  // restore focus to the always-visible opener if collapse was requested.
+  if (!value && root?.contains(document.activeElement)) visibility?.focus();
 }
 function moveKey(event, panel) {
   const delta = event.shiftKey ? 36 : 12;
@@ -156,6 +164,8 @@ for (const panel of panels) {
 }
 reset?.addEventListener('click',()=>{setVisible(true);restoreDefaults();});
 visibility?.addEventListener('click',()=>setVisible(hidden));
+// Establish the book-only first frame even when old layout state was saved.
+setVisible(false);
 window.addEventListener('resize',()=>{
   const f=frame();
   for(const panel of panels){
