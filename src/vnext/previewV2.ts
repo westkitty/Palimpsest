@@ -6,6 +6,7 @@ import { FIRST_LATER_FOLIO, LATER_STUDY_STORAGE_KEY, isLivingIndex, operateLater
 import { activeSpecimen, createLaterFolio, getLaterCopy, makeContactShadow } from './laterFolioScenes.ts';
 import { getLaterDiagram } from './laterFolioDiagrams.ts';
 import { LivingStagecraft } from './livingStagecraft.ts';
+import { LivingBookBinding } from './livingBookBinding.ts';
 
 /**
  * PALIMPSEST — F01–F03 sculptural REVIEW build.
@@ -38,6 +39,9 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matc
 const bridgeEmbedded = new URLSearchParams(window.location.search).get('embedded') === '1' && window.parent !== window;
 const requestedFolio = Number(new URLSearchParams(window.location.search).get('folio'));
 const initialFolio = Number.isInteger(requestedFolio) && requestedFolio >= 1 && requestedFolio <= 12 ? requestedFolio - 1 : 0;
+// A direct visit begins with a closed physical cover. Embedded archival
+// counterparts and explicit later-folio deep links open at the requested leaf.
+const startWithClosedCover = !bridgeEmbedded && initialFolio === 0;
 function sendBridge(action: 'folio' | 'continue' | 'exit', folio: number): void {
   if (bridgeEmbedded) window.parent.postMessage({ channel: 'palimpsest-living', action, folio }, window.location.origin);
 }
@@ -75,6 +79,150 @@ const overhead = new THREE.PointLight(0xc4e6ee, 26, 18, 2);
 overhead.position.set(0, 5.1, -2.1);scene.add(overhead);
 const rig = new THREE.Group();
 scene.add(rig);
+const binding = new LivingBookBinding();
+scene.add(binding.root);
+type BookPhase = 'closed' | 'opening' | 'open';
+let bookPhase: BookPhase = startWithClosedCover ? 'closed' : 'open';
+let coverAnimation = startWithClosedCover ? 0 : 1;
+binding.setCoverProgress(coverAnimation);
+rig.visible = !startWithClosedCover;
+canvas.dataset.bookPhase = bookPhase;
+canvas.dataset.pageTurn = 'idle';
+type PhysicalTurn = {
+  pointerId: number | null;
+  fromIndex: number;
+  toIndex: number;
+  direction: -1 | 1;
+  fromX: number;
+  currentX: number;
+  progress: number;
+  destination: number;
+  dragging: boolean;
+  commit: boolean;
+  swapped: boolean;
+};
+let physicalTurn: PhysicalTurn | null = null;
+const bookRaycaster = new THREE.Raycaster();
+const bookPointer = new THREE.Vector2();
+function bookHit(event: PointerEvent, object: THREE.Object3D): boolean {
+  const rect = canvas.getBoundingClientRect();
+  if(!rect.width || !rect.height)return false;
+  bookPointer.set((event.clientX-rect.left)/rect.width*2-1,
+    -((event.clientY-rect.top)/rect.height*2-1));
+  bookRaycaster.setFromCamera(bookPointer,camera);
+  return bookRaycaster.intersectObject(object,false).length>0;
+}
+function folioLeafTitle(index:number):string {
+  return index<3?titleCopy[index]:getLaterCopy(index as LaterFolioIndex).title;
+}
+function openPhysicalCover():void {
+  if(bookPhase!=='closed')return;
+  bookPhase='opening';
+  canvas.dataset.bookPhase='opening';
+  if(controls)controls.enabled=false;
+  announce('Opening the closed book to the first folio and its three original paper figures.');
+}
+function beginPhysicalTurn(direction:-1|1,pointerId:number|null,startX:number):void {
+  if(bookPhase!=='open' || physicalTurn || inspection!=='overview')return;
+  const target=currentFolio+direction;
+  if(!isLivingIndex(target))return;
+  const startProgress=direction===1?0:1;
+  physicalTurn={
+    pointerId,fromIndex:currentFolio,toIndex:target,direction,
+    fromX:startX,currentX:startX,progress:startProgress,destination:startProgress,
+    dragging:pointerId!==null,commit:pointerId===null,swapped:false,
+  };
+  binding.setLeafTitles(folioLeafTitle(currentFolio),currentFolio,
+    folioLeafTitle(target),target);
+  binding.setLeafProgress(startProgress,true);
+  if(pointerId===null)physicalTurn.destination=direction===1?1:0;
+  canvas.dataset.pageTurn=pointerId===null?'settling':'dragging';
+  if(controls)controls.enabled=false;
+}
+function onPhysicalPointerDown(event:PointerEvent):void {
+  if(event.button!==0 || !event.isPrimary)return;
+  if(bookPhase==='closed' && bookHit(event,binding.coverHit)){
+    event.preventDefault();event.stopImmediatePropagation();
+    openPhysicalCover();return;
+  }
+  if(bookPhase!=='open' || physicalTurn || inspection!=='overview')return;
+  const direction: -1|1|null =
+    currentFolio<11 && bookHit(event,binding.rightCornerHit)?1:
+    currentFolio>0 && bookHit(event,binding.leftCornerHit)?-1:null;
+  if(direction===null)return;
+  event.preventDefault();event.stopImmediatePropagation();
+  beginPhysicalTurn(direction,event.pointerId,event.clientX);
+  canvas.setPointerCapture(event.pointerId);
+  canvas.style.cursor='grabbing';
+}
+function onPhysicalPointerMove(event:PointerEvent):void {
+  const turn=physicalTurn;
+  if(!turn || !turn.dragging || turn.pointerId!==event.pointerId)return;
+  event.preventDefault();event.stopImmediatePropagation();
+  turn.currentX=event.clientX;
+  const delta=event.clientX-turn.fromX;
+  const fraction=THREE.MathUtils.clamp(
+    turn.direction===1?-delta/(canvas.clientWidth*0.34):delta/(canvas.clientWidth*0.34),
+    0,1);
+  turn.progress=turn.direction===1?fraction:1-fraction;
+  binding.setLeafProgress(turn.progress,true);
+}
+function onPhysicalPointerUp(event:PointerEvent):void {
+  const turn=physicalTurn;
+  if(!turn || !turn.dragging || turn.pointerId!==event.pointerId)return;
+  event.preventDefault();event.stopImmediatePropagation();
+  turn.dragging=false;
+  const travelled=Math.abs(turn.currentX-turn.fromX);
+  const distance=turn.direction===1?turn.progress:1-turn.progress;
+  turn.commit=travelled>14 && distance>=0.35;
+  turn.destination=turn.commit?(turn.direction===1?1:0):(turn.direction===1?0:1);
+  canvas.dataset.pageTurn='settling';
+  canvas.style.cursor='grab';
+  try{if(canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId);}catch{}
+}
+function onPhysicalPointerCancel(event:PointerEvent):void {
+  if(!physicalTurn || physicalTurn.pointerId!==event.pointerId)return;
+  event.preventDefault();event.stopImmediatePropagation();
+  physicalTurn.dragging=false;
+  physicalTurn.commit=false;
+  physicalTurn.destination=physicalTurn.direction===1?0:1;
+  canvas.dataset.pageTurn='settling';
+}
+function updatePhysicalBinding(dt:number):void {
+  if(bookPhase==='opening'){
+    coverAnimation=Math.min(1,coverAnimation+(reducedMotion?1:Math.max(0,dt)*0.82));
+    const eased=coverAnimation*coverAnimation*(3-2*coverAnimation);
+    binding.setCoverProgress(eased);
+    rig.visible=eased>=0.57;
+    if(coverAnimation===1){
+      bookPhase='open';canvas.dataset.bookPhase='open';
+      rig.visible=true;if(controls)controls.enabled=true;
+      announce('First folio open. Drag the outer paper edge to turn a leaf.');
+    }
+  }
+  const turn=physicalTurn;
+  if(!turn || turn.dragging)return;
+  if(reducedMotion)turn.progress=turn.destination;
+  else{
+    const difference=turn.destination-turn.progress;
+    const step=Math.max(0,dt)*2.8;
+    turn.progress+=Math.sign(difference)*Math.min(Math.abs(difference),step);
+  }
+  binding.setLeafProgress(turn.progress,true);
+  const unfolded=turn.direction===1?turn.progress:1-turn.progress;
+  if(turn.commit && !turn.swapped && unfolded>=0.55){
+    turn.swapped=true;
+    goFolio(turn.toIndex);
+    if(controls)controls.enabled=false;
+  }
+  if(Math.abs(turn.progress-turn.destination)<0.001){
+    if(turn.commit && !turn.swapped)goFolio(turn.toIndex);
+    binding.setLeafProgress(turn.progress,false);
+    physicalTurn=null;canvas.dataset.pageTurn='idle';
+    rig.visible=true;if(controls)controls.enabled=true;
+  }
+}
+
 let renderer: THREE.WebGLRenderer | null = null;
 let controls: OrbitControls | null = null;
 let frame = 0;
@@ -764,6 +912,10 @@ function goFolio(index:number):void {
     rig.add(livingStagecraft.root);
   }
   resetCamera();updateNav();
+  // A page change must never expose the story through a closed cover or
+  // re-enable orbit controls while an actual paper leaf is moving.
+  rig.visible=bookPhase==='open'||bookPhase==='opening'&&coverAnimation>0.57;
+  if(controls && (bookPhase!=='open'||physicalTurn))controls.enabled=false;
   canvas.dataset.authoredSculptures=String(authoredFigureCount);
   canvas.dataset.sourceAuthoredScene=String(index>=FIRST_LATER_FOLIO);
   announce(`Folio ${index+1} of 12. ${index<3?(overviewCopy as readonly string[])[index]:getLaterCopy(index as LaterFolioIndex).description}`);
@@ -1011,11 +1163,15 @@ function moveMini(dt:number):void {
   camera.position.y=THREE.MathUtils.clamp(camera.position.y,0.38,1.28);
 }
 function nextFolio(direction:number):void {
+  if(bookPhase==='closed'){openPhysicalCover();return;}
+  if(bookPhase!=='open' || physicalTurn)return;
   if(inspection!=='overview')leaveMini();
   const next=currentFolio+direction;
   if(!isLivingIndex(next))return;
-  goFolio(next);
-  if(!renderer)fallbackPage(next);
+  // Non-WebGL readers still have explicit page controls; the living 3D book
+  // uses the same curled cardstock transition as direct mouse/touch dragging.
+  if(!renderer){goFolio(next);fallbackPage(next);return;}
+  beginPhysicalTurn(direction as -1|1,null,0);
 }
 function handleKeys(event:KeyboardEvent):void {
   const target=event.target as HTMLElement;
@@ -1025,6 +1181,11 @@ function handleKeys(event:KeyboardEvent):void {
   if(k==='escape' && inspection!=='overview'){leaveMini();return;}
   if(k==='escape' && bridgeEmbedded){event.preventDefault();sendBridge('exit',currentFolio);return;}
   if(target.closest('button,input,textarea,select,[contenteditable]'))return;
+  if(bookPhase==='closed'){
+    if(k==='enter'||k===' '){event.preventDefault();openPhysicalCover();}
+    return;
+  }
+  if(bookPhase==='opening' || physicalTurn)return;
   if(['arrowleft','arrowright','a','b','c','m','i','w','s','d'].includes(k)&&event.target===canvas)event.preventDefault();
   if(event.repeat&&['m','i','arrowleft','arrowright','a','b','c'].includes(k))return;
   if(k==='arrowleft'&&inspection==='overview')nextFolio(-1);
@@ -1108,7 +1269,11 @@ function destroy():void {
   canvas.removeEventListener('pointerdown',onPaperPointerDown);
   canvas.removeEventListener('pointerup',onPaperPointerUp);
   canvas.removeEventListener('pointercancel',onPaperPointerCancel);
-  clear();controls?.dispose();renderer?.dispose();sharedMats.forEach(m=>m.dispose());fiber.dispose();paperShadow?.dispose();
+  canvas.removeEventListener('pointerdown',onPhysicalPointerDown,true);
+  canvas.removeEventListener('pointermove',onPhysicalPointerMove,true);
+  canvas.removeEventListener('pointerup',onPhysicalPointerUp,true);
+  canvas.removeEventListener('pointercancel',onPhysicalPointerCancel,true);
+  clear();binding.dispose();controls?.dispose();renderer?.dispose();sharedMats.forEach(m=>m.dispose());fiber.dispose();paperShadow?.dispose();
 }
 wireButtons();
 window.addEventListener('message',onBridgeMessage);
@@ -1135,6 +1300,10 @@ try{
   controls.mouseButtons={LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.PAN};
   controls.touches={ONE:THREE.TOUCH.ROTATE,TWO:THREE.TOUCH.DOLLY_PAN};
   canvas.addEventListener('pointerdown',(event)=>{if(controls)controls.mouseButtons.LEFT=event.shiftKey?THREE.MOUSE.PAN:THREE.MOUSE.ROTATE;},{capture:true});
+  canvas.addEventListener('pointerdown',onPhysicalPointerDown,{capture:true});
+  canvas.addEventListener('pointermove',onPhysicalPointerMove,{capture:true});
+  canvas.addEventListener('pointerup',onPhysicalPointerUp,{capture:true});
+  canvas.addEventListener('pointercancel',onPhysicalPointerCancel,{capture:true});
   canvas.addEventListener('pointerdown',onPaperPointerDown);
   canvas.addEventListener('pointerup',onPaperPointerUp);
   canvas.addEventListener('pointercancel',onPaperPointerCancel);
@@ -1145,16 +1314,24 @@ try{
   window.addEventListener('resize',resize);
   window.addEventListener('pagehide',destroy,{once:true});
   goFolio(initialFolio);resize();updateInspectButton();
+  binding.setCoverProgress(coverAnimation);
+  rig.visible=!startWithClosedCover;
+  if(startWithClosedCover && controls)controls.enabled=false;
   function step(now:number):void {
     const dt=lastTime?Math.min(0.06,(now-lastTime)/1000):0;
     lastTime=now;
-    animate(dt);moveMini(dt);advanceFlight(dt);revealTick();controls?.update();renderer?.render(scene,camera);
+    updatePhysicalBinding(dt);animate(dt);moveMini(dt);advanceFlight(dt);revealTick();controls?.update();renderer?.render(scene,camera);
     frame=requestAnimationFrame(step);
   }
   frame=requestAnimationFrame(step);
 }catch(error){
   console.error('PALIMPSEST preview: WebGL unavailable',error);
   canvas.hidden=true;fallback.hidden=false;
+  // The accessible illustrated edition cannot expose a 3D click target.
+  bookPhase='open';coverAnimation=1;
+  binding.setCoverProgress(1);rig.visible=true;
+  document.body.classList.add('no-webgl');
+  canvas.dataset.bookPhase='open';
   // The fallback remains an editorial, interactive read-only review; it has no automatic secret disclosure.
   window.addEventListener('keydown',handleKeys);
   window.addEventListener('keyup',releaseKey);
