@@ -48,6 +48,11 @@ function coverPrinting(): THREE.CanvasTexture {
   c.fillText('YOUR FATE IS IN OUR HANDS.', 384, 918, 656);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  // The front plate is printed on the cover's underside when fully open.
+  // Closing flips that underside upward: rotate print 180 degrees to read
+  // correctly from the visitor's near edge of the table.
+  texture.center.set(0.5, 0.5);
+  texture.rotation = Math.PI;
   texture.anisotropy = 4;
   return texture;
 }
@@ -133,7 +138,7 @@ export class LivingBookBinding {
       brass, 0.04, 0.08, 0);
     this.root.add(this.closedStack);
 
-    this.coverPivot.position.set(0, 0.51, 0);
+    this.coverPivot.position.set(0, 0.21, 0);
     const coverBoard = mesh(this.coverPivot,
       new THREE.BoxGeometry(4.94, 0.18, 6.26), coverMat, -2.43, -0.13, 0);
     coverBoard.castShadow = true;
@@ -201,7 +206,7 @@ export class LivingBookBinding {
   public setCoverProgress(amount: number): void {
     this.coverProgress = clamp01(amount);
     this.coverPivot.rotation.z = -(1-this.coverProgress)*Math.PI;
-    this.coverPivot.position.y = THREE.MathUtils.lerp(0.51, 0.08, this.coverProgress);
+    this.coverPivot.position.y = THREE.MathUtils.lerp(0.21, 0.08, this.coverProgress);
     this.closedStack.visible = this.coverProgress < 0.58;
     this.coverHit.visible = this.coverProgress < 0.1;
     this.cornerMarkers.visible = this.coverProgress > 0.99;
