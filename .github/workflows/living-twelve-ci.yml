@@ -5,6 +5,7 @@ on:
     branches:
       - living-volume/full-twelve-20261120
       - uplift/living-theatre-20261120
+      - feat/open-book-minimal-ui-20261120
   workflow_dispatch:
 
 permissions:
@@ -41,10 +42,11 @@ jobs:
           node tests/awe-signature.test.cjs
           node tests/authored-assets-ink.test.cjs
           node tests/living-folios-bridge.test.cjs
+          node tests/book-first-ui.test.cjs
       - name: Build both standalone and integrated routes
         run: |
           bun run build
-          test -s dist/index.html && test -s dist/folio-vnext.html
+          test -s dist/index.html && test -s dist/folio-vnext.html && test -s dist/archive.html
       - name: Setup Chromium
         run: |
           mkdir -p /tmp/palimpsest-e2e
