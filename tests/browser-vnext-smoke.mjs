@@ -161,7 +161,10 @@ try {
   archiveBrowser=await chromium.launch({
     headless:true,
     executablePath:process.env.PALIMPSEST_CHROME_PATH,
-    args:['--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader'],
+    // The historical edition has a full non-WebGL reading path. Test the
+    // archive counterpart there to avoid software-GPU stalls from testing
+    // its unrelated AtlasEngine on top of the 12-page sculptural journey.
+    args:['--disable-webgl'],
   });
   const archivePage=await archiveBrowser.newPage({viewport:{width:1360,height:840},reducedMotion:'reduce'});
   archivePage.on('pageerror',e=>pageErrors.push(String(e)));
