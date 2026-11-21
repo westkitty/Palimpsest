@@ -8,6 +8,42 @@ const page=await browser.newPage({viewport:{width:1360,height:840},reducedMotion
 const pageErrors=[];
 page.on('pageerror',e=>pageErrors.push(String(e)));
 const wait=(ms)=>new Promise(r=>setTimeout(r,ms));
+const stage=page.locator('#stage');
+async function openCover(){
+  assert.equal(await stage.getAttribute('data-book-phase'),'closed',
+    'book should first be physically closed, not already at F01');
+  const box=await stage.boundingBox();
+  assert.ok(box && box.width>500);
+  await page.mouse.click(box.x+box.width*0.655,box.y+box.height*0.475);
+  await page.waitForFunction(()=>document.querySelector('#stage')?.dataset.bookPhase==='open',{},{timeout:9000});
+}
+async function waitTurn(before){
+  await page.waitForFunction(previous=>document.querySelector('#folio-progress')?.textContent!==previous,
+    before,{timeout:13000});
+  await page.waitForFunction(()=>document.querySelector('#stage')?.dataset.pageTurn==='idle',
+    {},{timeout:13000});
+}
+async function turnKeyboard(direction){
+  const before=await page.locator('#folio-progress').textContent();
+  await stage.focus();
+  await page.keyboard.press(direction===1?'ArrowRight':'ArrowLeft');
+  await waitTurn(before);
+}
+async function dragPaper(direction){
+  const before=await page.locator('#folio-progress').textContent();
+  const box=await stage.boundingBox();
+  assert.ok(box,'canvas has visible physical book');
+  const x=box.x+box.width*(direction===1?0.78:0.22);
+  const y=box.y+box.height*0.61;
+  const end=box.x+box.width*(direction===1?0.29:0.71);
+  await page.mouse.move(x,y);
+  await page.mouse.down();
+  await page.mouse.move(end,y,{steps:18});
+  assert.equal(await stage.getAttribute('data-page-turn'),'dragging',
+    'real pointer displacement must control deforming paper');
+  await page.mouse.up();
+  await waitTurn(before);
+}
 try {
   let ready=false;
   for(let i=0;i<25;i++) {
@@ -19,7 +55,12 @@ try {
   const canvasShown=await page.locator('#stage').evaluate(e=>!e.hidden);
   // An actual WebGL scene is required for this optional signature acceptance pass.
   assert.ok(canvasShown,'WebGL must initialize in software renderer for browser smoke');
+  await openCover();
+  assert.equal(await stage.getAttribute('data-book-phase'),'open','closed cover animates into source F01 stage');
   assert.equal(await page.locator('[data-panel-id]').count(),4,'four movable instruments still exist');
+  assert.equal(await page.locator('#prev').isVisible(),false,'WebGL book has no page-turning UI buttons');
+  assert.equal(await page.locator('#next').isVisible(),false,'reader turns real paper, not Next');
+
   assert.equal(await page.locator('#window-layer').getAttribute('class'),'panels-hidden','book-only opening hides all four panels');
   assert.equal(await page.locator('#toggle-panels').getAttribute('aria-expanded'),'false','chevron starts collapsed');
   assert.equal(await page.locator('#toggle-panels').isVisible(),true,'bottom reveal stays available');
@@ -36,7 +77,7 @@ try {
   await handle.focus(); await page.keyboard.press('ArrowRight');
   const boxAfter=await page.locator('[data-panel-id="folio"]').boundingBox();
   assert.ok(boxAfter.x>boxBefore.x,'Keyboard reposition works independently from orbit');
-  await page.locator('#next').click();
+  await dragPaper(1);
   assert.match(await title.textContent(),/All Unfolds/);
   assert.equal(await page.locator('#stage').getAttribute('data-authored-sculptures'),'1','F02 must load the original Digital Geode sculpture');
   const witness=page.locator('#witness');
@@ -51,39 +92,40 @@ try {
   assert.equal(await witness.getAttribute('aria-pressed'),'true','witness toggle engaged');
   await page.keyboard.press('Escape');
   assert.equal(await witness.getAttribute('aria-pressed'),'false','Escape restores reader to book');
-  await page.locator('#next').click();
+  await turnKeyboard(1);
   assert.match(await title.textContent(),/Notebook Program/);
   assert.equal(await page.locator('#stage').getAttribute('data-authored-sculptures'),'0','F03 must not introduce character or Drakken sculptures ahead of canon');
   await page.locator('[data-mechanism="C"]').click();
   assert.match(await page.locator('#mechanism-status').textContent(),/Variation: 1/);
   await page.locator('[data-mechanism="B"]').click();
   assert.match(await page.locator('#mechanism-status').textContent(),/Ink register: 0110/,'second family has distinct printed ink identity');
-  await page.locator('#prev').click();
+  await turnKeyboard(-1);
   assert.match(await page.locator('#folio-title').textContent(),/All Unfolds/);
   assert.equal(await page.locator('#witness').isVisible(),true,'three stellar stages survive a folio revisit');
-  await page.locator('#prev').click();
+  await dragPaper(-1);
   await page.locator('[data-mechanism="A"]').click();
   assert.match(await page.locator('#mechanism-status').textContent(),/Physical folds: opened/);
-  await page.locator('#next').click();
-  await page.locator('#next').click();
+  await turnKeyboard(1);
+  await turnKeyboard(1);
   assert.match(await page.locator('#mechanism-status').textContent(),/Variation: 1/,'F03 generation survives page round trip');
   assert.match(await page.locator('#mechanism-status').textContent(),/Ink register: 0110/);
   await page.reload({waitUntil:'domcontentloaded'});
   await page.waitForTimeout(950);
+  await openCover();
   assert.equal(await page.locator('#window-layer').getAttribute('class'),'panels-hidden','reload still opens on clean book even with saved panel positions');
   await page.locator('#toggle-panels').click();
   assert.match(await page.locator('#mechanism-status').textContent(),/Physical folds: opened/,'the separate study state survives a browser reload');
-  await page.locator('#next').click();
+  await turnKeyboard(1);
   assert.equal(await page.locator('#witness').isVisible(),true,'F02 stage survives reload');
-  await page.locator('#next').click();
+  await turnKeyboard(1);
   assert.match(await page.locator('#mechanism-status').textContent(),/Ink register: 0110/);
   assert.match(await page.locator('#mechanism-status').textContent(),/Variation: 1/);
   await page.locator('#reset-study').click();
   assert.match(await page.locator('#mechanism-status').textContent(),/Ink register: 1001/,'reset restores first template');
   assert.match(await page.locator('#mechanism-status').textContent(),/Variation: 0/,'reset clears generation');
-  await page.locator('#prev').click();
+  await turnKeyboard(-1);
   assert.equal(await page.locator('#witness').isHidden(),true,'reset clears F02 stellar progression');
-  await page.locator('#prev').click();
+  await turnKeyboard(-1);
   assert.match(await page.locator('#mechanism-status').textContent(),/Physical folds: closed/,'reset clears F01 folds');
 
   await page.locator('#toggle-panels').click();
@@ -96,15 +138,15 @@ try {
   // Every later spread must be a physical 3D scene within the SAME living
   // renderer, with source-authored A/B/C mechanisms rather than an archive jump.
   // Reset study returns to F01; advance to F03 before the nine-page sweep.
-  await page.locator('#next').click();
-  await page.locator('#next').click();
+  await turnKeyboard(1);
+  await turnKeyboard(1);
   const chapters=[
     /First Contact/,/Standard of Conquest/,/Long Attrition/,
     /Ruby Eclipse/,/Aureal Gate/,/Heliocide/,
     /Siege Wall/,/First Dirt/,/Unfinished Peace/,
   ];
   for(let i=0;i<chapters.length;i++){
-    await page.locator('#next').click();
+    await turnKeyboard(1);
     assert.match(await page.locator('#folio-title').textContent(),chapters[i]);
     assert.equal(await page.locator('#stage').getAttribute('data-source-authored-scene'),'true',
       `F${String(i+4).padStart(2,'0')} uses source-authored 3D world`);
@@ -117,15 +159,16 @@ try {
     }
   }
   assert.equal(await page.locator('#next').isDisabled(),true,'F12 is the final living leaf');
-  for(let i=0;i<6;i++)await page.locator('#prev').click();
+  for(let i=0;i<6;i++)await turnKeyboard(-1);
   assert.match(await page.locator('#folio-title').textContent(),/Long Attrition/);
   await page.locator('[data-mechanism="B"]').click();
   assert.match(await page.locator('#mechanism-status').textContent(),/B: operated/);
   await page.reload({waitUntil:'domcontentloaded'});
-  // A fresh page defaults to F01 and starts without UI; reveal controls before navigating.
+  await openCover();
+  // A fresh page starts closed on F01 and retains source study state, not a visible console.
   assert.equal(await page.locator('#toggle-panels').getAttribute('aria-expanded'),'false');
   await page.locator('#toggle-panels').click();
-  for(let i=0;i<5;i++)await page.locator('#next').click();
+  for(let i=0;i<5;i++)await turnKeyboard(1);
   assert.match(await page.locator('#folio-title').textContent(),/Long Attrition/);
   assert.match(await page.locator('#mechanism-status').textContent(),/B: operated/);
   await page.close();
@@ -143,6 +186,8 @@ try {
     const landing=await landingBrowser.newPage({viewport:{width:1360,height:840},reducedMotion:'reduce'});
     await landing.goto(origin+'/',{waitUntil:'domcontentloaded'});
     await landing.waitForURL('**/folio-vnext.html',{timeout:12000});
+    assert.equal(await landing.locator('#stage').getAttribute('data-book-phase'),'closed',
+      'public homepage must show an actual shut book before anyone opens it');
     assert.equal(await landing.locator('#window-layer').getAttribute('class'),'panels-hidden','homepage lands directly on Living Folios without instruments');
     assert.equal(await landing.locator('#toggle-panels').isVisible(),true,'homepage exposes just the bottom chevron');
     assert.equal(await landing.locator('[data-panel-id="folio"]').isVisible(),false,'no floating UI overlays book');
@@ -155,7 +200,8 @@ try {
     assert.ok(mobileChevron && mobileChevron.x>=0 && mobileChevron.x+mobileChevron.width<=390,
       'chevron stays within narrow mobile viewport');
     await landing.locator('#toggle-panels').click();
-    assert.equal(await landing.locator('#prev').isVisible(),true,'mobile can reveal page navigation');
+    assert.equal(await landing.locator('#prev').isVisible(),false,
+      'mobile does not replace physical page dragging with buttons');
     assert.equal(await landing.locator('#archival-edition').isVisible(),true,'archive still reachable on mobile');
   } finally {await landingBrowser.close();}
   archiveBrowser=await chromium.launch({
