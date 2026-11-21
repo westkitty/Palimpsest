@@ -1330,7 +1330,7 @@ try{
   // The accessible illustrated edition cannot expose a 3D click target.
   bookPhase='open';coverAnimation=1;
   binding.setCoverProgress(1);rig.visible=true;
-  document.body.classList.add('no-webgl');
+  document.getElementById('book-stage')?.classList.add('no-webgl');
   canvas.dataset.bookPhase='open';
   // The fallback remains an editorial, interactive read-only review; it has no automatic secret disclosure.
   window.addEventListener('keydown',handleKeys);
