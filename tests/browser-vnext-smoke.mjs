@@ -187,7 +187,10 @@ try {
   const joined=archivePage.getByRole('dialog',{name:'PALIMPSEST integrated twelve-folio volume'});
   await joined.waitFor({state:'visible',timeout:10000});
   const embedded=archivePage.frameLocator('iframe[title^="F01–F12 living"]');
-  await embedded.locator('#stage').waitFor({state:'visible',timeout:12000});
+  // Archive Chromium intentionally disables WebGL; its embedded Living Folios
+  // are expected to present the source-grounded illustrated reading fallback.
+  await embedded.locator('#webgl-fallback').waitFor({state:'visible',timeout:12000});
+  assert.equal(await embedded.locator('#stage').isHidden(),true,'non-WebGL fallback never leaves a blank canvas');
   await archivePage.waitForTimeout(600);
   assert.equal(await embedded.locator('#toggle-panels').getAttribute('aria-expanded'),'false','embedded Living Folios also start with unobstructed book');
   await embedded.locator('#toggle-panels').click();
