@@ -113,7 +113,6 @@ export class LivingBookBinding {
   private readonly leafBase: Float32Array;
   private readonly leafFrontMat: THREE.MeshStandardMaterial;
   private readonly leafBackMat: THREE.MeshStandardMaterial;
-  private readonly ownedGeometries: THREE.BufferGeometry[] = [];
   private readonly ownedMaterials: THREE.Material[] = [];
   private readonly ownedTextures: THREE.Texture[] = [];
 
