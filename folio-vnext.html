@@ -65,8 +65,16 @@
     .move-controls button{min-width:38px;padding:7px}
     .miniature .move-controls{display:flex}
     .miniature .interaction-buttons{opacity:.42;pointer-events:none}
-    #layout-tools{position:absolute;right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));z-index:60;display:flex;gap:7px;pointer-events:auto}
-    #layout-tools button{background:#0d1521e8;border-color:#748994;box-shadow:0 5px 17px #000a;padding:7px 11px;font:700 10px/1.3 ui-monospace,monospace}
+    #layout-tools{position:absolute;left:50%;bottom:max(12px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:60;display:flex;align-items:center;justify-content:center;gap:8px;pointer-events:auto}
+    #layout-tools #toggle-panels{display:grid;place-items:center;width:48px;height:48px;padding:0;border-radius:999px;background:rgba(13,21,33,.86);border:1px solid rgba(207,182,131,.73);color:#f6e8cc;box-shadow:0 5px 24px #0009;backdrop-filter:blur(8px);font:600 24px/1 Georgia,serif}
+    #layout-tools #toggle-panels:hover{background:#25384a;border-color:#e5cd98}
+    #layout-tools #toggle-panels .chevron{display:inline-block;transition:transform .18s ease}
+    #layout-tools #toggle-panels[aria-expanded="true"] .chevron{transform:rotate(180deg)}
+    #layout-tools .expanded-action{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;min-height:42px;background:rgba(13,21,33,.94);border:1px solid #748994;border-radius:5px;color:#eee3cd;padding:8px 11px;text-decoration:none;font:700 10px/1.3 ui-monospace,monospace}
+    #layout-tools .expanded-action:hover{border-color:#e0c58f;background:#243344}
+    #layout-tools:not(.controls-expanded) .expanded-action{display:none}
+    #layout-tools:focus-within{z-index:70}
+    #layout-tools button{cursor:pointer}
     #window-layer.panels-hidden .window{display:none}
     #webgl-fallback{position:absolute;inset:0;overflow:auto;padding:120px 20px 270px;max-width:900px;margin:auto;color:#eadfcb;z-index:2}
     #webgl-fallback h2{font-family:Georgia,serif;font-size:24px;color:#d7c69d}
@@ -92,8 +100,8 @@
       .interaction-buttons{gap:4px}.interaction-buttons button{font-size:10px;line-height:1.35;min-height:48px;padding:6px}
       .folio-controls button,.instrument-bottom button{font-size:10px;min-height:38px;padding:5px 8px}
       .instrument-bottom{gap:5px}
-      #layout-tools{right:10px;bottom:10px}
-      #layout-tools button{font-size:9px;padding:5px 7px}
+      #layout-tools{left:50%;right:auto;bottom:max(10px,env(safe-area-inset-bottom));max-width:calc(100vw - 16px)}
+      #layout-tools .expanded-action{font-size:9px;padding:6px 8px}
     }
     @media(max-height:590px){.window[data-panel-id="field"]{top:10px}.window[data-panel-id="notes"]{bottom:240px}.panel-body{padding:8px 10px}.drag-grip{min-height:24px}.window[data-panel-id="instruments"]{bottom:50px}}
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
@@ -148,7 +156,7 @@
       <p data-folio-text hidden>The first stars rise through three mechanisms, forming a paper galaxy with the distinct landmarks Zentrum and the Digital Geode. NiAlBu's secret is discoverable inside the Geode.</p>
       <p data-folio-text hidden>The Notebook Program uses a finite set of archived planetary source templates to demonstrate related but non-identical worlds. No third maker inscription has been authorized.</p>
     </section>
-    <div id="window-layer" aria-label="Movable archival instruments">
+    <div id="window-layer" class="panels-hidden" aria-label="Movable archival instruments">
       <section class="window" data-panel-id="folio" aria-label="Folio identity panel">
         <div class="window-head"><button class="drag-grip" type="button" data-panel-handle aria-label="Move folio panel. Drag, or use arrow keys. Shift plus arrow moves farther; Home restores position."><span class="grip-mark" aria-hidden="true">⠿</span>FOLIO INDEX · MOVE</button><button class="fold-button" type="button" data-panel-fold aria-controls="folio-panel-body" aria-expanded="true">−</button></div>
         <div class="panel-body" id="folio-panel-body" data-panel-content>
@@ -181,7 +189,11 @@
       </section>
     </div>
     <div id="global-announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
-    <div id="layout-tools" role="group" aria-label="Instrument layout controls"><button id="toggle-panels" type="button" aria-pressed="false">Hide instruments</button><button id="reset-panels" type="button">Reset layout</button></div>
+    <div id="layout-tools" role="group" aria-label="Book controls">
+      <button id="toggle-panels" type="button" aria-controls="window-layer" aria-expanded="false" aria-label="Expand book controls" title="Expand book controls"><span class="chevron" aria-hidden="true">⌃</span></button>
+      <button id="reset-panels" class="expanded-action" type="button">Reset layout</button>
+      <a id="archival-edition" class="expanded-action" href="./archive.html" aria-label="Open the archival edition">Archival edition</a>
+    </div>
   </main>
   <script type="module" src="./src/vnext/panelDock.js"></script>
   <script type="module" src="./src/vnext/previewV2.ts"></script>
