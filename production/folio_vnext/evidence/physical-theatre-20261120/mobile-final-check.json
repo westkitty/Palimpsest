@@ -1,0 +1,18 @@
+{
+  "viewport": "390x844",
+  "captured": [
+    "10-mobile-open-after-camera-fix.png",
+    "11-mobile-F02-after-camera-fix.png"
+  ],
+  "bookOpen": true,
+  "keyboardPageTurn": true,
+  "pageErrors": [],
+  "stage": {
+    "bookPhase": "open",
+    "pageTurn": "idle",
+    "engine": "three.js r187",
+    "authoredSculptures": "1",
+    "sourceAuthoredScene": "false"
+  },
+  "ok": true
+}

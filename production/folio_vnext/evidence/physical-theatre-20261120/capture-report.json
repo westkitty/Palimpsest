@@ -1,0 +1,77 @@
+{
+  "recordedAt": "2026-11-21T04:10:18.110Z",
+  "source": "http://127.0.0.1:4173",
+  "browser": "Chromium",
+  "gpuMode": "software ANGLE SwiftShader for reproducible headless fallback",
+  "frames": [
+    {
+      "name": "01-closed-book",
+      "size": 260009,
+      "bookPhase": "closed",
+      "pageTurn": "idle",
+      "folio": "I \u2014 Before the Stars"
+    },
+    {
+      "name": "02-opening-cover",
+      "size": 312593,
+      "bookPhase": "opening",
+      "pageTurn": "idle",
+      "folio": "I \u2014 Before the Stars"
+    },
+    {
+      "name": "03-F01-settled",
+      "size": 271792,
+      "bookPhase": "open",
+      "pageTurn": "idle",
+      "folio": "I \u2014 Before the Stars"
+    },
+    {
+      "name": "04-mid-page-turn",
+      "size": 275947,
+      "bookPhase": "open",
+      "pageTurn": "dragging",
+      "folio": "I \u2014 Before the Stars"
+    },
+    {
+      "name": "05-F02-arrival",
+      "size": 213647,
+      "bookPhase": "open",
+      "pageTurn": "idle",
+      "folio": "II \u2014 The All Unfolds"
+    },
+    {
+      "name": "06-F02-three-stage-assembly",
+      "size": 246962,
+      "bookPhase": "open",
+      "pageTurn": "idle",
+      "folio": "II \u2014 The All Unfolds"
+    },
+    {
+      "name": "07-F10-later-folio",
+      "size": 216838,
+      "bookPhase": "open",
+      "pageTurn": "idle",
+      "folio": "F10 \u2014 The Siege Wall & the Postwar Protocols"
+    },
+    {
+      "name": "08-mobile-closed-book",
+      "size": 96909,
+      "bookPhase": "closed",
+      "pageTurn": "idle",
+      "folio": "I \u2014 Before the Stars"
+    },
+    {
+      "name": "09-mobile-open-F01",
+      "size": 106786,
+      "bookPhase": "open",
+      "pageTurn": "idle",
+      "folio": "I \u2014 Before the Stars"
+    }
+  ],
+  "errors": [],
+  "results": [],
+  "visualApproval": "REVIEWED_FRAMES_ONLY",
+  "ok": true,
+  "videoProof": "Full local WebM retained outside the Git repository on the authorized Big Mac; nine screenshots included.",
+  "notes": "Frames 08/09 were captured before the portrait OrbitControls maxDistance correction. Superseded by frames 10/11 and mobile-final-check.json; all eleven screenshots retained to document the comparison. Not real-device touch proof."
+}

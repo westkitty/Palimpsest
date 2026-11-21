@@ -7,6 +7,7 @@ on:
       - uplift/living-theatre-20261120
       - feat/open-book-minimal-ui-20261120
       - fix/physical-book-gesture-20261120
+      - feat/physical-theatre-restoration-20261120
   workflow_dispatch:
 
 permissions:
@@ -45,6 +46,7 @@ jobs:
           node tests/living-folios-bridge.test.cjs
           node tests/book-first-ui.test.cjs
           node tests/physical-book-contract.test.cjs
+          node tests/physical-theatre-restoration.test.cjs
       - name: Build both standalone and integrated routes
         run: |
           bun run build

@@ -118,6 +118,144 @@ export class LivingStagecraft {
       for(const y of [0.12,0.19])brassBar(pivot,0,y,0.075,6.7,0.016,0.028,brass);
       this.root.add(pivot);this.pivots.push(pivot);
     }
+    // Each document has a different mechanical printing vocabulary. These
+    // nested reliefs ride the A/B/C folds, not the literal world/organism.
+    // They are editorial cardstock and are never an additional canon object.
+    const scenic=(parent:THREE.Group,w:number,h:number,d:number,x:number,y:number,z:number,
+      material:THREE.Material,name:string):THREE.Mesh=>{
+      const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);
+      mesh.position.set(x,y,z);mesh.name=name;
+      mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);
+      return mesh;
+    };
+    const wedge=(parent:THREE.Group,x:number,y:number,w:number,h:number,
+      material:THREE.Material,name:string):void=>{
+      const shape=new THREE.Shape();
+      shape.moveTo(-w/2,0);shape.lineTo(-w/2,h*0.48);
+      shape.lineTo(0,h);shape.lineTo(w/2,h*0.58);shape.lineTo(w/2,0);
+      shape.closePath();
+      const piece=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{
+        depth:0.032,bevelEnabled:false,steps:1,
+      }),material);
+      piece.position.set(x,y,0.10);
+      piece.name=name;piece.castShadow=true;parent.add(piece);
+    };
+    // F10 deliberately owns no extra motif: avoid allocating an unused material.
+    const foil=folio===9?brass:new THREE.MeshStandardMaterial({
+      color:this.profile.accent,roughness:0.85,side:THREE.DoubleSide,
+      metalness:0.018,flatShading:true,
+    });
+    // The new palette item is parent-owned and disposed by the full traversal.
+    if(folio===3){
+      // F04: contact — three accordion-folded documentary colonies in
+      // receding bands; no unsupported biology is modeled.
+      for(let i=0;i<7;i++){
+        const x=-2.70+i*0.86;
+        const strip=scenic(this.pivots[i%3],0.50,0.08,0.44,x,0.32+(i%3)*0.10,0.10,
+          i%2?brass:foil,'F04 contact ledger folded paper tier');
+        strip.rotation.x=i%2?0.31:-0.28;
+        wedge(this.pivots[1],x,0.43,0.39,0.20+(i%3)*0.13,
+          i%2?foil:inkPaper,'F04 die-cut shifting settlement card');
+      }
+    }else if(folio===4){
+      // F05: material-processing instructional machinery as four sequential
+      // framed apertures; the actual four manufacturing steps are sourced.
+      for(let i=0;i<4;i++){
+        const x=-2.25+i*1.50;
+        const circ=new THREE.Mesh(new THREE.RingGeometry(0.33+i*0.045,0.39+i*0.045,32),
+          i%2?foil:brass);
+        circ.rotation.x=-0.06;circ.position.set(x,0.96,0.12);
+        circ.name='F05 hinged four-stage orbit fabrication diagram';
+        this.pivots[1].add(circ);
+        scenic(this.pivots[1],0.56,0.055,0.27,x,0.34,0.16,inkPaper,
+          'F05 paper machine footing and pivot support');
+      }
+    }else if(folio===5){
+      // F06: a receding loss ledger assembled from staggered, torn paper
+      // heights. The cards depict changing records, not invented memorials.
+      for(let i=0;i<11;i++){
+        const x=-3.10+i*0.62;
+        const height=0.34+(i%4)*0.18;
+        wedge(this.pivots[i%3],x,0.15,0.36,height,i%3===0?foil:brass,
+          'F06 accumulating loss-account die-cut card');
+        scenic(this.pivots[0],0.30,0.025,0.13,x,0.14,0.21,inkPaper,
+          'F06 binding ledger registration foot');
+      }
+    }else if(folio===6){
+      // F07: the Ruby Eclipse is represented by an asymmetric broken
+      // paper proscenium with visibly pinned fracture seams.
+      for(let i=0;i<8;i++){
+        const x=-2.90+i*0.82;
+        const fracture=wedge;
+        fracture(this.pivots[1],x,0.20,0.69,
+          (i%2?0.72:1.09)+(i%3)*0.17,i%2?foil:inkPaper,
+          'F07 broken campaign scenic silhouette');
+        const pin=scenic(this.pivots[1],0.085,0.085,0.13,x,0.21,0.17,brass,
+          'F07 hinge fracture brad');
+        pin.rotation.z=0.24*(i%2?-1:1);
+      }
+    }else if(folio===7){
+      // F08: an elaborate nested paper gate with open negative space. These
+      // are graphic portal cutouts, not a claim about the Gate's true shape.
+      for(let i=0;i<5;i++){
+        const width=5.5-i*0.75;
+        const h=1.58-i*0.12;
+        const shape=new THREE.Shape();
+        shape.moveTo(-width/2,0);
+        shape.lineTo(-width/2,h*0.61);
+        shape.quadraticCurveTo(0,h*1.36,width/2,h*0.61);
+        shape.lineTo(width/2,0);
+        shape.lineTo(width/2-0.18,0);
+        shape.lineTo(width/2-0.18,h*0.55);
+        shape.quadraticCurveTo(0,h*1.10,-width/2+0.18,h*0.55);
+        shape.lineTo(-width/2+0.18,0);
+        shape.closePath();
+        const gate=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{
+          depth:0.032,bevelEnabled:false,curveSegments:14,
+        }),i%2?brass:foil);
+        gate.position.set(0,0.12,0.11+i*0.08);
+        gate.name='F08 die-cut five-ring archival gate relief';
+        this.pivots[i%3].add(gate);
+      }
+    }else if(folio===8){
+      // F09: a black paper void is left visibly unprinted behind the single
+      // sourced MODEL STAR emblem. Do not invent extra stars.
+      for(let i=0;i<7;i++){
+        const x=-2.85+i*0.95;
+        const strip=scenic(this.pivots[0],0.46,0.08,0.30,x,0.40+i%3*0.09,0.11,
+          i%2?inkPaper:foil,'editorial absence shutter; no additional star');
+        strip.rotation.y=(i-3)*0.09;
+      }
+    }else if(folio===9){
+      // F10 is deliberately closed-world: the existing one black-horizon
+      // cutout remains the only inhabited-sky mark. Additional apparent
+      // grid ribs or bright orbital scaffolding would change its meaning.
+    }else if(folio===10){
+      // F11: fixed mountain trauma and exposed material strata. No new life
+      // or green decoration; the page remains barren.
+      for(let i=0;i<9;i++){
+        const x=-3.08+i*0.77;
+        const height=0.34+0.16*(i%4);
+        wedge(this.pivots[i%3],x,0.15,0.75,height,i%2?foil:inkPaper,
+          'F11 permanent mountain trauma paper cross-section');
+        scenic(this.pivots[i%3],0.59,0.03,0.13,x,0.16+height*0.37,0.14,brass,
+          'F11 fixed geological shear registration rule');
+      }
+    }else if(folio===11){
+      // F12: separated editorial leaves deliberately fail to meet in the
+      // middle, illustrating the divided record without deciding its end.
+      for(const side of [-1,1]){
+        for(let i=0;i<4;i++){
+          const x=side*(0.80+i*0.73);
+          const strip=scenic(this.pivots[side<0?0:2],0.54,0.06,
+            0.28,x,0.34+i*0.15,0.12,i%2?brass:foil,
+            'F12 suspended unfinished agreement paper leaf');
+          strip.rotation.z=side*0.13*(i+1);
+        }
+      }
+    }
+    // Every motif is mounted to an existing fold and inherits its smooth
+    // physical movement and reduced-motion snap. No extra lifecycle owner.
     if(folio===4){
       // The four B steps describe harvest -> conversion -> extrusion -> ring.
       // Four separate mechanically raised marks, never a fabricated strain.
