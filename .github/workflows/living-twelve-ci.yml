@@ -44,6 +44,7 @@ jobs:
           node tests/authored-assets-ink.test.cjs
           node tests/living-folios-bridge.test.cjs
           node tests/book-first-ui.test.cjs
+          node tests/physical-book-contract.test.cjs
       - name: Build both standalone and integrated routes
         run: |
           bun run build
