@@ -49,6 +49,11 @@
     .instruments-shell{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:12px}
     .folio-controls{display:flex;gap:5px;align-items:center}
     .folio-controls button{white-space:nowrap}
+    /* WebGL chapters are turned by grabbing and moving the actual paper,
+       never by overlay navigation buttons. The no-WebGL edition retains
+       accessible Prev/Next reading buttons behind the optional chevron. */
+    #book-stage:not(.no-webgl) .folio-controls #prev,
+    #book-stage:not(.no-webgl) .folio-controls #next{display:none}
     .folio-controls .chapter-tag{font:700 11px/1.2 ui-monospace,monospace;color:#c6aa78;min-width:56px;text-align:center}
     .interaction-buttons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
     .interaction-buttons button{text-align:left;white-space:normal}
@@ -109,7 +114,8 @@
 </head>
 <body>
   <main id="book-stage">
-    <canvas id="stage" tabindex="0" aria-label="Three-dimensional archival pop-up book. Drag outside control panels to orbit, pinch or scroll to zoom. The floating instrument panels can be dragged separately." role="img"></canvas>
+    <canvas id="stage" tabindex="0" aria-describedby="book-gesture-instructions" aria-label="Interactive physical Palimpsest book. Click the closed cover to open it. Drag the outside page corner across the binding to turn a folio; arrow keys also turn pages." role="application"></canvas>
+    <p id="book-gesture-instructions" class="sr-only">Click or tap the closed book cover. On the open book, grab the outer lower right paper edge and drag left for the next folio, or grab the lower left edge and drag right to go back. Use Left and Right arrow keys to turn pages, or Enter or Space to open the cover. Expand the bottom chevron to show optional tools and reading notes.</p>
     <section id="webgl-fallback" hidden aria-label="Non-WebGL illustrated folios">
       <div class="eyebrow">THE ARCHIVAL PLATES · ALTERNATIVE READING</div>
       <h2>The Living Volume · F01–F12</h2>
@@ -170,7 +176,7 @@
         <div class="window-head"><button class="drag-grip" data-panel-handle type="button" aria-label="Move camera guide. Drag or use arrow keys; Home restores."><span class="grip-mark" aria-hidden="true">⠿</span>CAMERA &amp; INSPECTION · MOVE</button><button class="fold-button" data-panel-fold type="button" aria-expanded="true" aria-controls="field-panel-body">−</button></div>
         <div class="panel-body" id="field-panel-body" data-panel-content>
           <p class="panel-text">The lesson is written in folded paper. Its smaller details are discovered by approaching the sculpture.</p>
-          <div class="direction"><div><b>ORBIT</b>Drag / swipe</div><div><b>ZOOM</b>Wheel / pinch</div><div><b>REPOSITION VIEW</b>Shift + drag / right drag</div><div><b>PAGES</b>← / →</div><div><b>MECHANISMS</b>A · B · C</div><div><b>MINIATURE</b>M · WASD</div><div><b>INSPECT</b>I · close view</div><div><b>ENTER THE ALL</b>G · after C on F02</div></div>
+          <div class="direction"><div><b>ORBIT</b>Drag away from edges</div><div><b>ZOOM</b>Wheel / pinch</div><div><b>REPOSITION VIEW</b>Shift + drag / right drag</div><div><b>PAGES</b>Drag outside paper corners; ← / → keyboard</div><div><b>MECHANISMS</b>A · B · C</div><div><b>MINIATURE</b>M · WASD</div><div><b>INSPECT</b>I · close view</div><div><b>ENTER THE ALL</b>G · after C on F02</div></div>
         </div>
       </section>
       <section class="window" data-panel-id="notes" data-mobile-fold="true" aria-label="Folio description and mechanism status">
@@ -180,7 +186,7 @@
       <section class="window" data-panel-id="instruments" aria-label="Folio mechanisms and navigation">
         <div class="window-head"><button class="drag-grip" data-panel-handle type="button" aria-label="Move mechanism console. Drag or use arrow keys; Home restores."><span class="grip-mark" aria-hidden="true">⠿</span>PHYSICAL FOLIO MECHANISMS · MOVE</button><button class="fold-button" data-panel-fold type="button" aria-expanded="true" aria-controls="instruments-panel-body">−</button></div>
         <div class="panel-body" id="instruments-panel-body" data-panel-content>
-          <div class="instruments-shell"><div class="folio-controls" aria-label="Page navigation"><button id="prev" type="button" disabled>← Prev</button><span class="chapter-tag" id="folio-progress">F01 / F03</span><button id="next" type="button">Next →</button></div>
+          <div class="instruments-shell"><div class="folio-controls" aria-label="Page position, with accessible navigation in illustrated fallback"><button id="prev" type="button" disabled>← Prev</button><span class="chapter-tag" id="folio-progress">F01 / F03</span><button id="next" type="button">Next →</button></div>
             <div class="interaction-buttons" role="group" aria-label="Physical paper mechanisms"><button type="button" data-mechanism="A" aria-pressed="false">A · Lift the three paper leaves</button><button type="button" data-mechanism="B" aria-pressed="false">B · Inspect folded detail</button><button type="button" data-mechanism="C" aria-pressed="false">C · Compare roles</button></div></div>
           <div class="instrument-bottom"><button id="mini" type="button" class="primary" aria-pressed="false">Enter miniature inspection (M)</button><button id="inspect" type="button" disabled>Inspect (I)</button><button id="witness" type="button" aria-pressed="false" hidden>Enter the All (G)</button><button id="reset-study" type="button" title="Reset only the living folios A/B/C study state, not the archival manuscript or draggable panel layout">Reset study</button><div class="spacer"></div>
             <div class="move-controls" aria-label="Miniature movement buttons"><button data-move="w" type="button" aria-label="Move forward">↑</button><button data-move="a" type="button" aria-label="Move left">←</button><button data-move="s" type="button" aria-label="Move backward">↓</button><button data-move="d" type="button" aria-label="Move right">→</button></div>
