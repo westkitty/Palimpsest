@@ -18,7 +18,7 @@ const required=[
   ['incoming and outgoing folio worlds coexist during turn',preview.includes('parkOutgoingStage();') && preview.includes('goFolio(turn.toIndex,true)') && preview.includes('discardOutgoingStage();')],
   ['outgoing scene teardown delayed until completed turn',preview.includes('if(outgoingStage){') && preview.includes('if(Math.abs(turn.progress-turn.destination)<0.001)')],
   ['cancelled turn retains current folio',preview.includes('physicalTurn.commit=false') && preview.includes('turn.commit=travelled>14 && distance>=0.35')],
-  ['source-authoritative early folio worlds retained',preview.includes('buildF01();else if(index===1)buildF02();else buildF03()')],
+  ['source-authoritative early folio worlds retained',preview.includes('const legacy=buildF01()') && preview.includes('if(index===1)buildF02();else buildF03()') && preview.includes('createF01Challenger(state,reducedMotion')],
   ['F01 remains intentionally starless',preview.includes('Intentionally NO star points, star meshes, nebula sky or cosmic background.')],
   ['pierced physical F01 scenery',preview.includes('shape.holes.push(hollow)') && preview.includes('paper proscenium')],
   ['physical A/B/C paper pulls on all early folios',preview.includes('mountEarlyPaperTabs(') && preview.includes('earlyPaperTabHits') && preview.includes("handleAction(slot)")],

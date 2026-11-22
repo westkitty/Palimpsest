@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const src=fs.readFileSync('src/vnext/previewV2.ts','utf8');
-const f01=src.split('function buildF01():void {')[1]?.split('function spiralInstances')[0];
+const f01=src.split('function buildF01():THREE.Group {')[1]?.split('function spiralInstances')[0];
 const f02=src.split('function buildF02():void {')[1]?.split('function buildF03():void {')[0];
 const f03=src.split('function redrawPlanets():void {')[1]?.split('function disposeSubtree')[0];
 const checks=[

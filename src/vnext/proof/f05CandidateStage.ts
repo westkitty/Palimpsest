@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { FolioRuntimeState } from '../../types/atlas';
-import glb from './assets/palimpsest-f05.glb?url&inline';
 
 const fps=24;
 const bFrames=[42,65,85,105,126];
@@ -40,7 +39,9 @@ export function makeF05CandidateStage(ready:()=>void,failed:()=>void) {
     failed();
   }
 
-  new GLTFLoader().load(glb,data=>{
+  void import('./assets/palimpsest-f05.glb?url').then(async glb=>{
+    if(disposed)return;
+    const data=await new GLTFLoader().loadAsync(glb.default);
     if(disposed){disposeTree(data.scene);return;}
     asset=data.scene;
     asset.scale.set(.89,.96,1.035);
@@ -87,7 +88,7 @@ export function makeF05CandidateStage(ready:()=>void,failed:()=>void) {
     root.add(asset);
     root.userData.assetState='ready';
     ready();
-  },undefined,reason=>{console.error('F05 challenger unavailable',reason);fail();});
+  }).catch(reason=>{if(!disposed){console.error('F05 challenger unavailable',reason);fail();}});
 
   function update(state:FolioRuntimeState,dt:number,reduced:boolean):void{
     if(root.userData.assetState!=='ready'||!mixer||!green||!scarred||!orbit)return;

@@ -21,7 +21,7 @@ const checks = [
   ['literate paper material quality', scene.includes('function paperGrain') && scene.includes('function cutArch') && scene.includes('THREE.ExtrudeGeometry')],
   ['depth and light with bounded resolution', scene.includes('renderer.shadowMap.enabled=!softwareRenderer') && scene.includes('softwareRenderer?0.85:Math.min(window.devicePixelRatio||1,1.6)')],
   ['study and panel layout use independent scoped session keys', scene.includes("const STUDY_STORAGE_KEY='palimpsest.folio.review.study-state.v1'") && dock.includes("const LAYOUT_KEY = 'palimpsest.folio.review.panel-layout.v1'") && !scene.includes('panel-layout.v1') && !dock.includes('study-state.v1') && !scene.includes('localStorage')],
-  ['F01 remains starless', !scene.split('function buildF01():void {')[1].split('function spiralInstances')[0].includes('spiralInstances')],
+  ['F01 remains starless', !scene.split('function buildF01():THREE.Group {')[1].split('function spiralInstances')[0].includes('spiralInstances')],
   ['no unapproved third testimony', !scene.includes('He could not create. He locked away the templates.')],
   ['narrator independent of discoveries', !/NarrationEngine|narrationEngine|speechSynthesis/.test(scene)],
 ];
