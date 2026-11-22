@@ -17,7 +17,7 @@ const checks = [
  ['real pointer drag changes paper geometry before release', preview.includes('onPhysicalPointerMove') && preview.includes('binding.setLeafProgress(turn.progress,true)')],
  ['pointer movement captures real cursor input', preview.includes('event.clientX-turn.fromX') && preview.includes('canvas.setPointerCapture(event.pointerId)')],
  ['short or cancelled turns return to their starting leaf', preview.includes('travelled>14 && distance>=0.35') && preview.includes('physicalTurn.commit=false')],
- ['the previous and next leaf stay within twelve', preview.includes('if(!isLivingIndex(target))return')],
+ ['the next leaf includes the separate closing pop-out', preview.includes('if(!playableIndex(target))return')],
  ['source stages remain independently authored', preview.includes('buildF01()') && preview.includes('createLaterFolio(')],
  ['keyboard accessibility remains without visual buttons', preview.includes("if(k==='enter'||k===' ')") && preview.includes("if(k==='arrowleft'")],
  ['no onscreen Next / Prev buttons in WebGL mode', html.includes('#book-stage:not(.no-webgl) .folio-controls #prev') && html.includes('#book-stage:not(.no-webgl) .folio-controls #next{display:none}')],

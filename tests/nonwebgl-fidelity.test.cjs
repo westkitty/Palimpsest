@@ -5,10 +5,8 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const cp = require('node:child_process');
 const vm = require('node:vm');
-let ts;
-try { ts = require('typescript'); } catch { ts = require(path.join(cp.execFileSync('npm',['root','-g'],{encoding:'utf8'}).trim(),'typescript')); }
+const { transformSync } = require('esbuild');
 // Verify the committed application component directly; no duplicate fragment source.
 const sourcePath = path.join(__dirname, '..', 'src', 'components', 'NonWebglFolioView.tsx');
 const applicationSource = fs.readFileSync(sourcePath, 'utf8');
@@ -20,11 +18,9 @@ assert.ok(start >= 0 && end > start, 'F01-F12 renderer must exist in non-WebGL c
 assert.equal(applicationSource.split(startMarker).length, 2, 'Renderer region must be unique');
 assert.match(applicationSource, /role="status" aria-live="polite" aria-atomic="true"/, 'Missing accessible state status');
 const source = applicationSource.slice(start, end);
-const TS=ts.transpileModule(source+'\nmodule.exports = { renderFolioSvg, getFolioVisualStatus };\n', {
-  compilerOptions: { module:ts.ModuleKind.CommonJS, jsx:ts.JsxEmit.ReactJSX, target:ts.ScriptTarget.ES2022 }, reportDiagnostics:true,
+const TS=transformSync(source+'\nmodule.exports = { renderFolioSvg, getFolioVisualStatus };\n', {
+  loader:'tsx', format:'cjs', jsx:'automatic', target:'es2022',
 });
-const errors=(TS.diagnostics||[]).filter(d=>d.category===ts.DiagnosticCategory.Error);
-assert.equal(errors.length,0,errors.map(e=>ts.flattenDiagnosticMessageText(e.messageText,'\n')).join('\n'));
 const jsx=(type,props,key)=>({type,props:props||{},key});
 const Fragment=Symbol('Fragment');
 const mod={exports:{}};
@@ -34,7 +30,7 @@ const names=['MAGMA PLEURON','BRINECHOIR','TERRAGULLET','AEROKARST','LYRIBORIS',
 const DRAXIS_BY_ID=Object.fromEntries(ids.map((id,i)=>[id,{id,name:names[i]}]));
 const FOLIO_BY_WORLD=titles.map((title,i)=>({code:`F${String(i+1).padStart(2,'0')}`,title}));
 const env={module:mod,exports:mod.exports,require(n){if(n==='react/jsx-runtime')return {jsx,jsxs:jsx,Fragment};throw Error('Unexpected import '+n)}, FOLIO_BY_WORLD,DRAXIS_BY_ID,ADMINISTRATION_SLOGAN:'Your fate is in our hands.'};
-vm.runInNewContext(TS.outputText,env,{timeout:2000,filename:'renderFolioSvg.fragment.js'});
+vm.runInNewContext(TS.code,env,{timeout:2000,filename:'renderFolioSvg.fragment.js'});
 const {renderFolioSvg,getFolioVisualStatus}=mod.exports;
 const maxB=[4,2,5,2,4,7,2,2,3,2,2,2];
 function snap(world,slot,step){

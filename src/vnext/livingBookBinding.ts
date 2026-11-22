@@ -330,12 +330,12 @@ export class LivingBookBinding {
   }
 
   public setPageIndex(index:number):void {
-    const page=Math.max(0,Math.min(11,Math.floor(index)));
+    const page=Math.max(0,Math.min(12,Math.floor(index)));
     for(const layer of this.pageEdges.children){
       if(!(layer instanceof THREE.Mesh))continue;
       const left=layer.userData.signatureSide<0;
       const signature=Number(layer.userData.signatureIndex);
-      layer.visible=left?signature<Math.min(7,page):signature<Math.min(7,12-page);
+      layer.visible=left?signature<Math.min(7,page):signature<Math.min(7,13-page);
       layer.position.y=0.02+signature*0.020;
     }
   }

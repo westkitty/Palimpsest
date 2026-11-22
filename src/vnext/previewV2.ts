@@ -5,15 +5,17 @@ import { activateSlot, mayReveal, planetPattern, restoreFolioStudy, sourceInkReg
 import { FIRST_LATER_FOLIO, LATER_STUDY_STORAGE_KEY, isLivingIndex, operateLater, restoreLaterStudy, serializeLaterStudy, type LaterFolioIndex } from './laterFolioState.ts';
 import { activeSpecimen, createLaterFolio, getLaterCopy, makeContactShadow } from './laterFolioScenes.ts';
 import { getLaterDiagram } from './laterFolioDiagrams.ts';
+import { revisionDiagram } from './revisionDiagrams.ts';
 import { LivingStagecraft } from './livingStagecraft.ts';
 import { LivingBookBinding } from './livingBookBinding.ts';
+import { createRevisionEarlyArt, REVISION_VAULT_TEMPLATES } from './revisionEarlyArt.ts';
+import { createRevisionWar1Art } from './revisionWar1Art.ts';
+import { createRevisionWar2Art } from './revisionWar2Art.ts';
+import { createRevisionAftermathArt } from './revisionAftermathArt.ts';
+import type { FolioRuntimeState } from '../types/atlas';
+import { CODA_INDEX, ADMINISTRATION_SLOGAN, playableIndex } from './revisionCodaLogic.ts';
 
-/**
- * PALIMPSEST — F01–F03 sculptural REVIEW build.
- * No narration, new canonical character geometry, hidden F03 inscription,
- * chapter rewrites or changes to the existing twelve-folio reader.
- * Production contract: production/folio_vnext/F01_F03_DIRECTION_AND_DELTA.md.
- */
+/** PALIMPSEST Living Book revision. Archive history and narration remain independent. */
 const byId = <T extends HTMLElement>(id: string): T => {
   const node = document.getElementById(id);
   if (!node) throw new Error(`Missing review control #${id}`);
@@ -38,7 +40,7 @@ const actionButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const bridgeEmbedded = new URLSearchParams(window.location.search).get('embedded') === '1' && window.parent !== window;
 const requestedFolio = Number(new URLSearchParams(window.location.search).get('folio'));
-const initialFolio = Number.isInteger(requestedFolio) && requestedFolio >= 1 && requestedFolio <= 12 ? requestedFolio - 1 : 0;
+const initialFolio = Number.isInteger(requestedFolio) && requestedFolio >= 1 && requestedFolio <= CODA_INDEX+1 ? requestedFolio - 1 : 0;
 // A direct visit begins with a closed physical cover. Embedded archival
 // counterparts and explicit later-folio deep links open at the requested leaf.
 const startWithClosedCover = !bridgeEmbedded && initialFolio === 0;
@@ -54,12 +56,12 @@ const titleCopy = [
 ] as const;
 const overviewCopy = [
   'Three existing PALIMPSEST papercraft figure sculptures occupy the primordial spread. There are no celestial stars yet; the character designs remain editorial interpretations.',
-  'Unfold the celestial fan: first points, then clusters, then a galactic paper sculpture. The Digital Geode uses PALIMPSEST’s existing NiAlBu sculpture. Zentrum is a landmark, not a literal universal centre.',
-  "Open finite template leaves from the World's Vault; select a source plate and generate visibly related but distinct worlds. These are illustrative models, not named planets.",
+  'The white vellum is starless. Black ink spreads; points, clusters and a galaxy form only over the dark. The landmarks are Zentrum and the Digital Geode.',
+  'Open the WorldsVault to compare folded globes from three named templates. Turn the dial to change the source and press the die to generate a bounded variation.',
 ] as const;
 const actionCopy = [
   ['Lift the three paper leaves', 'Inspect the folded detail', 'Compare the three roles'],
-  ['Raise first stellar points', 'Open the clusters', 'Unfold the galaxy'],
+  ['Spread the ink and reveal the first points', 'Open the clusters', 'Unfold the galaxy'],
   ['Open the source templates', 'Change source plate', 'Generate bounded variation'],
 ] as const;
 
@@ -119,7 +121,7 @@ function bookHit(event: PointerEvent, object: THREE.Object3D): boolean {
   return bookRaycaster.intersectObject(object,false).length>0;
 }
 function folioLeafTitle(index:number):string {
-  return index<3?titleCopy[index]:getLaterCopy(index as LaterFolioIndex).title;
+  return index===CODA_INDEX?'Closing imprint':index<3?titleCopy[index]:getLaterCopy(index as LaterFolioIndex).title;
 }
 function openPhysicalCover():void {
   if(bookPhase!=='closed')return;
@@ -131,7 +133,7 @@ function openPhysicalCover():void {
 function beginPhysicalTurn(direction:-1|1,pointerId:number|null,startX:number):void {
   if(bookPhase!=='open' || physicalTurn || inspection!=='overview')return;
   const target=currentFolio+direction;
-  if(!isLivingIndex(target))return;
+  if(!playableIndex(target))return;
   const startProgress=direction===1?0:1;
   physicalTurn={
     pointerId,fromIndex:currentFolio,toIndex:target,direction,
@@ -156,7 +158,7 @@ function onPhysicalPointerDown(event:PointerEvent):void {
   }
   if(bookPhase!=='open' || physicalTurn || inspection!=='overview')return;
   const direction: -1|1|null =
-    currentFolio<11 && bookHit(event,binding.rightCornerHit)?1:
+    currentFolio<CODA_INDEX && bookHit(event,binding.rightCornerHit)?1:
     currentFolio>0 && bookHit(event,binding.leftCornerHit)?-1:null;
   if(direction===null)return;
   event.preventDefault();event.stopImmediatePropagation();
@@ -311,11 +313,22 @@ function loadLaterStudy() {
 let laterStates = loadLaterStudy();
 let laterWorld: ReturnType<typeof createLaterFolio> | null = null;
 let livingStagecraft: LivingStagecraft | null = null;
+type RevisionLayer<S>={root:THREE.Group;update(state:S,dt:number,reduced:boolean):void;dispose?():void};
+let earlyRevision:RevisionLayer<FolioActions>|null=null;
+let laterRevision:RevisionLayer<FolioRuntimeState>|null=null;
+let codaPanel:THREE.Group|null=null;
+function disposeRevision(l:RevisionLayer<never>|null):void{
+  if(!l)return;
+  l.root.removeFromParent();
+  if(l.dispose)l.dispose();else disposeSubtree(l.root);
+}
+
 type ParkedStage = {
   root:THREE.Group;
   laterWorld:ReturnType<typeof createLaterFolio> | null;
   stagecraft:LivingStagecraft | null;
   textures:THREE.Texture[];
+  early:RevisionLayer<FolioActions>|null;later:RevisionLayer<FolioRuntimeState>|null;
 };
 let outgoingStage:ParkedStage | null = null;
 let paperShadow: THREE.CanvasTexture | null = null;
@@ -642,6 +655,26 @@ function book():THREE.Group {
   if(currentFolio<FIRST_LATER_FOLIO)mountEarlyPaperTabs(root);
   return root;
 }
+function buildCoda():void {
+  const page=book();
+  const panel=new THREE.Group();
+  panel.name='Character-free blind-embossed closing pop-out';
+  panel.position.set(0,0.28,1.42);
+  panel.rotation.x=reducedMotion?0.83:0.04;
+  page.add(panel);codaPanel=panel;
+  slab(panel,6.18,0.135,2.75,shared.paper,0,0.04,-1.37);
+  for(const x of [-2.92,2.92]){
+    slab(panel,0.1,0.06,2.45,shared.bone,x,0.14,-1.38);
+    slab(panel,0.032,0.045,2.24,shared.backing,x*0.95,0.145,-1.38);
+  }
+  for(const z of [-0.19,-2.55])slab(panel,5.89,0.06,0.08,shared.bone,0,0.14,z);
+  const printed=plaque(panel,ADMINISTRATION_SLOGAN,0,0.132,-1.37,5.5);
+  printed.name='Only printed line on the closing pop-out';
+  for(const side of [-1,1]){
+    const brace=slab(page,0.16,0.035,0.70,shared.bone,side*2.7,0.248,1.05);
+    brace.rotation.y=side*0.2;
+  }
+}
 function platform(parent:THREE.Object3D,x:number,z:number,w=1.55):void {
   slab(parent,w,0.11,1.18,shared.backing,x,0.24,z);
   slab(parent,w-0.13,0.065,1.05,shared.paper,x,0.32,z);
@@ -891,7 +924,7 @@ function buildF03():void {
       register.rotation.x=-Math.PI/2;
     }
   }
-  plaque(root,"WORLD'S VAULT",-2.72,0.35,0.94,2.03);
+  plaque(root,"WORLDSVAULT",-2.72,0.35,0.94,2.03);
   sourceWheel=new THREE.Group();root.add(sourceWheel);sourceWheel.position.set(0,0.43,-0.15);
   put(sourceWheel,new THREE.CylinderGeometry(0.85,0.92,0.17,14),shared.brass,0,0,0);
   for(let i=0;i<12;i++){
@@ -916,7 +949,7 @@ function buildF03():void {
   const loom=paperHinge(root,0,-1.65,1.94,1.98,shared.paper);paperHinges.push(loom);
   plaque(root,'TEMPLATES TO WORLDS',0,0.34,1.15,2.30);
   planets=new THREE.Group();root.add(planets);
-  redrawPlanets();
+  // The revision layer authors the folded source and result globes.
   plaque(root,'CONTROLLED VARIATION',2.68,0.25,1.40,2.30);
   for(const x of [-3.95,3.95])filigree(root,x,0.26,2.09,0.15,shared.gold);
   // Three folded transmission bands show a shared inherited source, not spontaneous creation.
@@ -996,6 +1029,7 @@ function disposeSubtree(root:THREE.Object3D):void {
   });
 }
 function clear():void {
+  disposeRevision(earlyRevision);disposeRevision(laterRevision);earlyRevision=null;laterRevision=null;codaPanel=null;
   if(inspection!=='overview')leaveMini();
   if (livingStagecraft) {
     rig.remove(livingStagecraft.root);
@@ -1016,11 +1050,11 @@ function clear():void {
 function parkOutgoingStage():void {
   if(outgoingStage)throw new Error('Another folio is already parked');
   outgoingStage={
-    root:rig,laterWorld,stagecraft:livingStagecraft,textures:textTextures,
+    root:rig,laterWorld,stagecraft:livingStagecraft,textures:textTextures,early:earlyRevision,later:laterRevision,
   };
   // Transfer ownership without disposing the outgoing geometry or its
   // independent authored mechanism state during the paper-turn animation.
-  laterWorld=null;livingStagecraft=null;textTextures=[];
+  laterWorld=null;livingStagecraft=null;earlyRevision=null;laterRevision=null;textTextures=[];
   rig=new THREE.Group();
   rig.name='arriving source-authored paper world';
   stageRoot.add(rig);
@@ -1028,6 +1062,7 @@ function parkOutgoingStage():void {
 function discardOutgoingStage():void {
   const parked=outgoingStage;
   if(!parked)return;
+  disposeRevision(parked.early);disposeRevision(parked.later);
   parked.laterWorld?.dispose();
   parked.stagecraft?.dispose();
   disposeSubtree(parked.root);
@@ -1036,16 +1071,36 @@ function discardOutgoingStage():void {
   parked.root.clear();
   outgoingStage=null;
 }
+function revisionCopy(index:LaterFolioIndex):ReturnType<typeof getLaterCopy>{
+  const existing=getLaterCopy(index);
+  if(index===3)return {...existing,actions:[existing.actions[0],'Light the expansion route',existing.actions[2]],
+    description:'Year zero. Follow the planet lights as expansion advances. The pulse stops at the final lit state.'};
+  if(index===7)return {...existing,description:'The Aureal Gate is a circular Hookshot portal. Operate its mechanisms to see the test of the gate and its consequences.',visuals:['A circular, plasma-filled Hookshot portal; plasma activates with the event.','Marcel stands by the gate. The fold-out records the twenty worlds.']};
+  if(index===10)return {...existing,description:'Thirty-one days after the war. Codec, Marcel and Tiger arrive in that order. The theatrical paper jungle depicts what the loam could make possible, not the restoration of Nacreous VI.',visuals:['Codec works on the barren remnant.','Marcel arrives with gravity and Wordstreaming. Roots run through the paper, then a jungle erupts.','Tiger arrives last. Codec’s posture drops while Marcel and Tiger are still celebratory.']};
+  if(index===11)return {...existing,description:'The Administration turns from containment and harm to a call to serve. The closing imprint has its own page.',visuals:['The containment and harm cards are separate.','The Administration cycles through celebratory service roles, then stamps its endorsement.','The closing imprint is on the following leaf.']};
+  return existing;
+}
 function updateNav():void {
+  if(currentFolio===CODA_INDEX){
+    progress.textContent='Closing imprint';
+    title.textContent='Closing imprint';description.textContent=ADMINISTRATION_SLOGAN;
+    indicator.textContent='End of the Living Book';
+    prevButton.disabled=false;prevButton.textContent='← F12';nextButton.disabled=true;nextButton.textContent='End of book';
+    for(const btn of actionButtons){btn.textContent=(btn.dataset.mechanism??'')+' · No mechanism';btn.disabled=true;btn.setAttribute('aria-pressed','false');}
+    miniButton.disabled=true;inspectButton.disabled=true;
+    setWitnessButton();
+    return;
+  }
+  prevButton.textContent='← Prev';miniButton.disabled=false;updateInspectButton();
   if (currentFolio >= FIRST_LATER_FOLIO) {
     const index=currentFolio as LaterFolioIndex;
-    const copy=getLaterCopy(index);
+    const copy=revisionCopy(index);
     const study=laterStates[index-FIRST_LATER_FOLIO];
     progress.textContent=`F${String(index+1).padStart(2,'0')} / F12`;
     document.querySelectorAll('.chapter-lines span').forEach((line,i)=>line.classList.toggle('active',i<=Math.min(2,Math.floor(index/4))));
     prevButton.disabled=false;
-    nextButton.disabled=index===11;
-    nextButton.textContent=index===11?'Final Folio':'Next →';
+    nextButton.disabled=false;
+    nextButton.textContent=index===11?'Closing pop-out →':'Next →';
     title.textContent=copy.title;
     description.textContent=copy.description;
     for(const btn of actionButtons){
@@ -1083,15 +1138,29 @@ function updateNav():void {
   }
   setWitnessButton();
   indicator.textContent=state.folio===1?`Stellar assembly: ${state.f02.reveal} / 3 stages`:
-    state.folio===2?`Source plate: ${state.f03.template+1} / 3  ·  Ink register: ${sourceInkRegistration(state.f03.template).join('')}  ·  Variation: ${state.f03.generation}`:
+    state.folio===2?`Source template: ${REVISION_VAULT_TEMPLATES[state.f03.template].name}  ·  Ink register: ${sourceInkRegistration(state.f03.template).join('')}  ·  Variation: ${state.f03.generation}`:
     `Physical folds: ${state.f01.fold?'opened':'closed'}  ·  Details: ${state.f01.detail?'shown':'folded'}`;
 }
 function goFolio(index:number, deferCameraReset=false):void {
-  if(!isLivingIndex(index))return;
+  if(!playableIndex(index))return;
   clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
-  if(index<FIRST_LATER_FOLIO){
+  canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
+  delete canvas.dataset.revisionPhase;delete canvas.dataset.inkAdvance;
+  if(index===CODA_INDEX){
+    if(renderer)buildCoda();
+  } else if(index<FIRST_LATER_FOLIO){
     state=studyStates[index as FolioIndex];
-    if(index===0)buildF01();else if(index===1)buildF02();else buildF03();
+    if(renderer){
+      if(index===0)buildF01();else if(index===1)buildF02();else buildF03();
+      if(index===1){
+        for(const layer of galaxyLayers)layer.group.visible=false;
+        if(paperHinges[0])paperHinges[0].visible=false;
+        if(galaxyPaperLoom)(galaxyPaperLoom as THREE.Group).visible=false;
+      }
+      earlyRevision=createRevisionEarlyArt(index as FolioIndex);
+      rig.add(earlyRevision.root);
+      earlyRevision.update(state,0,reducedMotion);
+    }
   } else if(renderer){
     book();
     if(!paperShadow)paperShadow=makeContactShadow();
@@ -1103,27 +1172,44 @@ function goFolio(index:number, deferCameraReset=false):void {
     livingStagecraft=new LivingStagecraft(laterIndex);
     livingStagecraft.sync(laterStates[laterIndex-FIRST_LATER_FOLIO]);
     rig.add(livingStagecraft.root);
+    const art=laterIndex<=5?createRevisionWar1Art(laterIndex as 3|4|5,laterWorld)
+      :laterIndex<=9?createRevisionWar2Art(laterIndex as 6|7|8|9,laterWorld)
+      :createRevisionAftermathArt(laterIndex as 10|11,laterWorld);
+    laterRevision=art;
+    laterWorld.root.add(art.root);
+    art.update(laterStates[laterIndex-FIRST_LATER_FOLIO],0,reducedMotion);
   }
-  if(!deferCameraReset)resetCamera();
+  if(!deferCameraReset){binding.setPageIndex(index);resetCamera();}
   updateNav();
   // A page change must never expose the story through a closed cover or
   // re-enable orbit controls while an actual paper leaf is moving.
   rig.visible=bookPhase==='open'||bookPhase==='opening'&&coverAnimation>0.57;
   if(controls && (bookPhase!=='open'||physicalTurn))controls.enabled=false;
   canvas.dataset.authoredSculptures=String(authoredFigureCount);
-  canvas.dataset.sourceAuthoredScene=String(index>=FIRST_LATER_FOLIO);
-  announce(`Folio ${index+1} of 12. ${index<3?(overviewCopy as readonly string[])[index]:getLaterCopy(index as LaterFolioIndex).description}`);
-  sendBridge('folio',index);
+  canvas.dataset.sourceAuthoredScene=String(index>=FIRST_LATER_FOLIO&&index<CODA_INDEX);
+  if(index===CODA_INDEX)announce('Closing imprint. '+ADMINISTRATION_SLOGAN);
+  else{
+    announce(`Folio ${index+1} of 12. ${index<3?(overviewCopy as readonly string[])[index]:revisionCopy(index as LaterFolioIndex).description}`);
+    sendBridge('folio',index);
+  }
 }
 function smooth(value:number,target:number,dt:number):number {
   return reducedMotion?target:THREE.MathUtils.damp(value,target,5.8,Math.min(dt,0.07));
 }
 function animate(dt:number):void {
+  if(currentFolio===CODA_INDEX){
+    if(codaPanel)codaPanel.rotation.x=smooth(codaPanel.rotation.x,0.83,dt);
+    return;
+  }
+  earlyRevision?.update(state,dt,reducedMotion);
+  if(currentFolio===1&&earlyRevision)canvas.dataset.inkAdvance=String(earlyRevision.root.userData.inkAdvance);
   if(currentFolio<FIRST_LATER_FOLIO)animateEarlyPaperTabs(dt);
   if(currentFolio>=FIRST_LATER_FOLIO){
     activeTime+=dt;
     laterWorld?.update(dt,activeTime,reducedMotion);
     livingStagecraft?.update(dt,reducedMotion);
+    laterRevision?.update(laterStates[currentFolio-FIRST_LATER_FOLIO],dt,reducedMotion);
+    if(currentFolio===10&&laterRevision)canvas.dataset.revisionPhase=String(laterRevision.root.userData.phase);
     return;
   }
   if(state.folio===0){
@@ -1134,20 +1220,20 @@ function animate(dt:number):void {
       hinge.rotation.y=smooth(hinge.rotation.y,state.f01.compare?(i-1)*0.10:0,dt);
     });
   } else if(state.folio===1){
-    for(const {group,stage} of galaxyLayers){
+    for(const {group,stage} of earlyRevision ? [] : galaxyLayers){
       const open=state.f02.reveal>=stage;
       if(open)group.visible=true;
       group.rotation.x=smooth(group.rotation.x,open?(-0.40-(stage*0.16)):0,dt);
       group.scale.y=smooth(group.scale.y,open?1:0.001,dt);
       if(!open&&group.scale.y<0.02)group.visible=false;
     }
-    if(galaxyPaperLoom){
+    if(galaxyPaperLoom&&!earlyRevision){
       const expanded=state.f02.reveal===3;
       if(expanded)galaxyPaperLoom.visible=true;
       galaxyPaperLoom.scale.y=smooth(galaxyPaperLoom.scale.y,expanded?1:0.001,dt);
       if(!expanded&&galaxyPaperLoom.scale.y<0.018)galaxyPaperLoom.visible=false;
     }
-    if(paperHinges[0])paperHinges[0].rotation.x=smooth(paperHinges[0].rotation.x,state.f02.reveal>0?-0.24:0,dt);
+    if(paperHinges[0]&&!earlyRevision)paperHinges[0].rotation.x=smooth(paperHinges[0].rotation.x,state.f02.reveal>0?-0.24:0,dt);
   } else {
     if(vaultLeaf)vaultLeaf.rotation.x=smooth(vaultLeaf.rotation.x,state.f03.vaultOpen?-0.81:0,dt);
     if(paperHinges[1])paperHinges[1].rotation.x=smooth(paperHinges[1].rotation.x,-0.47,dt);
@@ -1161,6 +1247,7 @@ function animate(dt:number):void {
   }
 }
 function handleAction(slot:Slot):void {
+  if(currentFolio===CODA_INDEX)return;
   if(currentFolio>=FIRST_LATER_FOLIO){
     if(inspection!=='overview'){announce('Return to the overview before operating a mechanism.');return;}
     const idx=currentFolio-FIRST_LATER_FOLIO;
@@ -1170,7 +1257,7 @@ function handleAction(slot:Slot):void {
     livingStagecraft?.sync(next);
     updateNav();
     if(!renderer)fallbackPage(currentFolio);
-    announce(`${getLaterCopy(currentFolio as LaterFolioIndex).actions[slot==='A'?0:slot==='B'?1:2]}. ${indicator.textContent}`);
+    announce(`${revisionCopy(currentFolio as LaterFolioIndex).actions[slot==='A'?0:slot==='B'?1:2]}. ${indicator.textContent}`);
     return;
   }
   if(inspection!=='overview'){
@@ -1180,9 +1267,10 @@ function handleAction(slot:Slot):void {
   studyStates[state.folio]=state;
   saveStudy();
   if(state.folio===2&&(slot==='B'||slot==='C')){
-    redrawPlanets();if(slot==='C')printPulse=reducedMotion?0:1;
+    if(!earlyRevision)redrawPlanets();if(slot==='C')printPulse=reducedMotion?0:1;
   }
   updateNav();
+  if(!renderer)fallbackPage(currentFolio);
   if(state.folio===1)announce(`Stellar assembly now shows stage ${state.f02.reveal} of 3.`);
   else if(state.folio===2)announce(`Source plate ${state.f03.template+1}; bounded variation ${state.f03.generation}.`);
   else announce(`${actionCopy[0][slot==='A'?0:slot==='B'?1:2]}: ${JSON.stringify(state.f01)}.`);
@@ -1378,7 +1466,7 @@ function nextFolio(direction:number):void {
   if(bookPhase!=='open' || physicalTurn)return;
   if(inspection!=='overview')leaveMini();
   const next=currentFolio+direction;
-  if(!isLivingIndex(next))return;
+  if(!playableIndex(next))return;
   // Non-WebGL readers still have explicit page controls; the living 3D book
   // uses the same curled cardstock transition as direct mouse/touch dragging.
   if(!renderer){goFolio(next);fallbackPage(next);return;}
@@ -1401,6 +1489,7 @@ function handleKeys(event:KeyboardEvent):void {
   if(event.repeat&&['m','i','arrowleft','arrowright','a','b','c'].includes(k))return;
   if(k==='arrowleft'&&inspection==='overview')nextFolio(-1);
   else if(k==='arrowright'&&inspection==='overview')nextFolio(1);
+  else if(currentFolio===CODA_INDEX)return;
   else if(k==='m')toggleMini();
   else if(k==='g')toggleWitness();
   else if(k==='i')inspect();
@@ -1439,25 +1528,36 @@ function wireButtons():void {
   }
 }
 function fallbackPage(index:number):void {
-  const isLater=index>=FIRST_LATER_FOLIO;
+  const coda=index===CODA_INDEX;
+  const codaText=fallback.querySelector<HTMLElement>('#coda-fallback');
+  if(codaText)codaText.hidden=!coda;
+  const isLater=index>=FIRST_LATER_FOLIO&&!coda;
+  if(index<3){
+    const paragraph=fallback.querySelectorAll<HTMLElement>('[data-folio-text]')[index];
+    if(paragraph&&index!==0)paragraph.textContent=overviewCopy[index];
+  }
   const paragraphs=fallback.querySelectorAll<HTMLElement>('[data-folio-text]');
-  paragraphs.forEach((p,i)=>p.hidden=isLater||i!==index);
-  fallback.querySelectorAll<SVGGElement>('[data-fb-folio]').forEach((g,i)=>{g.style.display=!isLater&&i===index?'':'none';});
+  paragraphs.forEach((p,i)=>p.hidden=coda||isLater||i!==index);
+  fallback.querySelectorAll<SVGGElement>('[data-fb-folio]').forEach((g,i)=>{
+    const visible=!coda&&!isLater&&i===index;
+    g.toggleAttribute('hidden',!visible);
+    g.style.display=visible?'':'none';
+  });
   const originalArt=fallback.querySelector<SVGSVGElement>('svg:not(#later-plate-art)');
-  if(originalArt)originalArt.toggleAttribute('hidden',isLater);
+  if(originalArt)originalArt.toggleAttribute('hidden',isLater||coda);
   const laterArt=fallback.querySelector<SVGSVGElement>('#later-plate-art');
   if(laterArt){
     laterArt.toggleAttribute('hidden',!isLater);
     if(isLater){
       const scene=laterArt.querySelector<SVGGElement>('#later-plate-scene');
-      if(scene)scene.innerHTML=getLaterDiagram(index);
+      if(scene)scene.innerHTML=revisionDiagram(index,laterStates[index-FIRST_LATER_FOLIO].interactions.A.active)??getLaterDiagram(index);
     }
   }
   const plate=fallback.querySelector<HTMLElement>('#later-fallback');
   if(plate){
     plate.hidden=!isLater;
     if(isLater){
-      const copy=getLaterCopy(index as LaterFolioIndex);
+      const copy=revisionCopy(index as LaterFolioIndex);
       const heading=plate.querySelector<HTMLElement>('[data-later-heading]');
       const summary=plate.querySelector<HTMLElement>('[data-later-summary]');
       const cues=plate.querySelector<HTMLElement>('[data-later-cues]');
@@ -1470,7 +1570,12 @@ function fallbackPage(index:number):void {
       }));
     }
   }
-  if(index===1&&state.f02.reveal===0)indicator.textContent='No stars yet. Activate A to unfold the first points.';
+  if(index===1){
+    fallback.querySelectorAll<SVGElement>('[data-reveal-stage]').forEach(el=>{
+      el.style.display=state.f02.reveal>=Number(el.dataset.revealStage)?'':'none';
+    });
+    if(state.f02.reveal===0)indicator.textContent='No stars yet. Activate A to spread the ink and reveal the first points.';
+  }
 }
 function destroy():void {
   cancelAnimationFrame(frame);
@@ -1540,6 +1645,7 @@ try{
   frame=requestAnimationFrame(step);
 }catch(error){
   console.error('PALIMPSEST preview: WebGL unavailable',error);
+  controls?.dispose();controls=null;renderer?.dispose();renderer=null;
   canvas.hidden=true;fallback.hidden=false;
   // The accessible illustrated edition cannot expose a 3D click target.
   bookPhase='open';coverAnimation=1;
@@ -1550,7 +1656,4 @@ try{
   window.addEventListener('keydown',handleKeys);
   window.addEventListener('keyup',releaseKey);
   goFolio(initialFolio);fallbackPage(initialFolio);
-  for(const button of actionButtons)button.addEventListener('click',()=>fallbackPage(currentFolio));
-  prevButton.addEventListener('click',()=>fallbackPage(currentFolio));
-  nextButton.addEventListener('click',()=>fallbackPage(currentFolio));
 }
