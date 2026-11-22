@@ -1,3 +1,4 @@
+import { cssStock, folioStock, isDarkStock } from './livingPaperStock.ts';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildShardGodFigure, buildWordstreamerFigure, buildNiAlBuGeode } from '../engine/drakken/CharacterFigures';
@@ -140,8 +141,9 @@ function beginPhysicalTurn(direction:-1|1,pointerId:number|null,startX:number):v
     fromX:startX,currentX:startX,progress:startProgress,destination:startProgress,
     dragging:pointerId!==null,commit:pointerId===null,swapped:false,
   };
-  binding.setLeafTitles(folioLeafTitle(currentFolio),currentFolio,
-    folioLeafTitle(target),target);
+  const [right,left]=direction===1?[currentFolio,target]:[target,currentFolio];
+  binding.setLeafTitles(folioLeafTitle(right),right,folioLeafTitle(left),left,
+    studyStates[1].f02.reveal===3);
   binding.setLeafProgress(startProgress,true);
   if(pointerId===null)physicalTurn.destination=direction===1?1:0;
   canvas.dataset.pageTurn=pointerId===null?'settling':'dragging';
@@ -423,6 +425,23 @@ const shared = {
   navy: new THREE.MeshStandardMaterial({color:0x162638,roughness:0.90,side:THREE.DoubleSide}),
 };
 const sharedMats: THREE.Material[] = Object.values(shared);
+// Separate substrate materials per spread: a parked outgoing spread must not
+// change color when the incoming leaf is built halfway through a page turn.
+const stockMaterials=Array.from({length:CODA_INDEX+1},(_,i)=>{
+  const {face,edge,cut}=folioStock(i);
+  return [face,edge,cut].map(color=>new THREE.MeshStandardMaterial({
+    color,roughness:.96,side:THREE.DoubleSide,
+  }));
+});
+sharedMats.push(...stockMaterials.flat());
+const wetStockColors=Object.values(folioStock(1,true)).map(value=>new THREE.Color(value));
+const dryStockColors=Object.values(folioStock(1)).map(value=>new THREE.Color(value));
+function tintVellumEdges(advance:number):void {
+  const amount=THREE.MathUtils.smoothstep(advance,.80,1);
+  stockMaterials[1].forEach((material,i)=>{
+    material.color.copy(dryStockColors[i]).lerp(wetStockColors[i],amount);
+  });
+}
 // Retain the palette on the authored sculptures. Overlay dark, independent ink linework
 // rather than recolouring the artists' cardstock. This is a physical cel-paint treatment,
 // not a glossy CGI/PBR remodel, texture replacement or new character design.
@@ -623,16 +642,17 @@ function animateEarlyPaperTabs(dt:number):void {
 }
 function book():THREE.Group {
   const root=new THREE.Group();rig.add(root);
+  const [stockFace,stockEdge,stockCut]=stockMaterials[currentFolio];
   // The binding now owns the one continuous material slate tabletop; avoid
   // z-fighting with a duplicate slab in every individually authored stage.
   slab(root,10.02,0.24,6.63,shared.ink,0,-0.125,-0.015);
   slab(root,9.72,0.09,6.39,shared.gold,0,0.015,-0.015);
   for(let i=0;i<5;i++){
-    const edge=slab(root,9.33-i*0.025,0.014,6.02-i*0.025, i%2?shared.backing:shared.bone,0,0.050+i*0.018,0);
+    const edge=slab(root,9.33-i*0.025,0.014,6.02-i*0.025, i%2?stockCut:stockEdge,0,0.050+i*0.018,0);
     edge.receiveShadow=true;
   }
-  slab(root,4.47,0.075,5.76,shared.paper,-2.32,0.15,0);
-  slab(root,4.47,0.075,5.76,shared.paper,2.32,0.15,0);
+  slab(root,4.47,0.075,5.76,stockFace,-2.32,0.15,0);
+  slab(root,4.47,0.075,5.76,stockFace,2.32,0.15,0);
   slab(root,0.155,0.22,5.92,shared.blue,0,0.16,0);
   for(const x of [-4.53,4.53]){
     slab(root,0.07,0.075,5.72,shared.gold,x,0.225,0);
@@ -1202,7 +1222,11 @@ function animate(dt:number):void {
     return;
   }
   earlyRevision?.update(state,dt,reducedMotion);
-  if(currentFolio===1&&earlyRevision)canvas.dataset.inkAdvance=String(earlyRevision.root.userData.inkAdvance);
+  if(currentFolio===1&&earlyRevision){
+    const advance=Number(earlyRevision.root.userData.inkAdvance);
+    tintVellumEdges(advance);
+    canvas.dataset.inkAdvance=String(advance);
+  }
   if(currentFolio<FIRST_LATER_FOLIO)animateEarlyPaperTabs(dt);
   if(currentFolio>=FIRST_LATER_FOLIO){
     activeTime+=dt;
@@ -1544,13 +1568,22 @@ function fallbackPage(index:number):void {
     g.style.display=visible?'':'none';
   });
   const originalArt=fallback.querySelector<SVGSVGElement>('svg:not(#later-plate-art)');
-  if(originalArt)originalArt.toggleAttribute('hidden',isLater||coda);
+  if(originalArt){
+    originalArt.toggleAttribute('hidden',isLater||coda);
+    const paper=folioStock(index,index===1&&state.f02.reveal===3);
+    originalArt.querySelector('#living-stock-light')?.setAttribute('stop-color',cssStock(paper.face));
+    originalArt.querySelector('#living-stock-shade')?.setAttribute('stop-color',cssStock(isDarkStock(paper)?paper.edge:paper.cut));
+    originalArt.setAttribute('data-dark-stock',String(isDarkStock(paper)));
+  }
   const laterArt=fallback.querySelector<SVGSVGElement>('#later-plate-art');
   if(laterArt){
     laterArt.toggleAttribute('hidden',!isLater);
     if(isLater){
       const scene=laterArt.querySelector<SVGGElement>('#later-plate-scene');
-      if(scene)scene.innerHTML=revisionDiagram(index,laterStates[index-FIRST_LATER_FOLIO].interactions.A.active)??getLaterDiagram(index);
+      if(scene){
+        scene.innerHTML=revisionDiagram(index,laterStates[index-FIRST_LATER_FOLIO].interactions.A.active)??getLaterDiagram(index);
+        scene.firstElementChild?.setAttribute('fill',cssStock(folioStock(index).face));
+      }
     }
   }
   const plate=fallback.querySelector<HTMLElement>('#later-fallback');

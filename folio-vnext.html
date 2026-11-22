@@ -83,6 +83,7 @@
     #window-layer.panels-hidden .window{display:none}
     #webgl-fallback{position:absolute;inset:0;overflow:auto;padding:120px 20px 270px;max-width:900px;margin:auto;color:#eadfcb;z-index:2}
     #webgl-fallback h2{font-family:Georgia,serif;font-size:24px;color:#d7c69d}
+    #webgl-fallback [data-dark-stock="true"] :is([data-fb-folio="1"],[data-fb-folio="2"]) > text{fill:#f3e8cf}
     #webgl-fallback svg{width:100%;max-width:670px;display:block;border:1px solid rgba(140,166,184,.35);border-radius:6px;background:#111a27;margin:16px auto}
     #webgl-fallback [data-folio-text]{font-size:14px;line-height:1.65}
     #later-fallback{max-width:670px;margin:18px auto;padding:19px 22px;border:1px solid #a89063;background:linear-gradient(145deg,#243249,#111b29);color:#e9e0cd}
@@ -120,7 +121,7 @@
       <div class="eyebrow">THE ARCHIVAL PLATES · ALTERNATIVE READING</div>
       <h2>The Living Volume · F01–F12</h2>
       <svg viewBox="0 0 720 390" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Stylized paper folio illustration for the selected chapter">
-        <defs><linearGradient id="vellum" x2="0.4" y2="1"><stop stop-color="#f6eedb"/><stop offset="1" stop-color="#c5b79e"/></linearGradient></defs>
+        <defs><linearGradient id="vellum" x2="0.4" y2="1"><stop id="living-stock-light" stop-color="#f0e6d2"/><stop id="living-stock-shade" offset="1" stop-color="#c7baa1"/></linearGradient></defs>
         <rect x="45" y="30" width="630" height="335" rx="8" fill="#202b3b" stroke="#af9561" stroke-width="4"/>
         <rect x="73" y="50" width="280" height="290" fill="url(#vellum)"/><rect x="367" y="50" width="280" height="290" fill="url(#vellum)"/><path d="M360 48V340" stroke="#9b835c" stroke-width="8"/>
         <g data-fb-folio="0">

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { folioStock } from './livingPaperStock.ts';
 import { planetPattern, sourceInkRegistration, type FolioActions, type FolioIndex } from './folioLogic.ts';
 
 /**
@@ -106,6 +107,7 @@ void main(){
 const inkFragment = /* glsl */ `
 uniform float advance;
 uniform sampler2D atlas;
+uniform vec3 vellumWhite;
 varying vec2 page;
 float hash(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453123); }
 float noise(vec2 p){
@@ -127,10 +129,10 @@ void main(){
   float spread=smoothstep(-.021,.009,tide) * step(.001,advance);
   float soak=smoothstep(.000,.041,tide)*step(.001,advance);
   float wet=smoothstep(.010,.029,tide)*(1.-smoothstep(.043,.103,tide))*spread;
-  vec3 vellum=mix(vec3(.76,.72,.65),vec3(.94,.92,.86),fiber);
+  vec3 vellum=vellumWhite*mix(.945,1.013,fiber);
   float press=noise(vec2(p.x*0.9,p.y*2.0));
   float score=1.-smoothstep(.002,.016,abs(p.y+1.43+abs(p.x)*.029));
-  vellum *= 1.-.080*score-.060*press;
+  vellum *= 1.-.060*score-.034*press;
   float rings=.18+.82*noise(p*6.3);
   vec3 ink=mix(vec3(.020,.024,.036),vec3(.0035,.0061,.011),soak);
   ink+=wet*vec3(.065,.092,.120)*rings;
@@ -205,15 +207,16 @@ function atlasStars():THREE.DataTexture{
 function vellumF02(root:THREE.Group):RevisionEarlyArt['update']{
   const advance={value:0};
   const atlas=atlasStars();
-  const size=new THREE.Vector2(4.393,5.58);
-  for(const [i,x] of [-2.318,2.318].entries()){
+  const size=new THREE.Vector2(4.47,5.76);
+  const vellumWhite={value:new THREE.Color(folioStock(1).face)};
+  for(const [i,x] of [-2.32,2.32].entries()){
     const mat=new THREE.ShaderMaterial({
       vertexShader:inkVertex,fragmentShader:inkFragment,
-      uniforms:{advance,atlas:{value:atlas},panelSize:{value:size},panelCenter:{value:new THREE.Vector2(x,-0.004)}},
+      uniforms:{advance,vellumWhite,atlas:{value:atlas},panelSize:{value:size},panelCenter:{value:new THREE.Vector2(x,0)}},
       side:THREE.FrontSide, toneMapped:false,
     });
     if(i===0)setResource(mat,atlas);
-    const panel=mesh(root,'F02 • white vellum with an ink-bound stellar mask',new THREE.PlaneGeometry(size.x,size.y),mat,x,0.210,-0.004);
+    const panel=mesh(root,'F02 • white vellum with an ink-bound stellar mask',new THREE.PlaneGeometry(size.x,size.y),mat,x,0.210,0);
     panel.rotation.x=-Math.PI/2;
   }
   const wick=new THREE.Group();wick.name='F02 • folded rag-fiber ink witness';wick.position.set(-3.79,0.225,1.60);

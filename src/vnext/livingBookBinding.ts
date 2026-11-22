@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { cssStock, folioStock, isDarkStock } from './livingPaperStock.ts';
 
 /**
  * Physical theatre binding for the continuous Living Folios.
@@ -114,32 +115,34 @@ function coverPrinting(): THREE.CanvasTexture {
   return texture;
 }
 
-function folioPrinting(title: string, page: number): THREE.CanvasTexture {
+function folioPrinting(title: string, page: number, soaked: boolean): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 768;
   canvas.height = 1000;
   const c = canvas.getContext('2d');
   if (!c) throw new Error('Folio leaf canvas unavailable');
-  c.fillStyle = '#e6dcc8';
+  const stock = folioStock(page,soaked);
+  const dark = isDarkStock(stock);
+  c.fillStyle = cssStock(stock.face);
   c.fillRect(0, 0, canvas.width, canvas.height);
-  c.strokeStyle = '#9b8056';
+  c.strokeStyle = dark ? '#b69a6b' : '#9b8056';
   c.lineWidth = 7;
   c.strokeRect(34, 35, 700, 930);
-  c.strokeStyle = '#c1ac87';
+  c.strokeStyle = dark ? '#81765e' : '#c1ac87';
   c.lineWidth = 2;
   c.strokeRect(52, 54, 664, 894);
-  c.fillStyle = '#303d49';
+  c.fillStyle = dark ? '#dfd1b4' : '#303d49';
   c.textAlign = 'center';
   c.font = '26px Georgia,serif';
   c.fillText('PALIMPSEST  /  LIVING FOLIOS', 384, 124);
-  c.fillStyle = '#3a4855';
+  c.fillStyle = dark ? '#f1e6ce' : '#3a4855';
   c.font = 'bold 110px Georgia,serif';
   c.fillText('F' + String(page + 1).padStart(2, '0'), 384, 424);
   c.font = 'bold 52px Georgia,serif';
   c.fillText(title.replace(/^[IVX]+\\s*[—-]\\s*/, ''), 384, 543, 645);
-  c.fillStyle = '#8c7658';
+  c.fillStyle = dark ? '#b69a6b' : '#8c7658';
   for (let i=0; i<5; i++) c.fillRect(146+i*92,654,52,3);
-  c.fillStyle = '#4e5b63';
+  c.fillStyle = dark ? '#d5c5ab' : '#4e5b63';
   c.font = '24px Georgia,serif';
   c.fillText('A PAGE MADE TO BE TURNED', 384, 880);
   const texture = new THREE.CanvasTexture(canvas);
@@ -177,6 +180,9 @@ export class LivingBookBinding {
   private readonly edgeGeo: THREE.BufferGeometry;
   private readonly leafFrontMat: THREE.MeshStandardMaterial;
   private readonly leafBackMat: THREE.MeshStandardMaterial;
+  private readonly leafRim: THREE.MeshStandardMaterial;
+  private readonly leafEdgeFront = new THREE.Color();
+  private readonly leafEdgeBack = new THREE.Color();
   private readonly ownedMaterials = new Set<THREE.Material>();
   private readonly ownedTextures = new Set<THREE.Texture>();
 
@@ -320,6 +326,7 @@ export class LivingBookBinding {
     }
     this.edgeGeo.setIndex(indices);
     const paperRim=new THREE.MeshStandardMaterial({color:0xc9b68f,roughness:0.99,side:THREE.DoubleSide});
+    this.leafRim=paperRim;
     this.ownedMaterials.add(paperRim);
     const edge=new THREE.Mesh(this.edgeGeo,paperRim);
     edge.name='deforming physical paper thickness at outer tip';
@@ -357,9 +364,11 @@ export class LivingBookBinding {
     this.pageEdges.visible=this.coverProgress>0.76;
   }
 
-  public setLeafTitles(front:string,frontIndex:number,back:string,backIndex:number):void {
-    const frontTexture=folioPrinting(front,frontIndex);
-    const backTexture=folioPrinting(back,backIndex);
+  public setLeafTitles(front:string,frontIndex:number,back:string,backIndex:number,soaked=false):void {
+    const frontTexture=folioPrinting(front,frontIndex,soaked);
+    const backTexture=folioPrinting(back,backIndex,soaked);
+    this.leafEdgeFront.setHex(folioStock(frontIndex,soaked).cut);
+    this.leafEdgeBack.setHex(folioStock(backIndex,soaked).cut);
     this.leafFrontMat.map?.dispose();
     this.leafBackMat.map?.dispose();
     this.leafFrontMat.map=frontTexture;
@@ -373,6 +382,7 @@ export class LivingBookBinding {
     if(!this.leaf.visible)return;
     const p=clamp01(progress);
     const positions=this.leafGeo.attributes.position as THREE.BufferAttribute;
+    this.leafRim.color.copy(this.leafEdgeFront).lerp(this.leafEdgeBack,p);
     const bend=Math.sin(p*Math.PI);
     for(let i=0;i<positions.count;i++){
       const bx=this.leafBase[i*3],bz=this.leafBase[i*3+2];
