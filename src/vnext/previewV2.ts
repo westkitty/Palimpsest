@@ -1,3 +1,4 @@
+import { makeF05CandidateStage } from './proof/f05CandidateStage';
 import { cssStock, folioStock, isDarkStock } from './livingPaperStock.ts';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -41,7 +42,7 @@ const moveButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[da
 const actionButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-mechanism]'));
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const bridgeEmbedded = new URLSearchParams(window.location.search).get('embedded') === '1' && window.parent !== window;
-const requestedFolio = Number(new URLSearchParams(window.location.search).get('folio') ?? 3);
+const requestedFolio = Number(new URLSearchParams(window.location.search).get('folio') ?? 1);
 const initialFolio = Number.isInteger(requestedFolio) && requestedFolio >= 1 && requestedFolio <= CODA_INDEX+1 ? requestedFolio - 1 : 0;
 // A direct visit begins with a closed physical cover. Embedded archival
 // counterparts and explicit later-folio deep links open at the requested leaf.
@@ -389,6 +390,14 @@ function onPaperPointerUp(e:PointerEvent):void {
     // The early-folio A/B/C tabs are actual pullable cardstock controls.
     // They operate the unchanged documented teaching actions, never secrets.
     for(const hit of mechanismRaycaster.intersectObjects(earlyPaperTabHits,false)){
+      const slot=hit.object.userData.slot;
+      if(slot==='A'||slot==='B'||slot==='C'){handleAction(slot);return;}
+    }
+    return;
+  }
+  if(currentFolio===4&&canvas.dataset.blenderFolio==='05'){
+    const slots:THREE.Mesh[]=laterRevision?.root.userData.interactables??[];
+    for(const hit of mechanismRaycaster.intersectObjects(slots,false)){
       const slot=hit.object.userData.slot;
       if(slot==='A'||slot==='B'||slot==='C'){handleAction(slot);return;}
     }
@@ -1166,7 +1175,7 @@ function goFolio(index:number, deferCameraReset=false):void {
   if(!playableIndex(index))return;
   clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
   canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
-  delete canvas.dataset.revisionPhase;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;
+  delete canvas.dataset.revisionPhase;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;
   if(index===CODA_INDEX){
     if(renderer)buildCoda();
   } else if(index<FIRST_LATER_FOLIO){
@@ -1218,6 +1227,26 @@ function goFolio(index:number, deferCameraReset=false):void {
     laterRevision=art;
     laterWorld.root.add(art.root);
     art.update(laterStates[laterIndex-FIRST_LATER_FOLIO],0,reducedMotion);
+    if(index===4){
+      const folioRig=rig;
+      const legacy=[...folioRig.children];
+      const staged=makeF05CandidateStage(()=>{
+        if(rig!==folioRig||currentFolio!==4)return;
+        staged.update(laterStates[1],0,reducedMotion);
+        for(const node of legacy)node.visible=false;
+        canvas.dataset.blenderFolio='05';
+      },()=>{if(rig===folioRig)canvas.dataset.blenderFolio='unavailable';});
+      staged.root.userData.interactables=staged.controls;
+      folioRig.add(staged.root);
+      const priorOwner=laterRevision;
+      laterRevision={root:staged.root,update:(actual,dt,reduce)=>{
+        if(staged.root.userData.assetState==='ready'){
+          staged.update(actual,dt,reduce);
+          const {ring,step,record,planetPhase,orbitalPhase}=staged.root.userData;
+          canvas.dataset.f05CandidateState=JSON.stringify({ring,step,record,planetPhase,orbitalPhase});
+        }else art.update(actual,dt,reduce);
+      },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
+    }
   }
   ambientLight.intensity=index===2?0.46:0.78;
   keyLight.intensity=index===2?2.66:1.96;rimLight.intensity=index===2?0.56:0.97;
@@ -1394,6 +1423,9 @@ function fitBookCamera(openProgress:number):void {
   if(currentFolio===2&&openProgress>.99){
     camera.position.set(4.0*scale,7.4*scale,9.8*scale);
     controls?.target.set(0,.56,.08);
+  }else if(currentFolio===4&&openProgress>.99){
+    camera.position.set(.55*scale,6.9*scale,9.25*scale);
+    controls?.target.set(0,.38,.10);
   }else{
     camera.position.set(0,6.5*scale,9.9*scale);
     controls?.target.set(0,.25,0);
