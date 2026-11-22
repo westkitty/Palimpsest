@@ -14,6 +14,7 @@ import { createRevisionWar1Art } from './revisionWar1Art.ts';
 import { createRevisionWar2Art } from './revisionWar2Art.ts';
 import { createRevisionAftermathArt } from './revisionAftermathArt.ts';
 import type { FolioRuntimeState } from '../types/atlas';
+import { makeF03CandidateStage } from './proof/f03CandidateStage';
 import { CODA_INDEX, ADMINISTRATION_SLOGAN, playableIndex } from './revisionCodaLogic.ts';
 
 /** PALIMPSEST Living Book revision. Archive history and narration remain independent. */
@@ -40,7 +41,7 @@ const moveButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[da
 const actionButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-mechanism]'));
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const bridgeEmbedded = new URLSearchParams(window.location.search).get('embedded') === '1' && window.parent !== window;
-const requestedFolio = Number(new URLSearchParams(window.location.search).get('folio'));
+const requestedFolio = Number(new URLSearchParams(window.location.search).get('folio') ?? 3);
 const initialFolio = Number.isInteger(requestedFolio) && requestedFolio >= 1 && requestedFolio <= CODA_INDEX+1 ? requestedFolio - 1 : 0;
 // A direct visit begins with a closed physical cover. Embedded archival
 // counterparts and explicit later-folio deep links open at the requested leaf.
@@ -71,7 +72,7 @@ scene.background = new THREE.Color('#0b1018');
 scene.fog = new THREE.FogExp2(0x0b1018, 0.017);
 const camera = new THREE.PerspectiveCamera(45, 1, 0.04, 80);
 camera.position.set(0, 6.5, 9.9); // Reframed by fitBookCamera after canvas mounting.
-scene.add(new THREE.AmbientLight(0xa3b5c6, 0.78));
+const ambientLight=new THREE.AmbientLight(0xa3b5c6,0.78);scene.add(ambientLight);
 const keyLight = new THREE.DirectionalLight(0xfff0d5, 1.96);
 keyLight.position.set(-4, 8, 5);
 scene.add(keyLight);
@@ -1165,7 +1166,7 @@ function goFolio(index:number, deferCameraReset=false):void {
   if(!playableIndex(index))return;
   clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
   canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
-  delete canvas.dataset.revisionPhase;delete canvas.dataset.inkAdvance;
+  delete canvas.dataset.revisionPhase;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;
   if(index===CODA_INDEX){
     if(renderer)buildCoda();
   } else if(index<FIRST_LATER_FOLIO){
@@ -1177,9 +1178,28 @@ function goFolio(index:number, deferCameraReset=false):void {
         if(paperHinges[0])paperHinges[0].visible=false;
         if(galaxyPaperLoom)(galaxyPaperLoom as THREE.Group).visible=false;
       }
-      earlyRevision=createRevisionEarlyArt(index as FolioIndex);
-      rig.add(earlyRevision.root);
-      earlyRevision.update(state,0,reducedMotion);
+      const procedural=createRevisionEarlyArt(index as FolioIndex);
+      earlyRevision=procedural;
+      rig.add(procedural.root);
+      procedural.update(state,0,reducedMotion);
+      if(index===2){
+        const folioRig=rig;
+        const oldNodes=[...rig.children];
+        const legacyTabs=[...earlyPaperTabs];
+        const staged=makeF03CandidateStage(()=>{
+          if(currentFolio!==2||rig!==folioRig)return;
+          for(const tab of legacyTabs)folioRig.attach(tab);
+          oldNodes.forEach(n=>{n.visible=false;});
+          earlyPaperTabHits.push(...staged.controls);
+          canvas.dataset.blenderFolio='03';
+          staged.root.userData.template=REVISION_VAULT_TEMPLATES[state.f03.template].name;
+        },()=>{if(rig===folioRig)canvas.dataset.blenderFolio='unavailable';});
+        rig.add(staged.root);
+        earlyRevision={root:staged.root,update:(current,dt,reduce)=>{
+          if(staged.root.userData.assetState!=='ready')procedural.update(current,dt,reduce);
+          staged.update(current,dt,reduce);
+        },dispose:()=>{staged.dispose();procedural.root.removeFromParent();disposeSubtree(procedural.root);}};
+      }
     }
   } else if(renderer){
     book();
@@ -1199,6 +1219,10 @@ function goFolio(index:number, deferCameraReset=false):void {
     laterWorld.root.add(art.root);
     art.update(laterStates[laterIndex-FIRST_LATER_FOLIO],0,reducedMotion);
   }
+  ambientLight.intensity=index===2?0.46:0.78;
+  keyLight.intensity=index===2?2.66:1.96;rimLight.intensity=index===2?0.56:0.97;
+  overhead.intensity=index===2?2.2:13.5;
+  if(renderer)renderer.toneMappingExposure=index===2?1.18:1.24;
   if(!deferCameraReset){binding.setPageIndex(index);resetCamera();}
   updateNav();
   // A page change must never expose the story through a closed cover or
@@ -1367,8 +1391,13 @@ function fitBookCamera(openProgress:number):void {
   const openScale=Math.max(1,1.28/aspect);
   const scale=THREE.MathUtils.lerp(closedScale,openScale,
     THREE.MathUtils.clamp(openProgress,0,1));
-  camera.position.set(0,6.5*scale,9.9*scale);
-  controls?.target.set(0,0.25,0);
+  if(currentFolio===2&&openProgress>.99){
+    camera.position.set(4.0*scale,7.4*scale,9.8*scale);
+    controls?.target.set(0,.56,.08);
+  }else{
+    camera.position.set(0,6.5*scale,9.9*scale);
+    controls?.target.set(0,.25,0);
+  }
   // OrbitControls otherwise clamps the responsive portrait fit back to its
   // original 19-unit desktop cap, cropping both physical page corners.
   if(controls)controls.maxDistance=Math.max(19,camera.position.distanceTo(controls.target)+5);

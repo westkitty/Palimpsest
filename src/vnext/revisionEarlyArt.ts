@@ -282,7 +282,7 @@ function registerF03(root:THREE.Group,template:0|1|2,x:number,y:number,z:number)
   for(let i=0;i<4;i++)box(g,'Source notch '+(i+1),bits[i]===1?ink:dry,.086,.008,.106,(i-1.5)*.120,0,0);
 }
 
-function foldedGlobe(parent:THREE.Group,template:0|1|2,generation:number,radius:number,isSource:boolean):THREE.Group{
+export function foldedGlobe(parent:THREE.Group,template:0|1|2,generation:number,radius:number,isSource:boolean):THREE.Group{
   const meta=REVISION_VAULT_TEMPLATES[template],variation=planetPattern(template,generation);
   const globe=new THREE.Group();globe.name=(isSource?'Vault specimen • ':'Notebook output • ')+meta.name;
   globe.userData={family:template,generation,model:isSource?'source template':'bounded Notebook variant',templateName:meta.name,motif:meta.motif};
