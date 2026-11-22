@@ -5,6 +5,7 @@ const pure = fs.readFileSync('src/vnext/folioLogic.ts', 'utf8');
 const html = fs.readFileSync('folio-vnext.html', 'utf8');
 const f01 = src.split('function buildF01():void {')[1]?.split('function spiralInstances')[0];
 const f02 = src.split('function buildF02():void {')[1]?.split('function buildF03():void {')[0];
+const f03Candidate = fs.readFileSync('src/vnext/proof/f03CandidateStage.ts', 'utf8');
 const f03 = src.split('function buildF03():void {')[1]?.split('function redrawPlanets():void {')[0];
 const checks = [
   ['F01 world defined', !!f01],
@@ -17,7 +18,7 @@ const checks = [
   ['F02 corrected testimony', !!f02 && f02.includes('NiAlBu still watches her die.') && f02.includes('Again and again.')],
   ['F01/F02 testimony not public narrator', !/NarrationEngine|narrationEngine|speechSynthesis|speak\(/.test(src)],
   ['F02 inspection specifically in Geode', src.includes("inspection='geode'") && src.includes("mayReveal(isF01?'f01-testimony':'f02-testimony'")],
-  ['F03 generated family variation', !!f03 && src.includes('earlyRevision.update(state,0,reducedMotion)') && src.includes('createRevisionEarlyArt')],
+  ['F03 generated family variation', !!f03 && src.includes('procedural.update(state,0,reducedMotion)') && src.includes('staged.update(current,dt,reduce)') && f03Candidate.includes('foldedGlobe(tempOutput,s.template,s.generation')],
   ['F03 no unapproved secret wording', !src.includes('He could not create. He locked away the templates.')],
   ['Physical paper construction', src.includes('paperHinge') && src.includes('THREE.InstancedMesh')],
   ['State isolated in a namespaced preview session', !/localStorage/.test(src) && src.includes("const STUDY_STORAGE_KEY='palimpsest.folio.review.study-state.v1'") && src.includes('sessionStorage.setItem(STUDY_STORAGE_KEY,JSON.stringify({version:1,folios:studyStates}))')],
