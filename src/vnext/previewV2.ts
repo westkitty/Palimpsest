@@ -11,6 +11,7 @@ import { revisionDiagram } from './revisionDiagrams.ts';
 import { LivingStagecraft } from './livingStagecraft.ts';
 import { LivingBookBinding } from './livingBookBinding.ts';
 import { createRevisionEarlyArt, REVISION_VAULT_TEMPLATES } from './revisionEarlyArt.ts';
+import { createF01Challenger } from './challengerF01.ts';
 import { createRevisionWar1Art } from './revisionWar1Art.ts';
 import { createRevisionWar2Art } from './revisionWar2Art.ts';
 import { createRevisionAftermathArt } from './revisionAftermathArt.ts';
@@ -709,8 +710,11 @@ function platform(parent:THREE.Object3D,x:number,z:number,w=1.55):void {
   slab(parent,w,0.11,1.18,shared.backing,x,0.24,z);
   slab(parent,w-0.13,0.065,1.05,shared.paper,x,0.32,z);
 }
-function buildF01():void {
-  const root=book();
+function buildF01():THREE.Group {
+  const page=book();
+  const root=new THREE.Group();
+  root.name='F01 legacy paper stage (offline GLB fallback)';
+  page.add(root);
   // Intentionally NO star points, star meshes, nebula sky or cosmic background.
   slab(root,7.95,0.05,1.73,shared.blue,0,0.25,-1.23);
   // Layered, unlit primordial architecture. These are intentionally blank
@@ -796,8 +800,9 @@ function buildF01():void {
     slab(root,0.014,0.012,0.25,shared.brass,-3.5+j*0.44,0.268,-0.1);
   }
   // Underside of the Wordstreamer standee: only an intentional miniature inspection can reveal it.
-  focusText=inscription(root,['He murdered her.'],0,0.51,0.12,1.85);
+  focusText=inscription(rig,['He murdered her.'],0,0.51,0.12,1.85);
   secretTarget=new THREE.Vector3(0,0.51,0.12);
+  return root;
 }
 function spiralInstances(group:THREE.Group,count:number,rad:number,depth:number,start:number,material:THREE.Material):void {
   const g=new THREE.TetrahedronGeometry(0.033,0);
@@ -1176,39 +1181,79 @@ function goFolio(index:number, deferCameraReset=false):void {
   clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
   canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
   delete canvas.dataset.revisionPhase;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;
+  delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;
   if(index===CODA_INDEX){
     if(renderer)buildCoda();
   } else if(index<FIRST_LATER_FOLIO){
     state=studyStates[index as FolioIndex];
     if(renderer){
-      if(index===0)buildF01();else if(index===1)buildF02();else buildF03();
-      if(index===1){
-        for(const layer of galaxyLayers)layer.group.visible=false;
-        if(paperHinges[0])paperHinges[0].visible=false;
-        if(galaxyPaperLoom)(galaxyPaperLoom as THREE.Group).visible=false;
+      if(index===0){
+        const legacy=buildF01();
+        const register=createRevisionEarlyArt(0);
+        const stage=new THREE.Group();
+        const stageOwner=rig;
+        const challenger=createF01Challenger(state,reducedMotion,phase=>{
+          if(phase==='ready'){
+            legacy.removeFromParent();
+            disposeSubtree(legacy);
+            legacy.clear();
+            if(rig===stageOwner){
+              paperHinges=[];
+              f01DetailMarks=[];
+            }
+            register.root.visible=false;
+          }
+          // The shared book and its real pull-tab meshes stay visible and
+          // raycastable; the GLB replaces only the F01 paper scenery.
+          if(rig===stageOwner&&currentFolio===0)canvas.dataset.f01Challenger=phase;
+        });
+        stage.add(register.root,challenger.root);
+        canvas.dataset.f01Challenger='loading';
+        earlyRevision={
+          root:stage,
+          update(s,dt,r){
+            if(register.root.visible)register.update(s,dt,r);
+            challenger.update(s,dt,r);
+            if(challenger.root.userData.status==='ready'){
+              canvas.dataset.f01Detent=String(challenger.root.userData.settled);
+              canvas.dataset.f01Clip=String(challenger.root.userData.clip);
+              canvas.dataset.f01Moving=String(challenger.root.userData.moving);
+            }
+          },
+          dispose(){challenger.dispose();disposeSubtree(register.root);stage.clear();},
+        };
+      }else{
+        if(index===1)buildF02();else buildF03();
+        if(index===1){
+          for(const layer of galaxyLayers)layer.group.visible=false;
+          if(paperHinges[0])paperHinges[0].visible=false;
+          if(galaxyPaperLoom)(galaxyPaperLoom as THREE.Group).visible=false;
+        }
+        const procedural=createRevisionEarlyArt(index as FolioIndex);
+        earlyRevision=procedural;
+        rig.add(procedural.root);
+        procedural.update(state,0,reducedMotion);
+        if(index===1)tintVellumEdges(Number(procedural.root.userData.inkAdvance));
+        if(index===2){
+          const folioRig=rig;
+          const oldNodes=[...rig.children];
+          const legacyTabs=[...earlyPaperTabs];
+          const staged=makeF03CandidateStage(()=>{
+            if(currentFolio!==2||rig!==folioRig)return;
+            for(const tab of legacyTabs)folioRig.attach(tab);
+            oldNodes.forEach(n=>{n.visible=false;});
+            earlyPaperTabHits.push(...staged.controls);
+            canvas.dataset.blenderFolio='03';
+            staged.root.userData.template=REVISION_VAULT_TEMPLATES[state.f03.template].name;
+          },()=>{if(rig===folioRig)canvas.dataset.blenderFolio='unavailable';});
+          rig.add(staged.root);
+          earlyRevision={root:staged.root,update:(current,dt,reduce)=>{
+            if(staged.root.userData.assetState!=='ready')procedural.update(current,dt,reduce);
+            staged.update(current,dt,reduce);
+          },dispose:()=>{staged.dispose();procedural.root.removeFromParent();disposeSubtree(procedural.root);}};
+        }
       }
-      const procedural=createRevisionEarlyArt(index as FolioIndex);
-      earlyRevision=procedural;
-      rig.add(procedural.root);
-      procedural.update(state,0,reducedMotion);
-      if(index===2){
-        const folioRig=rig;
-        const oldNodes=[...rig.children];
-        const legacyTabs=[...earlyPaperTabs];
-        const staged=makeF03CandidateStage(()=>{
-          if(currentFolio!==2||rig!==folioRig)return;
-          for(const tab of legacyTabs)folioRig.attach(tab);
-          oldNodes.forEach(n=>{n.visible=false;});
-          earlyPaperTabHits.push(...staged.controls);
-          canvas.dataset.blenderFolio='03';
-          staged.root.userData.template=REVISION_VAULT_TEMPLATES[state.f03.template].name;
-        },()=>{if(rig===folioRig)canvas.dataset.blenderFolio='unavailable';});
-        rig.add(staged.root);
-        earlyRevision={root:staged.root,update:(current,dt,reduce)=>{
-          if(staged.root.userData.assetState!=='ready')procedural.update(current,dt,reduce);
-          staged.update(current,dt,reduce);
-        },dispose:()=>{staged.dispose();procedural.root.removeFromParent();disposeSubtree(procedural.root);}};
-      }
+      if(index===0&&earlyRevision){rig.add(earlyRevision.root);earlyRevision.update(state,0,reducedMotion);}
     }
   } else if(renderer){
     book();
@@ -1427,8 +1472,9 @@ function fitBookCamera(openProgress:number):void {
     camera.position.set(.55*scale,6.9*scale,9.25*scale);
     controls?.target.set(0,.38,.10);
   }else{
-    camera.position.set(0,6.5*scale,9.9*scale);
-    controls?.target.set(0,.25,0);
+    const angleF01=currentFolio===0?THREE.MathUtils.clamp(openProgress,0,1):0;
+    camera.position.set(0.58*angleF01*scale,(6.5+1.30*angleF01)*scale,(9.9-0.75*angleF01)*scale);
+    controls?.target.set(0,0.25,0);
   }
   // OrbitControls otherwise clamps the responsive portrait fit back to its
   // original 19-unit desktop cap, cropping both physical page corners.
