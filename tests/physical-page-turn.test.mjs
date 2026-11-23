@@ -47,3 +47,9 @@ test('the neutral camera is direction/folio independent, centered and portrait s
   assert.match(preview,/Land the stock first/);
   assert.match(preview,/if\(reducedMotion\)\{\s*if\(turn\.dragging\)return/);
 });
+
+test('a prepared incoming theatre never spends its opening cue behind the leaf',()=>{
+  const preview=readFileSync(new URL('../src/vnext/previewV2.ts',import.meta.url),'utf8');
+  assert.match(preview,/function animate\(dt:number\):void \{[\s\S]*?if\(physicalTurn\?\.swapped\)\{\s*if\(!rig\.visible\)return;\s*if\(!physicalTurn\.incomingClockStarted\)\{physicalTurn\.incomingClockStarted=true;dt=0;\}/);
+  assert.ok(preview.indexOf('if(!rig.visible)return;',preview.indexOf('function animate(dt:'))<preview.indexOf('activeTime+=dt',preview.indexOf('function animate(dt:')));
+});

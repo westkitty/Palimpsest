@@ -129,6 +129,7 @@ type PhysicalTurn = {
   dragging:boolean;
   commit:boolean;
   swapped:boolean;
+  incomingClockStarted:boolean;
   readingStart:ReadingPose;
 };
 let physicalTurn: PhysicalTurn | null = null;
@@ -195,7 +196,7 @@ function beginPhysicalTurn(direction:-1|1,pointerId:number|null,startX:number):v
     pointerId,fromIndex:currentFolio,toIndex:target,direction,
     fromX:startX,desired:0,travel:0,phase:'pull',elapsed:0,
     settleFrom:0,settleElapsed:0,dragging:pointerId!==null,commit:pointerId===null,
-    swapped:false,readingStart:{position:camera.position.clone(),target:controls.target.clone()},
+    swapped:false,incomingClockStarted:false,readingStart:{position:camera.position.clone(),target:controls.target.clone()},
   };
   const [right,left]=direction===1?[currentFolio,target]:[target,currentFolio];
   binding.setLeafTitles(folioLeafTitle(right),right,folioLeafTitle(left),left,
@@ -335,7 +336,8 @@ function recordTurnPose(turn:PhysicalTurn):void {
   canvas.dataset.turnTheatre=[from.height,to.height].map(n=>n.toFixed(4)).join(',');
   canvas.dataset.turnPose=JSON.stringify({phase:turn.phase,travel:turn.travel,desired:turn.desired,
     direction:turn.direction,commit:turn.commit,swapped:turn.swapped,from,to,
-    position:camera.position.toArray(),target:turnLook.toArray()});
+    position:camera.position.toArray(),target:turnLook.toArray(),
+    startPosition:turn.readingStart.position.toArray(),startTarget:turn.readingStart.target.toArray()});
 }
 function finishPhysicalTurn(turn:PhysicalTurn):void {
   binding.setLeafProgress(physicalLeafPosition(turn.direction,turn.travel),false);
@@ -1685,6 +1687,12 @@ function smooth(value:number,target:number,dt:number):number {
   return reducedMotion?target:THREE.MathUtils.damp(value,target,5.8,Math.min(dt,0.07));
 }
 function animate(dt:number):void {
+  // Building the arriving mesh early lets native assets load behind the leaf,
+  // but wall-clock authored beats (notably F11) must not play while hidden.
+  if(physicalTurn?.swapped){
+    if(!rig.visible)return;
+    if(!physicalTurn.incomingClockStarted){physicalTurn.incomingClockStarted=true;dt=0;}
+  }
   if(currentFolio===CODA_INDEX){
     if(closingWall)canvas.dataset.closingBeat=closingWall.update(dt,reducedMotion);
     return;
