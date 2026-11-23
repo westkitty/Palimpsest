@@ -25,7 +25,7 @@ export function createF10StoryPaper(world:F10FolioWorld,pageY:(x:number)=>number
     const x=-.42+i*.285,z=.015+Math.sin(i*1.4)*.11,h=.14+(i%3)*.058,w=.183+(i%2)*.025;
     slab(margin,w,h,.16,chalk,x,.053+h/2,z,'Anonymous inhabited-side cottage');
     const top=new THREE.Mesh(new THREE.CylinderGeometry(.139,.139,.195,3),roof);
-    top.rotation.x=Math.PI/2;top.position.set(x,.068+h+.036,z);margin.add(top);
+    top.rotation.x=-Math.PI/2;top.position.set(x,.053+h+.0695,z);margin.add(top);
     for(const j of [-1,1]){
       slab(margin,.041,.061,.013,roof,x+j*w*.25,.068+h*.53,z+.085);
       marginWindows.push(slab(margin,.026,.041,.009,amber,x+j*w*.25,.068+h*.53,z+.095,'Inhabited-side slit window'));
