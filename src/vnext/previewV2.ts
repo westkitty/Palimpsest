@@ -1222,6 +1222,7 @@ function goFolio(index:number, deferCameraReset=false):void {
   delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;delete canvas.dataset.f01Stage;
   delete canvas.dataset.f02Challenger;delete canvas.dataset.f02Frame;delete canvas.dataset.f02Detent;delete canvas.dataset.f02Clip;delete canvas.dataset.f02InkBeat;delete canvas.dataset.f02Arms;
   delete canvas.dataset.f06CandidateState;
+  delete canvas.dataset.f03WorkshopState;
   delete canvas.dataset.f12CandidateState;
   if(index===CODA_INDEX){
     if(renderer)buildCoda();
@@ -1324,6 +1325,10 @@ function goFolio(index:number, deferCameraReset=false):void {
           earlyRevision={root:staged.root,update:(current,dt,reduce)=>{
             if(staged.root.userData.assetState!=='ready')procedural.update(current,dt,reduce);
             staged.update(current,dt,reduce);
+            if(rig===folioRig&&staged.root.userData.assetState==='ready'){
+              const {template,generation,sourceVisible,outputVisible,sourceRoll,printedProfileVertices,profileKey,geometrySignature,folded,pressDepth,sleeveOpen}=staged.root.userData;
+              canvas.dataset.f03WorkshopState=JSON.stringify({template,generation,sourceVisible,outputVisible,sourceRoll,printedProfileVertices,profileKey,geometrySignature,folded,pressDepth,sleeveOpen});
+            }
           },dispose:()=>{staged.dispose();procedural.root.removeFromParent();disposeSubtree(procedural.root);}};
         }
       }
