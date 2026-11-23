@@ -2,8 +2,12 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import assetUrl from './assets/palimpsest-f11-challenger.glb.gz?url';
 import motion from './assets/palimpsest-f11-motion.json';
+import { createF11StoryPaper, f11Ease } from './f11StoryPaper.ts';
 
-const cues: [number,number][]=[[0,1],[0.38,11],[1.35,34],[2.65,55],[5.58,99],[6.84,112],[7.22,129],[8.80,180]];
+const cues: [number,number][]=[
+  [0,1],[1.32,11],[2.65,34],[3.35,42],[4.15,55],[4.80,63],[5.58,72],
+  [7.25,92],[8.35,104],[9.90,112],[10.94,129],[12.70,180]
+];
 export function f11BlenderFrame(t:number):number {
   for(let i=1;i<cues.length;i++){
     const [hi,hiFrame]=cues[i], [lo,loFrame]=cues[i-1];
@@ -15,7 +19,7 @@ export function f11StoryPhase(frame:number):string {
   if(frame<11)return 'barren';
   if(frame<34)return 'codec';
   if(frame<55)return 'marcel';
-  if(frame<99)return 'jungle-growing';
+  if(frame<106)return 'jungle-growing';
   if(frame<112)return 'jungle-hold';
   if(frame<129)return 'tiger-arrival';
   return 'emotional-split';
@@ -37,32 +41,61 @@ const eyeNames=['L','R'].flatMap(side=>['SLIT','UPPER','LOWER'].map(kind=>`TIGER
 export function createF11Challenger(pageY:(x:number)=>number){
   const root=new THREE.Group();root.name='F11 dimensional Blender challenger';
   root.userData.assetState='loading';
+  const paper=createF11StoryPaper(pageY);paper.root.visible=false;root.add(paper.root);
   let disposed=false,scene:THREE.Group|null=null,mixer:THREE.AnimationMixer|null=null;
   let actions:THREE.AnimationAction[]=[];
   const idles: Array<{node:THREE.Object3D;motion:typeof motion.idles[keyof typeof motion.idles]}>=[];
   const eyes:THREE.Mesh[]=[];
   const anchors:THREE.Object3D[]=[];
+  const trees: Array<{ holder:THREE.Object3D;x:number;z:number;s:number;delay:number;edge:number }>=[];
   let elapsed=0,idleTime=0, reduced=false,lastRender=0;
   function sample(){
     if(!scene||!mixer)return;
-    const frame=f11BlenderFrame(elapsed), seconds=(frame-1)/motion.fps;
-    for(const a of actions)a.time=Math.min(seconds,a.getClip().duration);
+    const frame=f11BlenderFrame(elapsed);
+    for(const a of actions){
+      let local=frame;
+      // Keep authored under-vellum roots at exact timing. Only the rooted
+      // plant clips are sequenced into a left-to-right fold after the slit.
+      const name=a.getClip().name,match=/^(?:PLANT|STEM|FROND)_(\d+)/.exec(name);
+      if(match){const tree=trees[Number(match[1])];if(tree)local=Math.max(1,frame-tree.delay*(1-.62*f11Ease(81,96,frame)));}
+      a.time=Math.min((local-1)/motion.fps,a.getClip().duration);
+    }
     mixer.update(0);
     const storyIndex=THREE.MathUtils.clamp(Math.round(frame)-1,0,motion.last-1);
     const tick=Math.floor(idleTime*motion.fps);
+    const beats=paper.update(frame,reduced);
     for(const spec of idles){
       const frames=spec.motion.samples;
       const index=Math.max(tick-spec.motion.offset,0)%(frames.length-1);
-      rotateIdle(spec.node,frames[index],reduced?0:spec.motion.weights[storyIndex]);
+      rotateIdle(spec.node,frames[index],reduced?0:spec.motion.weights[storyIndex]*(spec.node.name.startsWith('CODEC')?1-beats.withdraw:1));
     }
     const blink=motion.eyes.Face_Idle;
     for(const [i,eye] of eyes.entries()){
       const afterEntry=Math.max(0,tick-122), pose=blink[afterEntry%(blink.length-1)];
       if(eye.morphTargetInfluences)eye.morphTargetInfluences[0]=reduced||frame<123?0:pose[Math.floor(i/3)];
     }
-    for(const [i,node] of anchors.entries()){
-      node.visible=i===0?frame>=11:i===1?frame>=34:i===2?frame>=112:i===3?frame>=33&&frame<85:frame>=55;
+    for(const [i,node] of anchors.entries())
+      node.visible=i===0?frame>=11:i===1?frame>=34:i===2?frame>=112:frame>=33&&frame<85;
+    // Fixed base positions: tilt only about the actual root/stem hinge,
+    // never translate a leaf cluster or separate it from the source stalk.
+    for(const t of trees){
+      t.holder.visible=frame>=55+t.delay;
+      const near=t.z>-.43, kernel=1-Math.min(1,Math.abs(t.x-.07)/2.65);
+      const peak=beats.close*(near?.52:1)*kernel;
+      const lean=t.edge*(.23*peak-.18*beats.parted);
+      const stretch=1+(near?.92:1.72)*peak+(near?.04:.28)*beats.parted;
+      t.holder.scale.set(t.s*(1+.20*peak),t.s*stretch,t.s*(1+.09*peak));
+      t.holder.rotation.set(near?.14*peak: .47*peak,0,lean);
     }
+    // A quiet withdrawal layered on the source pose and idle envelope.
+    anchors[0].rotation.y=-.66*beats.withdraw;
+    anchors[1].rotation.y=.14*f11Ease(133,147,frame);
+    anchors[2].rotation.y=.11*f11Ease(133,150,frame);
+    const storyBeat=frame<11?'ash':frame<34?'single-patch':frame<55?'gravity-redirect':frame<63?'fine-roots':
+      frame<72?'gutter-cut':frame<88?'unfold-wave':frame<98?'canopy-full':frame<106?'canopy-parts':
+      frame<112?'held-opening':frame<129?'tiger-late':'codec-withdraws';
+    root.userData.story={beat:storyBeat,...Object.fromEntries(Object.entries(beats).map(([k,v])=>[k,Math.round(v*100)/100])),
+      codecIdle:Math.round((1-beats.withdraw)*100)/100,tiger:anchors[2].visible};
     root.userData.phase=f11StoryPhase(frame);
     root.userData.frame=Math.round(frame);
     root.userData.codecSad=frame>=141;
@@ -88,8 +121,16 @@ export function createF11Challenger(pageY:(x:number)=>number){
       anchors.push(move(get('MARCEL_EFFECT'),0.74,pageY(0.74)+0.40,0.38,0.60));
       for(let i=0;i<27;i++){
         const p=get('PLANT_'+String(i).padStart(2,'0'));
-        const x=p.position.x*.63,z=p.position.z*.67;
-        anchors.push(move(p,x,pageY(x)+.018,z,.64));
+        const x=p.position.x*.70,z=p.position.z*.73;
+        const scale=z<-.44?.85:.72;
+        // Pivots are directly grounded; apply scale on an inner conversion
+        // group so the outer scenic tilt cannot lift the root from the page.
+        const outer=new THREE.Group(), inner=new THREE.Group();
+        outer.name=p.name+'_ROOT_HINGE';
+        outer.position.set(x,pageY(x)+.018,z);
+        inner.position.copy(p.position).negate();outer.scale.setScalar(scale);
+        p.parent!.add(outer);outer.add(inner);inner.add(p);
+        trees.push({holder:outer,x,z,s:scale,delay:9+(x+2.6)*1.42+(.26*Math.sin(i*4)),edge:x<.07?-1:1});
       }
       move(get('ROOT_REGISTER'),-1.85,pageY(-1.85)+.014,1.05,.78);
       for(const [name,source] of Object.entries(motion.idles))idles.push({node:get(name),motion:source});
@@ -115,7 +156,7 @@ export function createF11Challenger(pageY:(x:number)=>number){
         const play=mixer.clipAction(new THREE.AnimationClip(clip.name,clip.duration,clean));
         play.setLoop(THREE.LoopOnce,1);play.clampWhenFinished=true;play.play();play.paused=true;actions.push(play);
       }
-      root.add(scene);elapsed=0;idleTime=0;lastRender=0;sample();
+      root.add(scene);paper.root.visible=true;elapsed=0;idleTime=0;lastRender=0;sample();
       root.userData.assetState='ready';
     } catch(error){
       root.userData.assetState='fallback';
@@ -146,7 +187,7 @@ export function createF11Challenger(pageY:(x:number)=>number){
       const now=performance.now();
       const step=lastRender?Math.min(Math.max(0,(now-lastRender)/1000),.65):Math.max(0,dt);
       lastRender=now;
-      const next=Math.min(9,elapsed+step);
+      const next=Math.min(cues.at(-1)![0],elapsed+step);
       // Do not skip even a short dramatic beat when presenting on a slow GPU.
       const boundary=cues.find(([at])=>at>elapsed+1e-6&&at<=next);
       elapsed=boundary ? boundary[0]+1e-6 : next;
@@ -155,7 +196,7 @@ export function createF11Challenger(pageY:(x:number)=>number){
     dispose(){
       disposed=true;mixer?.stopAllAction();
       if(scene){mixer?.uncacheRoot(scene);destroy(scene);}
-      scene=null;actions=[];root.removeFromParent();
+      scene=null;actions=[];paper.dispose();root.removeFromParent();
     },
   };
 }

@@ -1209,7 +1209,7 @@ function goFolio(index:number, deferCameraReset=false):void {
   if(!playableIndex(index))return;
   clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
   canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
-  delete canvas.dataset.revisionPhase;delete canvas.dataset.f10CandidateState;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;delete canvas.dataset.f11AuthoredFrame;delete canvas.dataset.f07CandidateState;delete canvas.dataset.f08CandidateState;delete canvas.dataset.f09CandidateState;
+  delete canvas.dataset.revisionPhase;delete canvas.dataset.f10CandidateState;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;delete canvas.dataset.f11AuthoredFrame;delete canvas.dataset.f11Story;delete canvas.dataset.f07CandidateState;delete canvas.dataset.f08CandidateState;delete canvas.dataset.f09CandidateState;
   delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;
   delete canvas.dataset.f02Challenger;delete canvas.dataset.f02Frame;delete canvas.dataset.f02Detent;delete canvas.dataset.f02Clip;
   delete canvas.dataset.f06CandidateState;
@@ -1560,6 +1560,7 @@ function animate(dt:number):void {
       if(evidence.blenderState==='ready'){
         canvas.dataset.blenderFolio='11';
         canvas.dataset.f11AuthoredFrame=String(evidence.authoredFrame);
+        canvas.dataset.f11Story=JSON.stringify(evidence.f11Story);
       }
     }
     return;
@@ -1702,6 +1703,12 @@ function fitBookCamera(openProgress:number):void {
   }else if(currentFolio===2&&openProgress>.99){
     camera.position.set(4.0*scale,7.4*scale,9.8*scale);
     controls?.target.set(0,.56,.08);
+  }else if(currentFolio===10&&openProgress>.99){
+    // F11 action and all three levers live near the gutter. On narrow screens
+    // frame the populated stock rather than shrinking it to fit blank margins.
+    const storyScale=scale*THREE.MathUtils.lerp(.66,.96,THREE.MathUtils.smoothstep(aspect,.52,1.28));
+    camera.position.set(0,6.05*storyScale,8.85*storyScale);
+    controls?.target.set(0,.54,.02);
   }else if(currentFolio===4&&openProgress>.99){
     camera.position.set(.55*scale,6.9*scale,9.25*scale);
     controls?.target.set(0,.38,.10);

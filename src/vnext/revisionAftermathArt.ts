@@ -109,7 +109,7 @@ function f11Art(world: BaseFolioWorld): MechanismArt {
   quoteCover.position.set(0,y(0)+0.08,1.03);
   quoteCover.userData={interactionType:'folioMechanism',worldId:10,slot:'C',label:'[C] Open attributed quotation leaf'};
   world.interactables.push(quoteCover);
-  const caption=plate(root,2.36,0.37,'31 days after the war','NACREOUS VI · CLEANUP ALREADY UNDERWAY',['#252c26','#efe1bd','#ac9e63']);
+  const caption=plate(root,2.36,0.37,'31 days after the war','NACREOUS VI · PAPER STUDY, NOT PLANET RECOVERY',['#252c26','#efe1bd','#ac9e63']);
   caption.name='living-f11-postwar-framing';
   caption.position.set(0,0.11,1.49);
   caption.rotation.x=-Math.PI/2+0.12;
@@ -309,6 +309,7 @@ function f11Art(world: BaseFolioWorld): MechanismArt {
       const actual=authored.root.userData;
       root.userData.phase=actual.phase;
       root.userData.authoredFrame=actual.frame;
+      root.userData.f11Story=actual.story;
       root.userData.codecSad=actual.codecSad;
       root.userData.rootWindowFilled=Number(actual.frame)>=63;
       root.userData.allPlantsUnfolded=actual.mature;
