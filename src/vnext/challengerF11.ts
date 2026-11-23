@@ -109,10 +109,13 @@ export function createF11Challenger(pageY:(x:number)=>number){
       if(gltf.animations.length<160)throw new Error('F11 is missing authored motion tracks');
       const move=(node:THREE.Object3D,x:number,y:number,z:number, scale:number)=>{
         const parent=node.parent!;
-        const outer=new THREE.Group(); outer.name=node.name+'_PAGE_MOUNT';
+        const outer=new THREE.Group(), offset=new THREE.Group();outer.name=node.name+'_PAGE_MOUNT';
         outer.scale.setScalar(scale);
-        outer.position.set(x-node.position.x*scale,y-node.position.y*scale,z-node.position.z*scale);
-        parent.add(outer);outer.add(node);
+        outer.position.set(x,y,z);
+        // Authors key rotation/scale, not root translation. Cancel the
+        // original station offset inside the pivot so a turn cannot drag feet.
+        offset.position.copy(node.position).negate();
+        parent.add(outer);outer.add(offset);offset.add(node);
         return outer;
       };
       for(const [name,x,z,scale] of [['ACTOR_CODEC',-1.29,0.32,0.64],['ACTOR_MARCEL',0.74,0.38,0.70],['ACTOR_TIGER',1.80,0.56,0.74]] as const){
