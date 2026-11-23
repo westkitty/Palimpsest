@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { F02_RETURN_CREASE } from './f02WitnessReturn.ts';
 import { f02InkRate, f02InkBeat } from './f02Motion.ts';
 import { folioStock } from './livingPaperStock.ts';
 import { planetPattern, sourceInkRegistration, type FolioActions, type FolioIndex } from './folioLogic.ts';
@@ -107,6 +108,8 @@ void main(){
 }`;
 const inkFragment = /* glsl */ `
 uniform float advance;
+uniform float creaseGlint;
+uniform vec2 returnCrease;
 uniform sampler2D atlas;
 uniform vec3 vellumWhite;
 varying vec2 page;
@@ -130,7 +133,7 @@ void main(){
   float dryEdge=max(0.,abs(p.x)-4.25)*.11+max(0.,abs(p.y)-2.55)*.16;
   float diffuseTime=.022+broad*.215+dryEdge;
   // Branches are elongated fibers with different tip speeds, not colored particles.
-  vec2 branch=vec2(-2.58,1.14), gutter=vec2(-.09,.27);
+  vec2 branch=vec2(-2.58,1.14), gutter=returnCrease;
   float fiberTime=channel(p,origin,branch,.017,.079,.34);
   fiberTime=min(fiberTime,channel(p,branch,vec2(-1.44,1.90),.079,.176,.43));
   fiberTime=min(fiberTime,channel(p,branch,vec2(-2.93,-.14),.079,.222,.37));
@@ -182,6 +185,11 @@ void main(){
     +stars.g*clusters*vec3(.20,.56,.85)
     +stars.b*galaxies*vec3(.44,.34,.22);
   paper+=stellar*safeInterior;
+  // Read the *same* stained gutter as a narrow grazing reflection, neither
+  // a new star on white vellum nor a second source point.
+  vec2 detail=p-returnCrease;
+  float scoreGlint=(1.-smoothstep(.004,.022,abs(detail.x)))*exp(-abs(detail.y)*5.8);
+  paper+=vec3(.30,.41,.43)*creaseGlint*scoreGlint*safeInterior;
   gl_FragColor=vec4(paper,1.);
   #include <colorspace_fragment>
 }`;
@@ -237,14 +245,16 @@ function atlasStars():THREE.DataTexture{
   texture.needsUpdate=true;return texture;
 }
 function vellumF02(root:THREE.Group):RevisionEarlyArt['update']{
-  const advance={value:0};
+  const advance={value:0},creaseGlint={value:0};
+  const returnCrease={value:new THREE.Vector2(F02_RETURN_CREASE[0],F02_RETURN_CREASE[2])};
+  root.userData.setWitnessGlint=(value:number)=>{creaseGlint.value=value;};
   const atlas=atlasStars();
   const size=new THREE.Vector2(4.47,5.76);
   const vellumWhite={value:new THREE.Color(folioStock(1).face)};
   for(const [i,x] of [-2.32,2.32].entries()){
     const mat=new THREE.ShaderMaterial({
       vertexShader:inkVertex,fragmentShader:inkFragment,
-      uniforms:{advance,vellumWhite,atlas:{value:atlas},panelSize:{value:size},panelCenter:{value:new THREE.Vector2(x,0)}},
+      uniforms:{advance,creaseGlint,returnCrease,vellumWhite,atlas:{value:atlas},panelSize:{value:size},panelCenter:{value:new THREE.Vector2(x,0)}},
       side:THREE.FrontSide, toneMapped:false,
     });
     if(i===0)setResource(mat,atlas);

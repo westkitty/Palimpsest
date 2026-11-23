@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {F02_RETURN_CREASE} from './f02WitnessReturn.ts';
 
 const clamp=(x:number)=>THREE.MathUtils.clamp(x,0,1);
 const smooth=(x:number,a:number,b:number)=>THREE.MathUtils.smoothstep(x,a,b);
@@ -13,6 +14,8 @@ const vertex=/*glsl*/`
 uniform float lift;
 uniform float clock;
 uniform float strand;
+uniform float creaseCollapse;
+uniform vec3 creasePoint;
 varying vec2 uvPlane;
 varying vec3 sceneP;
 void main(){
@@ -23,11 +26,14 @@ void main(){
   v.y=.220+(v.y-.220)*rise+shiver*uv.x;
   v.x+=sin(clock*.51+strand+uv.x*14.)*rise*uv.x*.063;
   sceneP=v;
+  vec3 loose=v-creasePoint;
+  v=creasePoint+loose*mix(vec3(1.),vec3(.008,.012,.055),creaseCollapse);
   gl_Position=projectionMatrix*modelViewMatrix*vec4(v,1.);
 }`;
 const fragment=/*glsl*/`
 uniform float wake;
 uniform float lift;
+uniform float creaseCollapse;
 uniform float clock;
 uniform float strand;
 uniform vec3 innerInk;
@@ -59,7 +65,7 @@ void main(){
   float geode=smoothstep(.22,.87,length((sceneP.xz-vec2(2.27,.24))*vec2(1.,.83)));
   float zentrum=smoothstep(.17,.73,length((sceneP.xz-vec2(-2.39,.44))*vec2(1.,.94)));
   float shape=head*feather*(.36+.64*middle)*(.24+.55*ink+.23*filament);
-  float alpha=shape*wake*(.30+.70*lift)*mix(.42,1.,geode*zentrum);
+  float alpha=shape*wake*(.30+.70*lift)*mix(.42,1.,geode*zentrum)*(1.-smoothstep(.78,1.,creaseCollapse));
   if(alpha<.010) discard;
   gl_FragColor=vec4(color,alpha);
   #include <colorspace_fragment>
@@ -70,6 +76,8 @@ attribute float heft;
 attribute vec3 ink;
 uniform float lift;
 uniform float clock;
+uniform float creaseCollapse;
+uniform vec3 creasePoint;
 varying vec3 luminous;
 varying float emergence;
 varying float grain;
@@ -79,11 +87,12 @@ void main(){
   p.y=.23+(p.y-.23)*local*lift;
   float wobble=sin(clock*.64+order*44.+heft*13.) *local*lift;
   p.x+=wobble*.065; p.z+=wobble*.039;
+  p=creasePoint+(p-creasePoint)*mix(vec3(1.),vec3(.006,.014,.032),creaseCollapse);
   vec4 mv=modelViewMatrix*vec4(p,1.);
   gl_Position=projectionMatrix*mv;
   gl_PointSize=clamp(heft*230./max(1.,-mv.z),1.1,12.);
   luminous=ink;
-  emergence=local*(.66+.34*sin(clock*1.7+order*21.));
+  emergence=local*(.66+.34*sin(clock*1.7+order*21.))*(1.-smoothstep(.82,1.,creaseCollapse));
   grain=heft;
 }`;
 const dustFrag=/*glsl*/`
@@ -124,7 +133,7 @@ const palettes=[
  * camera passes among them. None of these sources is a page-sized billboard. */
 export function makeF02DepthField(parent:THREE.Group){
   const root=new THREE.Group();root.name='F02 • ink becomes suspended deep field';root.visible=false;parent.add(root);
-  const wake={value:0},lift={value:0},clock={value:0};
+  const wake={value:0},lift={value:0},clock={value:0},creaseCollapse={value:0},creasePoint={value:new THREE.Vector3(...F02_RETURN_CREASE)};
   const owned: {geometry:THREE.BufferGeometry;material:THREE.Material}[]=[];
   for(let strand=0;strand<12;strand++){
     const arm=strand%4, layer=Math.floor(strand/4);
@@ -148,7 +157,7 @@ export function makeF02DepthField(parent:THREE.Group){
     const material=new THREE.ShaderMaterial({
       vertexShader:vertex,fragmentShader:fragment,transparent:true,depthWrite:false,side:THREE.DoubleSide,
       toneMapped:false,
-      uniforms:{lift,wake,clock,strand:{value:strand},innerInk:{value:new THREE.Color(inside)},outerInk:{value:new THREE.Color(outside)}},
+      uniforms:{lift,wake,clock,creaseCollapse,creasePoint,strand:{value:strand},innerInk:{value:new THREE.Color(inside)},outerInk:{value:new THREE.Color(outside)}},
     });
     material.forceSinglePass=true;
     const strip=new THREE.Mesh(geometry,material);
@@ -176,11 +185,12 @@ export function makeF02DepthField(parent:THREE.Group){
   geometry.setAttribute('ink',new THREE.Float32BufferAttribute(ink,3));
   const material=new THREE.ShaderMaterial({
     vertexShader:dustVert,fragmentShader:dustFrag,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false,
-    uniforms:{lift,clock},
+    uniforms:{lift,clock,creaseCollapse,creasePoint},
   });
   const dust=new THREE.Points(geometry,material);dust.name='F02 • shear knots seeded off the actual folds';
   dust.renderOrder=7;dust.frustumCulled=false;root.add(dust);owned.push({geometry,material});
-  return {update(ink:number,frame:number,dt:number,reduce:boolean){
+  return {setWitnessCollapse(value:number){creaseCollapse.value=clamp(value);},
+  update(ink:number,frame:number,dt:number,reduce:boolean){
     const read=f02DepthRead(ink,frame);
     root.visible=read.lift>.002;
     wake.value=read.wake;lift.value=read.lift;

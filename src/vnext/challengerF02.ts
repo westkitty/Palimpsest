@@ -113,6 +113,7 @@ export function createF02Challenger(initial: F02Reveal, reducedMotion: boolean, 
     }});
   return {
     root,
+    setWitnessCollapse:deep.setWitnessCollapse,
     update(reveal: F02Reveal, dt: number, reduce: boolean, inkAdvance:number) {
       target=reveal;reduced=reduce;
       if (!action)return;

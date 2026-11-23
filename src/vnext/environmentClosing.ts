@@ -12,13 +12,16 @@ export function closingReadingPose(aspect:number){
   return {distance:d,focusY:1.18,focusZ:.59};
 }
 export function closingBeat(seconds:number,reduced:boolean){
-  const t=reduced?2.35:clamp(seconds/2.35)*2.35;
-  const rise=ease(t/1.38);
-  const settle=t>1.38&&t<2.03?Math.sin((t-1.38)/.65*Math.PI*2)*.014*(1-ease((t-1.38)/.65)):0;
+  const t=reduced?1.9:clamp(seconds/1.9)*1.9;
+  const settle=ease(t/.96);
+  const rake=ease((t-.22)/1.68);
   return {
-    angle:.06+(WALL_ANGLE-.06)*rise+settle,
-    relief:ease((t-.76)/1.20),
-    stage:t>=2.35?'held':t>=1.38?'emboss':'rising',
+    // The page turn does the rising. Once readable, the wall barely
+    // relaxes against its paper braces instead of performing another reveal.
+    angle:WALL_ANGLE-.034*(1-settle),
+    relief:.87+.13*rake,
+    rake,
+    stage:t>=1.9?'held':'resting',
   };
 }
 function put(root:THREE.Group, g:THREE.BufferGeometry, m:THREE.Material, x=0,y=0,z=0){
@@ -61,6 +64,9 @@ function letterTexture(emboss:boolean, lightOnly=false){
 }
 export function createEnvironmentalClosing(textures:THREE.Texture[]){
   const root=new THREE.Group();root.name='Closing imprint • scored paper wall and working tension folds';
+  const rakeLight=new THREE.PointLight(0xffe4b8,0,9,2);
+  rakeLight.name='One gentle light grazing the blind impression';
+  root.add(rakeLight);
   const hinge=new THREE.Group();hinge.position.set(0,.257,1.44);root.add(hinge);
   const top=new THREE.Group();top.position.z=-WALL_HEIGHT/2;top.rotation.x=-Math.PI/2;hinge.add(top);
   const stock=letterTexture(false),impression=letterTexture(true,true);
@@ -86,11 +92,11 @@ export function createEnvironmentalClosing(textures:THREE.Texture[]){
   put(root,new THREE.BoxGeometry(WALL_WIDTH+.06,.028,.11),fibre,0,.261,1.447);
   let elapsed=0, last=NaN;
   return {root,update(dt:number,reduced:boolean){
-    elapsed=Math.min(2.35,elapsed+Math.min(.10,Math.max(0,dt)));
+    elapsed=Math.min(1.9,elapsed+Math.min(.10,Math.max(0,dt)));
     const beat=closingBeat(elapsed,reduced);
     const a=beat.angle;
     if(a!==last){
-      hinge.rotation.x=a;ink.opacity=beat.relief;blind.visible=beat.relief>.001;
+      hinge.rotation.x=a;
       for(const {sign,geo} of braces){
         const p=geo.getAttribute('position') as THREE.BufferAttribute;
         const x=sign*(WALL_WIDTH/2-.22), baseZ=hinge.position.z;
@@ -102,8 +108,12 @@ export function createEnvironmentalClosing(textures:THREE.Texture[]){
       }
       last=a;
     }
-    // Relief continues for a moment after the wall locks, even though its angle rests.
-    ink.opacity=beat.relief;blind.visible=beat.relief>.001;
+    // The text is readable throughout; a one-time off-axis rake only
+    // reveals the depth of its pressure marks. No loop, flare, or audio.
+    ink.opacity=beat.relief;
+    rakeLight.position.set(-4.74+.22*beat.rake,1.47,1.98);
+    rakeLight.intensity=1.00+.64*beat.rake;
+    root.userData.rest={angle:beat.angle,rake:beat.rake,relief:beat.relief,stage:beat.stage};
     return beat.stage;
   }};
 }

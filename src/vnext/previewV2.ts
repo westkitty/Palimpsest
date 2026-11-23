@@ -1,4 +1,5 @@
 import { invitationFrame, makePrimaryPaperGrip, primaryPaperSlot } from './primaryPaperControl.ts';
+import {F02_RETURN_CREASE,F02_RETURN_NEAR,F02_RETURN_SECONDS,f02WitnessReturn} from './f02WitnessReturn.ts';
 import { TURN_PULL_SECONDS, TURN_RETURN_SECONDS, commitPageDrag, commonTurnCamera, pageDragTravel, pageSettlePosition, physicalLeafPosition, turnEase, turnTheatre } from './physicalPageTurn.ts';
 import { F09_AFTERMATH_SECONDS, armsF09, f09ForcedBeat, F09_INDEX } from './f09ForcedTurn.ts';
 import {closingReadingPose,createEnvironmentalClosing} from './environmentClosing.ts';
@@ -490,7 +491,9 @@ let galaxyLayers: {group: THREE.Group; stage: 1 | 2 | 3}[] = [];
 let galaxyPaperLoom: THREE.Group | null = null;
 let witnessActive = false;
 let witnessCamera: {position: THREE.Vector3; target: THREE.Vector3} | null = null;
-type CameraFlight = {from: THREE.Vector3; to: THREE.Vector3; lookFrom: THREE.Vector3; lookTo: THREE.Vector3; elapsed: number; seconds: number; destination: 'witness' | 'overhead'};
+let witnessCollapse=0;
+let applyWitnessScene:((collapse:number,glint:number)=>void)|null=null;
+type CameraFlight = {from: THREE.Vector3; to: THREE.Vector3; lookFrom: THREE.Vector3; lookTo: THREE.Vector3; elapsed: number; seconds: number; destination: 'witness' | 'overhead'; collapseFrom:number};
 let cameraFlight: CameraFlight | null = null;
 let vaultLeaf: THREE.Group | null = null;
 let sourceWheel: THREE.Group | null = null;
@@ -861,7 +864,12 @@ function buildCoda():void {
   const page=book();
   closingWall=createEnvironmentalClosing(textTextures);
   page.add(closingWall.root);
-  canvas.dataset.closingBeat=closingWall.update(0,reducedMotion);
+  updateClosingBeat(0);
+}
+function updateClosingBeat(dt:number):void {
+  if(!closingWall)return;
+  canvas.dataset.closingBeat=closingWall.update(dt,reducedMotion);
+  canvas.dataset.closingRest=JSON.stringify(closingWall.root.userData.rest);
 }
 function platform(parent:THREE.Object3D,x:number,z:number,w=1.55):void {
   slab(parent,w,0.11,1.18,shared.backing,x,0.24,z);
@@ -1232,7 +1240,8 @@ function disposeSubtree(root:THREE.Object3D):void {
   });
 }
 function clear():void {
-  disposeRevision(earlyRevision);disposeRevision(laterRevision);earlyRevision=null;laterRevision=null;closingWall=null;delete canvas.dataset.closingBeat;
+  witnessCollapse=0;applyWitnessScene=null;delete canvas.dataset.f02Return;
+  disposeRevision(earlyRevision);disposeRevision(laterRevision);earlyRevision=null;laterRevision=null;closingWall=null;delete canvas.dataset.closingBeat;delete canvas.dataset.closingRest;
   if(inspection!=='overview')leaveMini();
   if (livingStagecraft) {
     rig.remove(livingStagecraft.root);
@@ -1420,6 +1429,10 @@ function goFolio(index:number, deferCameraReset=false):void {
             if(rig===stageOwner&&currentFolio===1)canvas.dataset.f02Challenger=phase;
           });
           const stage=new THREE.Group();
+          applyWitnessScene=(collapse,glint)=>{
+            challenger.setWitnessCollapse(collapse);
+            procedural.root.userData.setWitnessGlint?.(glint);
+          };
           stage.add(procedural.root,challenger.root);
           rig.add(stage);
           canvas.dataset.f02Challenger='loading';
@@ -1715,7 +1728,7 @@ function animate(dt:number):void {
   }
   updatePrimaryPaperControl(dt);
   if(currentFolio===CODA_INDEX){
-    if(closingWall)canvas.dataset.closingBeat=closingWall.update(dt,reducedMotion);
+    updateClosingBeat(dt);
     return;
   }
   earlyRevision?.update(state,dt,reducedMotion);
@@ -1840,7 +1853,7 @@ function beginFlight(to: THREE.Vector3, lookTo: THREE.Vector3, destination: 'wit
   if(!controls)return;
   const from=camera.position.clone();
   const lookFrom=controls.target.clone();
-  cameraFlight={from,to,lookFrom,lookTo,elapsed:0,seconds:reducedMotion?0:2.25,destination};
+  cameraFlight={from,to,lookFrom,lookTo,elapsed:0,seconds:reducedMotion?0:destination==='overhead'?F02_RETURN_SECONDS:2.25,destination,collapseFrom:witnessCollapse};
   controls.enabled=false;
   if(reducedMotion)advanceFlight(1);
 }
@@ -1850,9 +1863,29 @@ function advanceFlight(dt:number):void {
   f.elapsed=Math.min(f.seconds, f.elapsed+dt);
   const t=f.seconds===0?1:THREE.MathUtils.clamp(f.elapsed/f.seconds,0,1);
   const eased=t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
-  if(f.destination==='overhead')controls.maxDistance=Math.max(19,f.to.distanceTo(f.lookTo)+3);
-  camera.position.copy(f.from).lerp(f.to,eased);
-  controls.target.copy(f.lookFrom).lerp(f.lookTo,eased);
+  controls.maxDistance=Math.max(19,f.to.distanceTo(f.lookTo)+3);
+  if(f.destination==='overhead'){
+    const cue=f02WitnessReturn(f.elapsed,reducedMotion);
+    const crease=new THREE.Vector3(...F02_RETURN_CREASE);
+    if(reducedMotion||cue.recede>0){
+      camera.position.set(...F02_RETURN_NEAR).lerp(f.to,cue.recede);
+      controls.target.copy(crease).lerp(f.lookTo,cue.recede);
+    }else{
+      camera.position.copy(f.from).lerp(new THREE.Vector3(...F02_RETURN_NEAR),cue.approach);
+      controls.target.copy(f.lookFrom).lerp(crease,cue.approach);
+    }
+    const collapse=THREE.MathUtils.lerp(f.collapseFrom,1,cue.collapse);
+    setWitnessReduction(collapse,cue.glint);
+    canvas.dataset.f02Return=JSON.stringify({...cue,collapse,at:f.elapsed,crease:F02_RETURN_CREASE,
+      position:camera.position.toArray(),look:controls.target.toArray()});
+  }else{
+    camera.position.copy(f.from).lerp(f.to,eased);
+    controls.target.copy(f.lookFrom).lerp(f.lookTo,eased);
+    // Re-entry lifts the same depth field again, without rerunning A/B/C.
+    setWitnessReduction(f.collapseFrom*(1-eased),0);
+    delete canvas.dataset.f02Return;
+  }
+  controls.maxPolarAngle=Math.PI-.12;
   controls.update();
   if(t>=1){
     const inside=f.destination==='witness';
@@ -1864,8 +1897,12 @@ function advanceFlight(dt:number):void {
     cameraFlight=null;
   }
 }
+function setWitnessReduction(collapse:number,glint:number):void {
+  witnessCollapse=collapse;applyWitnessScene?.(collapse,glint);
+}
 function toggleWitness():void {
   if(physicalTurn||!renderer||!controls||inspection!=='overview'||state.folio!==1||state.f02.reveal!==3)return;
+  if(cameraFlight?.destination==='overhead')return;
   if(!witnessActive){
     witnessCamera={position:camera.position.clone(),target:controls.target.clone()};
     witnessActive=true;
@@ -1974,7 +2011,7 @@ function leaveMini():void {
   inspectButton.textContent='Inspect (I)';
   resetCamera();updateInspectButton();
 }
-function toggleMini():void {if(physicalTurn)return;if(inspection==='overview')enterMini();else leaveMini();}
+function toggleMini():void {if(physicalTurn||cameraFlight)return;if(inspection==='overview')enterMini();else leaveMini();}
 function gazeTo(target:THREE.Vector3):boolean {
   camera.getWorldDirection(clockDirection);
   cursorToSecret.copy(target).sub(camera.position);
