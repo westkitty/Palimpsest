@@ -17,3 +17,6 @@ npm run lint && npm run build
 ### Structural shadow reading
 
 The twelve existing opaque fin meshes cast individually resolved matte silhouettes onto the adjacent paper as their pinned hinges rise in sequence. The cutout shows the reach of the boundary on land outside the well while the original recess, inhabited horizon, and independent Postwar Protocols reading remain unchanged. The cast follows evaluated Blender geometry, disappears as the collar folds back down, and is drawn on receiving stock even without renderer shadow maps. No new light effect, camera, or control is required.
+### Two points of view, one mechanism
+
+Under **Paper viewpoints** the reader can choose **Containment edge**, **Inhabited street**, or return to the existing **Whole book**. These are camera controls, not historical variants or new mechanism slots. Moving between them leaves all twelve hinge samples, the continuing capture, the B-side window choice, C's protocol, and the paper motion clock alone. The inhabited view frames the already visible source ground (the existing miniature margin or the B-side horizon). A small quiet shutter movement in the margin does not follow the capture or suggest a new event. Optional framing widens on portrait and reduced motion snaps the camera only.

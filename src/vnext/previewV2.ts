@@ -1,5 +1,6 @@
 import { invitationFrame, makePrimaryPaperGrip, primaryPaperSlot } from './primaryPaperControl.ts';
 import {F02_RETURN_CREASE,F02_RETURN_NEAR,F02_RETURN_SECONDS,f02WitnessReturn} from './f02WitnessReturn.ts';
+import {f10ReadingView,type F10ReadingView} from './f10ReadingViews.ts';
 import { TURN_PULL_SECONDS, TURN_RETURN_SECONDS, commitPageDrag, commonTurnCamera, pageDragTravel, pageSettlePosition, physicalLeafPosition, turnEase, turnTheatre } from './physicalPageTurn.ts';
 import { F09_AFTERMATH_SECONDS, armsF09, f09ForcedBeat, F09_INDEX } from './f09ForcedTurn.ts';
 import {closingReadingPose,createEnvironmentalClosing} from './environmentClosing.ts';
@@ -52,6 +53,9 @@ const nextButton = byId<HTMLButtonElement>('next');
 const miniButton = byId<HTMLButtonElement>('mini');
 const inspectButton = byId<HTMLButtonElement>('inspect');
 const witnessButton = byId<HTMLButtonElement>('witness');
+const f10Viewpoints=byId<HTMLElement>('f10-viewpoints');
+const f10ViewButtons=Array.from(f10Viewpoints.querySelectorAll<HTMLButtonElement>('button[data-f10-view]'));
+let f10View:F10ReadingView='book';
 const resetStudyButton = byId<HTMLButtonElement>('reset-study');
 const fallback = byId<HTMLElement>('webgl-fallback');
 const moveButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-move]'));
@@ -493,7 +497,7 @@ let witnessActive = false;
 let witnessCamera: {position: THREE.Vector3; target: THREE.Vector3} | null = null;
 let witnessCollapse=0;
 let applyWitnessScene:((collapse:number,glint:number)=>void)|null=null;
-type CameraFlight = {from: THREE.Vector3; to: THREE.Vector3; lookFrom: THREE.Vector3; lookTo: THREE.Vector3; elapsed: number; seconds: number; destination: 'witness' | 'overhead'; collapseFrom:number;wallTick:number};
+type CameraFlight = {from: THREE.Vector3; to: THREE.Vector3; lookFrom: THREE.Vector3; lookTo: THREE.Vector3; elapsed: number; seconds: number; destination: 'witness' | 'overhead' | 'f10'; collapseFrom:number;wallTick:number};
 let cameraFlight: CameraFlight | null = null;
 let vaultLeaf: THREE.Group | null = null;
 let sourceWheel: THREE.Group | null = null;
@@ -1361,6 +1365,8 @@ function goFolio(index:number, deferCameraReset=false):void {
   if(!playableIndex(index))return;
   cancelF09Run();clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
   canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
+  f10View='book';
+  delete canvas.dataset.f10View;delete canvas.dataset.f10ViewMotion;
   delete canvas.dataset.revisionPhase;delete canvas.dataset.f10CandidateState;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;delete canvas.dataset.f11AuthoredFrame;delete canvas.dataset.f11Story;delete canvas.dataset.f07CandidateState;delete canvas.dataset.f08CandidateState;delete canvas.dataset.f09CandidateState;
   delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;delete canvas.dataset.f01Stage;
   delete canvas.dataset.f02Challenger;delete canvas.dataset.f02Frame;delete canvas.dataset.f02Detent;delete canvas.dataset.f02Clip;delete canvas.dataset.f02InkBeat;delete canvas.dataset.f02Arms;delete canvas.dataset.f02Depth;delete canvas.dataset.f02Witness;
@@ -1848,12 +1854,33 @@ function setWitnessButton():void {
   witnessButton.hidden=!available;
   witnessButton.setAttribute('aria-pressed',String(witnessActive));
   witnessButton.textContent=witnessActive?'Return to the page (G)':'Enter the All (G)';
+  f10Viewpoints.hidden=!renderer||currentFolio!==9||inspection!=='overview';
+  for(const b of f10ViewButtons)b.setAttribute('aria-pressed',String(b.dataset.f10View===f10View));
+  if(!f10Viewpoints.hidden)canvas.dataset.f10View=f10View;
 }
-function beginFlight(to: THREE.Vector3, lookTo: THREE.Vector3, destination: 'witness'|'overhead'):void {
+function chooseF10View(view:F10ReadingView):void {
+  if(currentFolio!==9||!renderer||!controls||physicalTurn||bookPhase!=='open'||inspection!=='overview')return;
+  if(view===f10View&&!cameraFlight)return;
+  f10View=view;
+  const pose=readF10Pose(view);
+  setWitnessButton();
+  canvas.dataset.f10ViewMotion='traveling';
+  beginFlight(pose.position,pose.target,'f10',.86);
+  announce(view==='containment'?'Containment edge. The mechanism continues on the same page.':
+    view==='street'?'Inhabited street. The mechanism continues on the same page.':'Whole-book view.');
+}
+function readF10Pose(view:F10ReadingView):ReadingPose {
+  if(view==='book')return readingPose(9,1);
+  const aspect=canvas.clientWidth/Math.max(1,canvas.clientHeight);
+  const state=laterStates[9-FIRST_LATER_FOLIO];
+  const {position,target}=f10ReadingView(view,aspect,state.interactions.B.active);
+  return {position:new THREE.Vector3(...position),target:new THREE.Vector3(...target)};
+}
+function beginFlight(to: THREE.Vector3, lookTo: THREE.Vector3, destination: 'witness'|'overhead'|'f10',seconds=2.25):void {
   if(!controls)return;
   const from=camera.position.clone();
   const lookFrom=controls.target.clone();
-  cameraFlight={from,to,lookFrom,lookTo,elapsed:0,seconds:reducedMotion?0:destination==='overhead'?F02_RETURN_SECONDS:2.25,destination,collapseFrom:witnessCollapse,wallTick:performance.now()};
+  cameraFlight={from,to,lookFrom,lookTo,elapsed:0,seconds:reducedMotion?0:destination==='overhead'?F02_RETURN_SECONDS:seconds,destination,collapseFrom:witnessCollapse,wallTick:performance.now()};
   controls.enabled=false;
   if(reducedMotion)advanceFlight(1);
 }
@@ -1887,8 +1914,10 @@ function advanceFlight(dt:number):void {
     camera.position.copy(f.from).lerp(f.to,eased);
     controls.target.copy(f.lookFrom).lerp(f.lookTo,eased);
     // Re-entry lifts the same depth field again, without rerunning A/B/C.
-    setWitnessReduction(f.collapseFrom*(1-eased),0);
-    delete canvas.dataset.f02Return;
+    if(f.destination==='witness'){
+      setWitnessReduction(f.collapseFrom*(1-eased),0);
+      delete canvas.dataset.f02Return;
+    }
   }
   controls.maxPolarAngle=Math.PI-.12;
   controls.update();
@@ -1897,6 +1926,7 @@ function advanceFlight(dt:number):void {
     controls.minDistance=inside?0.48:1.2;
     controls.maxDistance=inside?9:Math.max(19,f.to.distanceTo(f.lookTo)+3);
     if(currentFolio===1)canvas.dataset.f02Witness=inside?'inside':'overhead';
+    if(currentFolio===9)canvas.dataset.f10ViewMotion='settled';
     controls.maxPolarAngle=inside?Math.PI-0.12:1.51;
     controls.enabled=true;
     cameraFlight=null;
@@ -1987,6 +2017,7 @@ function fitBookCamera(openProgress:number):void {
 }
 function resetCamera():void {
   cameraFlight=null;witnessActive=false;witnessCamera=null;
+  f10View='book';setWitnessButton();
   if(!controls)return;
   controls.enabled=true;
   fitBookCamera(bookPhase==='open'?1:coverAnimation);
@@ -1995,7 +2026,7 @@ function resetCamera():void {
 function enterMini():void {
   cameraFlight=null;witnessActive=false;witnessCamera=null;
   if(controls)controls.enabled=true;
-  inspection='miniature';discovered=false;
+  inspection='miniature';discovered=false;setWitnessButton();
   if(focusText)focusText.visible=false;
   if(controls){
     const x=currentFolio===1?2.27:currentFolio===2?-2.6:0;
@@ -2147,7 +2178,9 @@ function resize():void {
   if(!renderer)return;
   const w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);
   camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);
-  if(!physicalTurn && (bookPhase!=='open'||currentFolio===CODA_INDEX) && inspection==='overview')fitBookCamera(coverAnimation);
+  if(!physicalTurn&&currentFolio===9&&f10View!=='book'&&inspection==='overview'&&!cameraFlight&&controls){
+    const pose=readF10Pose(f10View);camera.position.copy(pose.position);controls.target.copy(pose.target);controls.update();
+  }else if(!physicalTurn && (bookPhase!=='open'||currentFolio===CODA_INDEX) && inspection==='overview')fitBookCamera(coverAnimation);
 }
 function wireButtons():void {
   prevButton.addEventListener('click',()=>nextFolio(-1));
@@ -2155,6 +2188,7 @@ function wireButtons():void {
   miniButton.addEventListener('click',toggleMini);
   inspectButton.addEventListener('click',inspect);
   witnessButton.addEventListener('click',toggleWitness);
+  for(const b of f10ViewButtons)b.addEventListener('click',()=>chooseF10View(b.dataset.f10View as F10ReadingView));
   resetStudyButton.addEventListener('click',resetStudy);
   for(const b of actionButtons)b.addEventListener('click',()=>handleAction(b.dataset.mechanism as Slot));
   for(const b of moveButtons){

@@ -43,6 +43,17 @@ export function createF10StoryPaper(world:F10FolioWorld,pageY:(x:number)=>number
     }
   }
 
+  // An everyday paper door remains an inhabited-side detail, not a
+  // response timing track for the collar or evidence of a named encounter.
+  const doors=[[-.42,.102],[.135,.163]].map(([x,z],i)=>{
+    const pivot=new THREE.Group();pivot.name='Existing cottage · folded ground-level door';margin.add(pivot);
+    pivot.position.set(x+.036,.107,z);
+    const panel=slab(pivot,.071,.089,.017,roof,-.032,0,0,'A lit folded paper door at home');
+    panel.castShadow=true;
+    slab(pivot,.012,.072,.021,brass,-.063,0,.003);
+    return pivot;
+  });
+
   // A literal paper threshold, not a new policy document. Opening these
   // hinges reveals the unchanged original source protocol card beyond.
   const gate=new THREE.Group();gate.name='F10 gatefold over the Postwar Protocols';gate.position.set(0,pageY(0)+.075,1.123);root.add(gate);
@@ -80,12 +91,16 @@ export function createF10StoryPaper(world:F10FolioWorld,pageY:(x:number)=>number
   protocol.visible=false;
   const amberTarget=new THREE.Color(0xd49a58),dimTarget=new THREE.Color(0x87674a);
   for(const [i,n] of [...marginWindows,...bLights].entries())n.material=i%5===2?dimAmber:amber;
-  let openness=0;
+  let openness=0,streetTime=0;
   return {root,update(open:boolean,ground:boolean,lift:number,dt:number,reduce:boolean,localLift:(azimuth:number)=>number){
     if(reduce)openness=Number(open);
     else {
       const amount=Math.max(0,dt)/.69;
       openness=open?Math.min(1,openness+amount):Math.max(0,openness-amount);
+    }
+    streetTime+=reduce?0:Math.max(0,dt);
+    for(const [i,door] of doors.entries()){
+      door.rotation.y=.22+((reduce?.5:Math.sin(streetTime*(.51+i*.07)+i*1.8)*.5+.5)*.29);
     }
     const eased=ease(0,1,openness);
     shutter[0].rotation.y=1.53*eased;shutter[1].rotation.y=-1.53*eased;

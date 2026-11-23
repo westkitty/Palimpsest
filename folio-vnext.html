@@ -62,6 +62,12 @@
     .instrument-bottom button.primary{background:#2a4655;border-color:#79b9cb}
     #witness{background:linear-gradient(120deg,#423b2c,#1c323d);border-color:#c0a16b;color:#f6e8c5;box-shadow:inset 0 1px #e5c99928}
     #witness:hover{border-color:#e5c88d}
+    #f10-viewpoints{display:flex;flex-wrap:wrap;gap:6px;align-items:center;border-top:1px solid #8f795650;margin-top:8px;padding-top:8px}
+    #f10-viewpoints[hidden]{display:none}
+    #f10-viewpoints-label{font:700 10px Georgia,serif;letter-spacing:.13em;text-transform:uppercase;color:#ddc7a0;margin-right:2px}
+    #f10-viewpoints button{color:#f2e5ca;background:linear-gradient(155deg,#463a2f,#28282c);border:1px solid #967e56;border-radius:4px;padding:7px 10px;min-height:36px}
+    #f10-viewpoints button[aria-pressed="true"]{background:#7f6647;color:#fff8e8;border-color:#ebcb91}
+    #f10-viewpoints button:focus-visible{outline:2px solid #f4d796;outline-offset:2px}
     .instrument-bottom .spacer{flex:1}
     #mechanism-status{font:11px/1.5 ui-monospace,monospace;color:#9dc9d4;margin:8px 0 0}
     #folio-description{font-size:12px;line-height:1.57;margin:0;color:#c4ced2}
@@ -201,6 +207,7 @@
           <div class="instrument-bottom"><button id="mini" type="button" class="primary" aria-pressed="false">Enter miniature inspection (M)</button><button id="inspect" type="button" disabled>Inspect (I)</button><button id="witness" type="button" aria-pressed="false" hidden>Enter the All (G)</button><button id="reset-study" type="button" title="Reset only the living folios A/B/C study state, not the archival manuscript or draggable panel layout">Reset study</button><div class="spacer"></div>
             <div class="move-controls" aria-label="Miniature movement buttons"><button data-move="w" type="button" aria-label="Move forward">↑</button><button data-move="a" type="button" aria-label="Move left">←</button><button data-move="s" type="button" aria-label="Move backward">↓</button><button data-move="d" type="button" aria-label="Move right">→</button></div>
           </div>
+          <div id="f10-viewpoints" role="group" aria-labelledby="f10-viewpoints-label" hidden><span id="f10-viewpoints-label">Paper viewpoints</span><button type="button" data-f10-view="book" aria-pressed="true">Whole book</button><button type="button" data-f10-view="containment" aria-pressed="false">Containment edge</button><button type="button" data-f10-view="street" aria-pressed="false">Inhabited street</button></div>
         </div>
       </section>
     </div>
