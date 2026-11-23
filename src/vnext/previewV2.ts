@@ -1185,7 +1185,7 @@ function goFolio(index:number, deferCameraReset=false):void {
   if(!playableIndex(index))return;
   clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
   canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
-  delete canvas.dataset.revisionPhase;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;
+  delete canvas.dataset.revisionPhase;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;delete canvas.dataset.f11AuthoredFrame;
   delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;
   delete canvas.dataset.f02Challenger;delete canvas.dataset.f02Frame;delete canvas.dataset.f02Detent;delete canvas.dataset.f02Clip;
   if(index===CODA_INDEX){
@@ -1390,7 +1390,14 @@ function animate(dt:number):void {
       livingStagecraft?.update(dt,reducedMotion);
     }
     laterRevision?.update(laterStates[currentFolio-FIRST_LATER_FOLIO],dt,reducedMotion);
-    if(currentFolio===10&&laterRevision)canvas.dataset.revisionPhase=String(laterRevision.root.userData.phase);
+    if(currentFolio===10&&laterRevision){
+      const evidence=laterRevision.root.userData;
+      canvas.dataset.revisionPhase=String(evidence.phase);
+      if(evidence.blenderState==='ready'){
+        canvas.dataset.blenderFolio='11';
+        canvas.dataset.f11AuthoredFrame=String(evidence.authoredFrame);
+      }
+    }
     return;
   }
   if(state.folio===0){

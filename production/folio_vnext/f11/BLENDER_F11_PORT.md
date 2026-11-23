@@ -1,0 +1,20 @@
+# F11 dimensional paper and acting import
+Private review branch, not a production deployment. Built from the editable dimensional-quality Blender proof (see source SHA in the motion manifest); original Living binding, crater/base, tab/lever controls, specimen A, comparison B, quotation C and Archive are retained. No new voice, canon, or concealed content.
+
+- The exported Blender material and motion selection comprises 27 roots, 27 stem hinges, 108 frond controllers, 238 modeled leaf solids with scored paper thickness, rooted feet, window, the Marcel effect, and the three articulated actor meshes. GPU geometry uses 208 material batches (about 66k triangles), batched only inside a preserved moving pivot. Plants use authored dye as vertex color; cameras, lights, fonts, archived inscription and the retired planar foliage are not shipped.
+- Story source is Blender at 24 fps, frames 1–180. Living presentation maps the authored local transform clips to a paced sequence: quiet spread, Codec, Marcel/effects, roots into canopy, mature hold, Tiger last, and the emotional split. Projected actor mounts preserve the existing Living stations. Reduced motion preserves the event order while disabling separate idles and eye flutter; no independent wink is auto-fired.
+- Facial eye shapes retain the two cyan slit apertures and four dark facet closure modifiers. Exported source local-idle profiles and their weights remain independent of body and head story motion. Blink and both deliberate wink source arrays are included as verification data, not UI controls. Blender's original procedural roughness/bump response and renderer lighting were not baked or claimed equivalent; the Living Book lights and source-adjusted paper roughness are used.
+- The neutral local transforms of generated static batches are deliberately not mesh animation. Blender's scene-sampling path inferred phantom +4/+8 translations when calculating these leaves beneath a very small parent. The post-export check removes only the generated meshes' redundant TRS binding and maintains the exact parent transform/cut geometry; no leaf geometry was discarded.
+- Runtime asset is gzip-compressed with deterministic gzip headers; browser detects the byte signature and decompresses before GLTFLoader parsing. The raw GLB is a private verification intermediate, not a tracked asset.
+
+## Regenerate
+Open the verified F11 dimensional proof with Blender 4.3.2, pass an isolated output directory, then use deterministic gzip. Do not overwrite the source:
+```sh
+blender -b /path/to/Palimpsest_F11_Dimensional_Quality_Proof.blend -t 3 --python-exit-code 13 -P production/folio_vnext/f11/export_challenger.py -- /tmp/f11-export
+gzip -n -9 -c /tmp/f11-export/palimpsest-f11-challenger.glb > src/vnext/assets/palimpsest-f11-challenger.glb.gz
+cp /tmp/f11-export/palimpsest-f11-motion.json src/vnext/assets/
+node --test tests/challenger-f11.test.mjs
+npm run lint
+npm run build
+```
+Browser test: `tests/browser-f11-challenger.cjs` against the built preview or standalone file, desktop normal motion and narrow touch with reduced motion. It requires the actual imported asset, exact distinct phases, and independent working A/B/C controls. Software Chromium is smoke evidence, not a physical-device performance benchmark.

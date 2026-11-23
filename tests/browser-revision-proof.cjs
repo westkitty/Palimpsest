@@ -54,7 +54,7 @@ const out=process.env.PALIMPSEST_PROOF_DIR||'/tmp';
   await desktop.goto(openURL(11));
   await desktop.waitForFunction(()=>window.__phaseTrace.includes('emotional-split'),undefined,{timeout:100000});
   const trace=await desktop.evaluate(()=>window.__phaseTrace);
-  assert.deepEqual(trace,['codec','marcel','jungle-growing','jungle-hold','tiger-arrival','emotional-split']);
+  assert.deepEqual(trace,['barren','codec','marcel','jungle-growing','jungle-hold','tiger-arrival','emotional-split']);
   await screen(desktop,'F11-story');
   assert.deepEqual(failures,[]);
   console.log('PASS: '+(process.env.PALIMPSEST_QUICK?'selected':'all 12')+' WebGL spreads; early controls and tablet touch; reversible coda; exact F11 event order; no unexpected runtime errors');

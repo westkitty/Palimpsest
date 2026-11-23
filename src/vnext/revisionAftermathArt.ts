@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { getOpenPageY } from '../engine/BookAndDeskRig';
+import { createF11Challenger } from './challengerF11.ts';
 import type { BaseFolioWorld } from '../engine/folios/BaseFolioWorld';
 import type { FolioRuntimeState } from '../types/atlas';
 
@@ -279,6 +280,8 @@ function f11Art(world: BaseFolioWorld): MechanismArt {
     motes.push(m);
   }
 
+  const authored=createF11Challenger(y);
+  root.add(authored.root);
   let time=0, idleClock=0;
   const update:MechanismArt['update']=(state,dt,reduced)=>{
     // Use mount-local timeline, independent of mutable Archive runtime, levers and hidden records.
@@ -295,6 +298,26 @@ function f11Art(world: BaseFolioWorld): MechanismArt {
     root.userData.allPlantsUnfolded=time>=5.58;
     if(quote) quote.visible=state.interactions.C.active;
     quoteCover.visible=!state.interactions.C.active;
+    authored.update(dt,reduced);
+    root.userData.blenderState=authored.root.userData.assetState;
+    if(authored.root.userData.assetState==='loading'){
+      root.userData.phase='barren';
+      for(const v of [win,canopy,celebrate,marcelEffect,...rootStrips.map(r=>r.pivot)])v.visible=false;
+      return;
+    }
+    if(authored.root.userData.assetState==='ready'){
+      const actual=authored.root.userData;
+      root.userData.phase=actual.phase;
+      root.userData.authoredFrame=actual.frame;
+      root.userData.codecSad=actual.codecSad;
+      root.userData.rootWindowFilled=Number(actual.frame)>=63;
+      root.userData.allPlantsUnfolded=actual.mature;
+      for(const p of pivots)if(p.model)p.model.visible=false;
+      for(const c of root.children)if(c.userData.actor)c.visible=false;
+      for(const v of [win,canopy,celebrate,marcelEffect,...rootStrips.map(r=>r.pivot)])v.visible=false;
+      return;
+    }
+    win.visible=true;canopy.visible=true;celebrate.visible=true;
     for(const [i,p] of pivots.entries()){
       const inP=smoothFold(time,actorStart[i],actorEnd[i],reduced);
       const g=p.model;
@@ -348,6 +371,7 @@ function f11Art(world: BaseFolioWorld): MechanismArt {
   };
   return {root,update,dispose:()=>{
     const at=world.interactables.indexOf(quoteCover);if(at>=0)world.interactables.splice(at,1);
+    authored.dispose();
     dispose();
   }};
 }
