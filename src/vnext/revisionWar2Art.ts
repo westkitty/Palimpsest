@@ -3,6 +3,7 @@ import { makeF09RuptureBed, newF09CollapsingPaperGround } from './f09Environment
 import * as THREE from 'three';
 import { f08CueClock, f08Cue } from './f08Motion.ts';
 import { newF08ThresholdResponse } from './f08ThresholdResponse.ts';
+import { createF08HookshotTraffic } from './f08HookshotTraffic.ts';
 import type { FolioRuntimeState } from '../types/atlas';
 import type { BaseFolioWorld } from '../engine/folios/BaseFolioWorld';
 import { getOpenPageY as pageY } from '../engine/BookAndDeskRig';
@@ -298,6 +299,7 @@ function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
   shoes.position.set(1.59,pageY(1.59)+.012,.38);root.add(shoes);
   for(const dz of [-.075,.075])slab(shoes,.40,.018,.06,ink,0,0,dz);
   const threshold=newF08ThresholdResponse(pageY,shoes);root.add(threshold.root);
+  const traffic=createF08HookshotTraffic(pageY);root.add(traffic.root);
   let t=0,cueTime=0,wasOn=false,initialized=false;
   return (state,dt,reduced) => {
     const on = state.interactions.A.active;
@@ -315,6 +317,7 @@ function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
     threshold.root.visible=liveThreshold;
     const witness=threshold.update(liveThreshold?cueTime:0,liveThreshold&&on,reduced);
     root.userData.thresholdResponse=liveThreshold?witness:undefined;
+    root.userData.hookshotTraffic=traffic.update(liveThreshold,on,cue.plasma,dt,reduced);
     root.userData.marcelLight=liveThreshold?witness.actorLight:cue.plasma*.84+cue.impulse*.68;
     plasma.visible=cue.plasma>.005;
     plasmaMaterial.uniforms.uEnergy.value=cue.plasma*.96;

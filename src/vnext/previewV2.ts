@@ -1616,9 +1616,9 @@ function goFolio(index:number, deferCameraReset=false):void {
         art.update(actual,dt,reduce);
         if(rig===stageOwner&&staged.root.userData.assetState==='ready'){
           const {authoredFrames,rings,shutterFrames,leafFrames,comparison}=staged.root.userData;
-          const {portalPower:plasma,portalCue,collarPower,rimPower,foldLight,marcelLight,thresholdResponse}=art.root.userData;
+          const {portalPower:plasma,portalCue,collarPower,rimPower,foldLight,marcelLight,thresholdResponse,hookshotTraffic}=art.root.userData;
           canvas.dataset.f08CandidateState=JSON.stringify({authoredFrames,rings,shutterFrames,leafFrames,comparison,
-            plasma,portalCue,collarPower,rimPower,foldLight,marcelLight,thresholdResponse});
+            plasma,portalCue,collarPower,rimPower,foldLight,marcelLight,thresholdResponse,hookshotTraffic});
         }
       },dispose(){staged.dispose();art.dispose();}};
     }
