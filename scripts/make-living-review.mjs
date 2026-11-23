@@ -16,11 +16,12 @@ const embedGltf={
     plugin.onLoad({filter:/\.js$/},async args=>{
       if(!args.path.startsWith(path.join(dist,'assets')+path.sep))return;
       const source=await readFile(args.path,'utf8');
-      const urls=/new URL\(`([a-zA-Z0-9_.-]+\.glb)`,import\.meta\.url\)\.href/g;
+      const urls=/new URL\(`([a-zA-Z0-9_.-]+\.glb(?:\.gz)?)`,import\.meta\.url\)\.href/g;
       let result=source;
       for(const match of source.matchAll(urls)){
         const data=await readFile(path.join(path.dirname(args.path),match[1]));
-        result=result.replace(match[0],JSON.stringify('data:model/gltf-binary;base64,'+data.toString('base64')));
+        const mime=match[1].endsWith('.gz')?'application/gzip':'model/gltf-binary';
+        result=result.replace(match[0],JSON.stringify('data:'+mime+';base64,'+data.toString('base64')));
       }
       if(result!==source)return {contents:result,loader:'js'};
     });
