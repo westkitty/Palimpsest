@@ -1,3 +1,4 @@
+import {pressPaperFlex} from '../livingPaperBeats';
 import * as THREE from 'three';
 import { sourceInkRegistration,type FolioActions } from '../folioLogic';
 import { foldedGlobe,REVISION_VAULT_TEMPLATES } from '../revisionEarlyArt';
@@ -176,7 +177,10 @@ export function makeF03PaperWorkshop() {
   const plate=new THREE.Group();plate.name='Notebook press, keyed sleeve and feedstock';plate.position.copy(diePlace);root.add(plate);
   box(plate,'Dovetail bonded carrier plate',shade,.76,.04,.72);
   box(plate,'Paper-press bed',brass,.68,.041,.64,0,.041);
-  const sheet=box(plate,'Blank stock held under the die',pearl,.565,.021,.50,0,.070);
+  const sheet=add(plate,'Blank stock flexes against the bonded die',new THREE.BoxGeometry(.565,.021,.50,10,1,3),pearl,0,.070);
+  const blankVerts=sheet.geometry.getAttribute('position');
+  const relaxedBlank=Array.from({length:blankVerts.count},(_,i)=>blankVerts.getY(i));
+  let previousPress=-1;
   const rails=new THREE.Group();rails.name='Scored press guides';plate.add(rails);
   for(const side of [-1,1]){
     box(rails,'Bonded die guide',stock,.056,.436,.09,side*.354,.23,-.145);
@@ -280,6 +284,10 @@ export function makeF03PaperWorkshop() {
     const t=s.generation>0?printing:0;
     const pressed=ease(.10,.53,t)*(1-ease(.75,1.08,t));
     ram.position.y=.366-.286*pressed;
+    if(pressed!==previousPress){
+      for(let i=0;i<blankVerts.count;i++)blankVerts.setY(i,relaxedBlank[i]+pressPaperFlex(blankVerts.getX(i),pressed));
+      blankVerts.needsUpdate=true;sheet.geometry.computeVertexNormals();previousPress=pressed;
+    }
     // Pull the scored card fully clear before anything stands. Give the
     // accordion and globe assembly separate inspectable beats rather than
     // playing another scale tween while the blank is still in flight.

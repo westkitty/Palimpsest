@@ -1,3 +1,4 @@
+import {historicalMachineBeat,reliefFoldCue} from './livingPaperBeats';
 import { makeF09RuptureBed, newF09CollapsingPaperGround } from './f09EnvironmentalTheatre.ts';
 import * as THREE from 'three';
 import { f08CueClock, f08Cue } from './f08Motion.ts';
@@ -90,8 +91,8 @@ function relief(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
     slab(bench, .05,.15,.12, dark,x,.075,0);
     slab(bench, .075,.023,.17,brass,x,.013,0);
   }
-  slab(bench,.60,.043,.20,rust,0,.15);
-  slab(bench,.54,.013,.017,brass,0,.173,.084);
+  const topSlat=slab(bench,.60,.043,.20,rust,0,.15);
+  const topCrease=slab(bench,.54,.013,.017,brass,0,.173,.084);
   for(let i=0;i<3;i++){
     const x=-.17+.17*i, h=.09+i%2*.035;
     slab(bench,.125,h,.12,i===1?cloth:parcel,x,.175+h/2,0);
@@ -103,12 +104,15 @@ function relief(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
     f.position.set(sign*.39,.037,.07); reliefBase.add(f);
     const body = new THREE.Group(); f.add(body);
     for(const x of [-.031,.031]) slab(f,.041,.085,.06,dark,x,.043,0);
-    const coat=mesh(body,new THREE.CylinderGeometry(.073,.091,.16,5),i===0?slate:rust,0,.17);
+    const coat=mesh(body,new THREE.CylinderGeometry(.073,.091,.16,5,5),i===0?slate:rust,0,.17);
     coat.scale.z=.72;
+    const meshPose=coat.geometry.getAttribute('position');
+    const original=meshPose.clone();
     if(i===0) slab(body,.10,.022,.007,cream,0,.205,.049); // uniform trim, not an invented insignia
-    mesh(body,new THREE.IcosahedronGeometry(.048,0),parcel,0,.278);
-    slab(body,.11,.035,.055,i===0?slate:cloth,sign*.063,.196,.013).rotation.z=-sign*.31;
-    return body;
+    const head=mesh(body,new THREE.IcosahedronGeometry(.048,0),parcel,0,.278);
+    const wrist=slab(body,.11,.035,.055,i===0?slate:cloth,sign*.063,.196,.013);
+    wrist.rotation.z=-sign*.31;
+    return {body,head,wrist,coat,meshPose,original};
   });
   // Only the two anonymous existing paper workers. A separate ply of stock
   // visibly moves from hand to hand rather than pulsing a supply icon.
@@ -121,6 +125,8 @@ function relief(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
     hand.name='F07 · paper hinge at wrist';
     return {shoulder:new THREE.Vector3(sign*.345,.254,.108),reach,hand};
   });
+  const brace=slab(reliefBase,.055,.060,.070,slate);
+  brace.name='F07 · sender steadies the folding recipient';
   const edgeStock=paper(0x9c6648,bump);
   const apron=slab(reliefBase,1.00,.008,.10,edgeStock,0,.041,.245);
   apron.name='F07 · stock catches the ruby cast shadow';
@@ -132,11 +138,32 @@ function relief(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
     const target = state.interactions.C.active ? 1 : .50;
     hinge = reduced ? target : toward(hinge, target, dt);
     bench.rotation.x = .58 * (1-hinge);
-    figures.forEach((figure,i) => {
-      figure.rotation.y=(i===0?.35:-.35)+(reduced?0:Math.sin(t*.9+i*1.5)*.045);
-      figure.rotation.z=(i===0?-.09:.09)+(reduced?0:Math.sin(t*1.12+i*.8)*.023);
-    });
     const phase=reduced?2.95:t%6.4;
+    const cue=reliefFoldCue(phase,reduced);
+    topSlat.position.y=.15-.019*cue.load;
+    topSlat.rotation.z=cue.load*.11;
+    topCrease.position.y=.173-.019*cue.load;
+    topCrease.rotation.z=topSlat.rotation.z;
+    figures.forEach(({body,head,wrist,coat,meshPose,original},i) => {
+      const fold=i===1?cue.receive:0;
+      body.rotation.y=(i===0?.35:-.35)+(reduced?0:Math.sin(t*.9+i*1.5)*.045);
+      body.rotation.z=(i===0?-.09:.09)+(reduced?0:Math.sin(t*1.12+i*.8)*.023)+fold*.12;
+      head.position.y=.278-fold*.086;
+      head.rotation.y=(i===0?1:-1)*cue.look*.59;
+      wrist.position.y=.196-fold*.047;
+      if(coat.userData.fold!==fold){
+        for(let j=0;j<meshPose.count;j++){
+          const v=(original.getY(j)+.08)/.16;
+          meshPose.setXYZ(j,original.getX(j)+fold*Math.sin(v*Math.PI*5)*.022*v,
+            original.getY(j)-fold*.081*v,original.getZ(j)+fold*Math.sin(v*Math.PI*5)*.038*v);
+        }
+        meshPose.needsUpdate=true;coat.geometry.computeVertexNormals();coat.userData.fold=fold;
+      }
+    });
+    brace.visible=cue.brace>.15;
+    brace.position.set(.335,.24-cue.receive*.053,.144);
+    reliefBase.userData.recipientFold=cue.receive;
+    reliefBase.userData.parcelLoad=cue.load;
     const pass=ease(1.35,4.35,phase);
     const up=ease(.15,1.35,phase)*(1-ease(4.5,5.64,phase));
     const x=THREE.MathUtils.lerp(-.255,.255,pass);
@@ -353,6 +380,16 @@ function heliocide(root: THREE.Group, bump: THREE.Texture | undefined): UpdateAr
   const historicalBed=makeF09RuptureBed(root,new THREE.Vector3(1.22,pageY(1.22)+.48,-.53));
   const nextBed=makeF09RuptureBed(root,new THREE.Vector3(1.78,pageY(1.78)+.48,-.53));
   const leftFold=makeF09RuptureBed(root,new THREE.Vector3(.62,pageY(.62)+.48,-.53));
+  const clockMount=new THREE.Group();
+  clockMount.name='F09 · historical machine mechanical witness';
+  clockMount.position.set(.74,pageY(.74)+.028,.37);root.add(clockMount);
+  const tickMetal=paper(0x8c7757,bump,.39,.33);
+  const struck=paper(0x5d4231,bump,.44,.14);
+  slab(clockMount,.31,.024,.18,frame);
+  const hammer=new THREE.Group();clockMount.add(hammer);
+  slab(hammer,.30,.015,.052,tickMetal,0,.059,0);
+  slab(hammer,.064,.020,.061,struck,.105,.071,0);
+  let historicalClock=0;
   let was=false, initialized=false, t=0;
   return (state,dt,reduced)=>{
     const on=state.interactions.A.active||state.interactions.A.locked;
@@ -369,6 +406,12 @@ function heliocide(root: THREE.Group, bump: THREE.Texture | undefined): UpdateAr
     root.userData.f09RuptureBedFractures=(rupture??fallbackRupture).update(destruction,reduced);
     comb.visible=destructionClock<55;
     const historical=root.userData.f09HistoricalFinale??-1;
+    historicalClock+=Math.max(0,dt);
+    const rhythm=historicalMachineBeat(historicalClock,historical,state.interactions.B.locked,reduced);
+    hammer.rotation.z=rhythm.beat*.40;
+    struck.emissive.setHex(0xa36730);
+    struck.emissiveIntensity=rhythm.beat*.45;
+    root.userData.f09HistoricalPulse=rhythm.beat;
     const bedAt=(start:number,duration:number)=>historical<start?-1:(historical-start)/duration;
     root.userData.f09HistoricalFractures=historicalBed.update(bedAt(2.31,.94),reduced)+
       nextBed.update(bedAt(2.53,1.02),reduced)+leftFold.update(bedAt(2.14,.91),reduced);
