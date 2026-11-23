@@ -37,7 +37,7 @@ const url=(process.env.PALIMPSEST_STANDALONE
       const state=()=>stage.evaluate(e=>JSON.parse(e.dataset.f09CandidateState));
       const field=(key,value)=>p.waitForFunction(([key,value])=>
         JSON.parse(document.querySelector('#stage').dataset.f09CandidateState||'{}')[key]===value,[key,value],{timeout:85000});
-      const save=async(label)=>{if(output)await p.screenshot({path:path.join(output,'F09-'+form+'-'+label+'.png')});};
+      const save=async(label)=>{if(output)await p.screenshot({path:path.join(output,'F09-'+form+'-'+label+'.png'),timeout:90000});};
       await p.goto(url);await ready().catch(async e=>{throw new Error(JSON.stringify({errors,messages}),{cause:e});});
       await p.waitForFunction(()=>document.querySelector('#stage')?.dataset.bookPhase==='open',null,{timeout:15000});
       await stage.focus();
