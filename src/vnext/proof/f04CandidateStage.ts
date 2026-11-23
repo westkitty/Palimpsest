@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createF04Environment } from './f04Environment';
+import { paperKey } from './portedPaperAsset';
 import type { FolioRuntimeState } from '../../types/atlas';
 
 const fps=24, start=1, colonyEnd=31, routeEnd=38, foldEnd=28;
@@ -39,10 +41,12 @@ export function makeF04CandidateStage(
   const echo:THREE.Object3D[]=[];
   let disposed=false, initialized=false;
   let model:THREE.Group|null=null;
+  let environment:ReturnType<typeof createF04Environment>|null=null;
   let mixer:THREE.AnimationMixer|null=null;
   let colonyFrame=start, expansionFrame=savedFrame??start, foldFrame=start;
   const refuse=()=>{
     if(disposed)return;
+    environment?.dispose();environment=null;
     mixer?.stopAllAction();if(model){mixer?.uncacheRoot(model);disposeAsset(model);}
     mixer=null;model=null;controls.length=0;
     root.userData.assetState='unavailable';failed();
@@ -73,6 +77,19 @@ export function makeF04CandidateStage(
     if(!clipNames.has('A__ColonyCardAndLift')||channels.A.length!==1||
       channels.B.length!==13||channels.C.length!==6||lamps.length!==5||echo.length!==5||
       new Set(controls.map(n=>n.userData.slot)).size!==3){refuse();return;}
+    const colony=model.getObjectByName('A__ColonyCardAndLift');
+    if(!colony){refuse();return;}
+    lamps.sort((a,b)=>a.name.localeCompare(b.name));
+    environment=createF04Environment(model,colony,lamps);
+    model.traverse(n=>{
+      if(!(n instanceof THREE.Mesh))return;
+      const k=paperKey(n.name);
+      if(k==='agreenprintedterrace'||k==='areversescarredundersidemodelednotshowninconlyrehearsal')n.userData.slot='A';
+      else if(k.startsWith('f04darkfacetedplanetarymarker')||k.startsWith('scoredlowpaperrouterail'))n.userData.slot='B';
+      else if(k.startsWith('cactualblackcardstockpanel'))n.userData.slot='C';
+      else return;
+      controls.push(n);
+    });
     root.add(model);root.userData.assetState='ready';ready();
   }).catch(refuse);
 
@@ -89,13 +106,13 @@ export function makeF04CandidateStage(
       if(savedFrame===null&&B.active)expansionFrame=routeEnd;
       initialized=true;
     }
-    expansionFrame=nextExpansionFrame(expansionFrame,B.active,dt,reduced);
+    expansionFrame=nextExpansionFrame(expansionFrame,B.active,dt*.57,reduced);
     recordFrame(expansionFrame);
     const t={A:colonyFrame/fps,B:expansionFrame/fps,C:foldFrame/fps};
     for(const slot of slots)for(const action of channels[slot])action.time=t[slot];
     mixer.update(0);
     Object.assign(root.userData,{
-      colonyFrame, expansionFrame, foldFrame,
+      colonyFrame, expansionFrame, foldFrame,...environment?.update(expansionFrame),
       litPlanets:lamps.filter(l=>l.scale.x>.9).length,
       litEchoes:echo.filter(l=>l.scale.x>.9).length,
       expansion:expansionFrame>=routeEnd?'complete':B.active?'advancing':'held',
@@ -103,6 +120,7 @@ export function makeF04CandidateStage(
   }
   function dispose(){
     disposed=true;
+    environment?.dispose();environment=null;
     mixer?.stopAllAction();if(model){mixer?.uncacheRoot(model);disposeAsset(model);}
     mixer=null;model=null;controls.length=0;
   }

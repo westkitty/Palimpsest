@@ -21,3 +21,7 @@ npm run build
 ```
 
 The exporter saves a separate editable Blender challenger and a standalone runtime GLB. It does not overwrite the reviewed candidate. The local runtime browser proof is ANGLE/SwiftShader WebGL, not a physical GPU FPS claim or art acceptance sign-off.
+
+## Environmental reading pass
+
+The native colony lamp begins unlit. B gives the opening signal on the authored colony, sends a cream pulse along scored connections to the existing source-checked schematic stations, and turns their relay hinges as the signals arrive. Pausing B holds the exact travelling signal and the current dock positions; completing B leaves the five existing anonymous teaching lamps steady and the unconnected lane dark. The unfinished groove is not a sixth planet. The native A terrain turn physically exposes the reverse print, independently of B. C still opens the existing verification folio; its original crease tracks are unchanged. The 3D route, colony plate and verification stock are also tactile controls. No new named event, world, character or recorded battle outcome was introduced.

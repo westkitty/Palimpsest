@@ -172,7 +172,7 @@ function onPhysicalPointerDown(event:PointerEvent):void {
     return;
   }
   if(bookPhase!=='open' || physicalTurn || inspection!=='overview')return;
-  if(currentFolio===6&&canvas.dataset.blenderFolio==='07'){
+  if((currentFolio===3&&canvas.dataset.blenderFolio==='04')||(currentFolio===6&&canvas.dataset.blenderFolio==='07')){
     const controls=(laterRevision?.root.userData.interactables??[]) as THREE.Mesh[];
     // The generous page-turn hit volume extends behind an outer A/C tab.
     // Its invisible plane must not swallow a tap on the actual mechanism.
@@ -1368,8 +1368,10 @@ function goFolio(index:number, deferCameraReset=false):void {
       laterRevision={root:staged.root,update:(actual,dt,reduce)=>{
         if(staged.root.userData.assetState==='ready'){
           staged.update(actual,dt,reduce);
-          const {colonyFrame,expansionFrame,foldFrame,litPlanets,litEchoes,expansion}=staged.root.userData;
-          canvas.dataset.f04CandidateState=JSON.stringify({colonyFrame,expansionFrame,foldFrame,litPlanets,litEchoes,expansion});
+          const {colonyFrame,expansionFrame,foldFrame,litPlanets,litEchoes,expansion,
+            colonySignal,pulseSegment,pulseAlong,relaysUnfolded,unfinishedLaneDark}=staged.root.userData;
+          canvas.dataset.f04CandidateState=JSON.stringify({colonyFrame,expansionFrame,foldFrame,litPlanets,litEchoes,expansion,
+            colonySignal,pulseSegment,pulseAlong,relaysUnfolded,unfinishedLaneDark});
         }else art.update(actual,dt,reduce);
       },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
     }
