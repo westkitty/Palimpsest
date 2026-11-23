@@ -26,12 +26,18 @@ export function createF04Environment(parent:THREE.Group,colony:THREE.Object3D,la
   const lens=put(signal,'Paper first lamp amber insert',new THREE.CylinderGeometry(.095,.091,.018,20),flare,-.220,.587,-.10);
   put(signal,'First lamp folded graphite ring',new THREE.TorusGeometry(.104,.019,6,20),gray,-.220,.587,-.10).rotation.x=-Math.PI*.5;
   const coal=put(signal,'Unlit colony signal face',new THREE.CylinderGeometry(.092,.078,.016,20),black,-.220,.585,-.10);
-  const cutPoint=new THREE.Vector3(-1.67,.111,-.31);
+  // Bring the colony wire out through the fore-edge instead of letting
+  // its first lit pulse run invisibly underneath the city card.
+  const cutPoint=new THREE.Vector3(-1.62,.123,.48);
+  box(stage,'Colony outgoing signal cut and brass heel',trim,.13,.044,.10,-1.62,.113,.49);
   const nodes=[cutPoint,...lamps.map(n=>n.position.clone().add(new THREE.Vector3(0,-.07,.015)))];
   const paths=nodes.slice(1).map((n,i)=>{
     const a=nodes[i],middle=a.clone().lerp(n,.57);
     middle.z+=i===0?.08:.034;
-    if(i===0)middle.y=.124;
+    if(i===0)return new THREE.CatmullRomCurve3([
+      a,new THREE.Vector3(-1.33,.13,.53),new THREE.Vector3(-.76,.145,.45),
+      new THREE.Vector3(-.65,.154,-.06),n,
+    ]);
     return new THREE.CatmullRomCurve3([a,middle,n]);
   });
   const final=nodes.at(-1)!;
