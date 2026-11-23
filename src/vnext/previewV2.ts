@@ -6,6 +6,7 @@ import { F09_MODEL_CENTER, makeF09CandidateStage } from './proof/f09CandidateSta
 import { makeF04CandidateStage } from './proof/f04CandidateStage';
 import { makeF05CandidateStage } from './proof/f05CandidateStage';
 import { makeF06CandidateStage } from './proof/f06CandidateStage';
+import { resetF06TerrainWear } from './proof/f06AttritionLayers';
 import { makeF12CandidateStage } from './proof/f12CandidateStage';
 import { F12FolioWorld } from '../engine/folios/FoliosAftermath';
 import { cssStock, folioStock, isDarkStock } from './livingPaperStock.ts';
@@ -1410,8 +1411,8 @@ function goFolio(index:number, deferCameraReset=false):void {
       laterRevision={root:staged.root,update:(actual,dt,reduce)=>{
         if(staged.root.userData.assetState==='ready'){
           staged.update(actual,dt,reduce);
-          const {era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell}=staged.root.userData;
-          canvas.dataset.f06CandidateState=JSON.stringify({era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell});
+          const {era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell,physicalBlankApertures,specimenYaw,wearMask,routeLayerCount,paperRipple}=staged.root.userData;
+          canvas.dataset.f06CandidateState=JSON.stringify({era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell,physicalBlankApertures,specimenYaw,wearMask,routeLayerCount,paperRipple});
         }else art.update(actual,dt,reduce);
       },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
     }
@@ -1652,7 +1653,7 @@ function handleAction(slot:Slot):void {
 function resetStudy():void{
   if(inspection!=='overview')leaveMini();
   studyStates=restoreFolioStudy(null);
-  laterStates=restoreLaterStudy(null);f04ExpansionFrame=null;
+  laterStates=restoreLaterStudy(null);f04ExpansionFrame=null;resetF06TerrainWear();
   try{sessionStorage.removeItem(STUDY_STORAGE_KEY);sessionStorage.removeItem(LATER_STUDY_STORAGE_KEY);}catch{}
   const current=currentFolio;
   goFolio(current);

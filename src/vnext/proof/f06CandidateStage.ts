@@ -3,6 +3,7 @@ import type { FolioRuntimeState, DraxisId } from '../../types/atlas';
 import { buildDraxisModel, type DraxisRig } from '../../engine/drakken/DraxisModels';
 import { F06_CAMPAIGN_DRAXIS_IDS, DRAXIS_BY_ID } from '../../story/draxisCatalog';
 import { authoredSlotMixer, createPortedPaperAsset } from './portedPaperAsset';
+import { attachF06AttritionTerrain,cutF06UnknownLossCells } from './f06AttritionLayers';
 
 export const F06_ERAS = ['7–30','31–60','61–90','91–120'] as const;
 const fps=18;
@@ -99,6 +100,12 @@ export function makeF06CandidateStage(bump:THREE.Texture, ready:()=>void, failed
       if(!ledgerParent||!leaves.every(n=>n.parent===ledgerParent))
         throw new Error('F06 six native hinges do not share the reviewed substrate');
       ledgerParent.add(ledger);leaves.forEach(leaf=>ledger.add(leaf));
+      const apertures=cutF06UnknownLossCells(leaves);
+      if(apertures!==4)throw Error('F06 documented blank cells missing');
+      const terrain=attachF06AttritionTerrain(ledgerParent);
+      const specimenRotator=new THREE.Group();
+      specimenRotator.name='F06 independently revolving sourced specimen';
+      seat.add(specimenRotator);
       const wheelParent=wheel.parent;
       if(!wheelParent)throw new Error('F06 chronology wheel lost its fixed axle');
       const coarseWheel=new THREE.Group();
@@ -116,10 +123,13 @@ export function makeF06CandidateStage(bump:THREE.Texture, ready:()=>void, failed
       const initialSlip=indexSlip.position.x;
       let specimen:DraxisRig|undefined, currentId:DraxisId|undefined, elapsed=0;
       let era=-1, target=0, wheelTravel=0, cFrame=69, bFrame=45, jog=0;
+      let targetYaw=0,specimenYaw=0,clock=0;
       return {
         update(state,dt,reduced){
           const s=f06CandidateSelection(state);
-          const time=Math.min(.07,Math.max(0,dt));
+          const now=performance.now();
+          const time=dt>0&&clock>0?Math.min(.18,Math.max(0,(now-clock)/1000)):0;
+          clock=now;
           const first=era<0;
           if(first){target=s.era;wheelTravel=target;cFrame=s.open?111:69;bFrame=s.specimenId==='003'?45:66;}
           else if(s.era!==era){target+=(s.era-era+4)%4;jog=reduced?0:.43;}
@@ -132,8 +142,8 @@ export function makeF06CandidateStage(bump:THREE.Texture, ready:()=>void, failed
             specimen=buildDraxisModel(currentId,bump);
             specimen.group.name='F06 authored catalog '+currentId;
             specimen.group.scale.setScalar(1.05);
-            seat.add(specimen.group);
-            if(!first&&!reduced)bFrame=45;
+            specimenRotator.add(specimen.group);
+            if(!first){targetYaw+=.72;if(!reduced)bFrame=45;}
           }
           bFrame=reduced?(s.specimenId==='003'?45:66):approach(bFrame,s.specimenId==='003'?45:66,time*42);
           const coarse=Math.floor(wheelTravel);
@@ -151,10 +161,14 @@ export function makeF06CandidateStage(bump:THREE.Texture, ready:()=>void, failed
           printSpecimen(currentId+'  '+DRAXIS_BY_ID[currentId].name.toUpperCase());
           elapsed+=reduced?0:time;
           specimen?.animate(elapsed,!reduced);
+          specimenYaw=reduced?targetYaw:approach(specimenYaw,targetYaw,time*1.9);
+          specimenRotator.rotation.y=specimenYaw%(Math.PI*2);
+          const marks=terrain.update(s.era,time,reduced);
           Object.assign(art.root.userData,{
             era:eraText,ledgerEra:eraText,specimenId:currentId,cFrame,ledgerOpen:s.open,
             wheelDetent:target%4,ledgerJiggle:ripple,nativeLedgerLeaves:leaves.length,
             authoredBlankCasualtyCell:blankCell.visible,authoredCradleYaw:cradle.rotation.y,
+            physicalBlankApertures:apertures,specimenYaw,...marks,
           });
         },
         dispose(){if(specimen)disposeSpecimen(specimen);channels.dispose();controls.length=0;},
