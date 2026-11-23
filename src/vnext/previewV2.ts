@@ -1,3 +1,4 @@
+import { invitationFrame, makePrimaryPaperGrip, primaryPaperSlot } from './primaryPaperControl.ts';
 import { TURN_PULL_SECONDS, TURN_RETURN_SECONDS, commitPageDrag, commonTurnCamera, pageDragTravel, pageSettlePosition, physicalLeafPosition, turnEase, turnTheatre } from './physicalPageTurn.ts';
 import { F09_AFTERMATH_SECONDS, armsF09, f09ForcedBeat, F09_INDEX } from './f09ForcedTurn.ts';
 import {closingReadingPose,createEnvironmentalClosing} from './environmentClosing.ts';
@@ -506,6 +507,19 @@ const mechanismPointer = new THREE.Vector2();
 let paperTap: {id:number;x:number;y:number} | null = null;
 let earlyPaperTabs:THREE.Group[]=[];
 let earlyPaperTabHits:THREE.Mesh[]=[];
+let primaryGrip:ReturnType<typeof makePrimaryPaperGrip>=null;
+let invitationTime=0;
+function updatePrimaryPaperControl(dt:number):void {
+  if(physicalTurn||bookPhase!=='open'||inspection!=='overview'||currentFolio===CODA_INDEX)return;
+  invitationTime=Math.min(.87,invitationTime+Math.max(0,dt));
+  const slot=primaryPaperSlot(currentFolio);
+  if(primaryGrip){
+    const locked=laterStates[currentFolio-FIRST_LATER_FOLIO]?.interactions[primaryGrip.slot].locked;
+    primaryGrip.root.visible=!witnessActive&&!locked&&f09Run===null;
+    primaryGrip.update(invitationTime,reducedMotion);
+  }
+  if(slot)canvas.dataset.primaryPaper=JSON.stringify({slot,settled:reducedMotion||invitationTime>=.86});
+}
 function onPaperPointerDown(e:PointerEvent):void {
   if(inspection==='overview' && e.isPrimary && bookPhase==='open' && !physicalTurn)
     paperTap={id:e.pointerId,x:e.clientX,y:e.clientY};
@@ -519,6 +533,9 @@ function onPaperPointerUp(e:PointerEvent):void {
   if(box.width<1||box.height<1)return;
   mechanismPointer.set((e.clientX-box.left)/box.width*2-1,-((e.clientY-box.top)/box.height*2-1));
   mechanismRaycaster.setFromCamera(mechanismPointer,camera);
+  if(primaryGrip?.root.visible&&f09Run===null&&mechanismRaycaster.intersectObject(primaryGrip.hit,false).length){
+    handleAction(primaryGrip.slot);return;
+  }
   if(currentFolio<FIRST_LATER_FOLIO){
     // The early-folio A/B/C tabs are actual pullable cardstock controls.
     // They operate the unchanged documented teaching actions, never secrets.
@@ -801,7 +818,8 @@ function animateEarlyPaperTabs(dt:number):void {
       : [state.f03.vaultOpen,state.f03.template!==0,state.f03.generation!==0];
   earlyPaperTabs.forEach((tab,i)=>{
     tab.position.z=smooth(tab.position.z,engaged[i]?3.02:2.71,dt);
-    tab.rotation.x=smooth(tab.rotation.x,engaged[i]?-0.12:0,dt);
+    tab.rotation.x=smooth(tab.rotation.x,(engaged[i]?-.12:0)-
+      (!physicalTurn&&bookPhase==='open'&&i===0?.65*invitationFrame(invitationTime,reducedMotion):0),dt);
   });
 }
 function book():THREE.Group {
@@ -1230,6 +1248,7 @@ function clear():void {
   for(const texture of textTextures)texture.dispose();
   textTextures=[];rig.clear();
   focusText=null;secretTarget=null;paperHinges=[];f01DetailMarks=[];earlyPaperTabs=[];earlyPaperTabHits=[];galaxyLayers=[];galaxyPaperLoom=null;vaultLeaf=null;sourceWheel=null;programDie=null;printPulse=0;planets=null;
+  primaryGrip=null;invitationTime=0;delete canvas.dataset.primaryPaper;
   discovered=false;
 }
 function parkOutgoingStage():void {
@@ -1660,6 +1679,7 @@ function goFolio(index:number, deferCameraReset=false):void {
       },dispose(){staged.dispose();if(mounted)world.unmountLivingBlender();art.root.removeFromParent();art.dispose();}};
     }
   }
+  if(renderer&&index>=FIRST_LATER_FOLIO&&index<CODA_INDEX)primaryGrip=makePrimaryPaperGrip(rig,index);
   if(!deferCameraReset){applyFolioLighting(index,index,1);binding.setPageIndex(index);resetCamera();presentFolio(index);}
   // A page change must never expose the story through a closed cover or
   // re-enable orbit controls while an actual paper leaf is moving.
@@ -1693,6 +1713,7 @@ function animate(dt:number):void {
     if(!rig.visible)return;
     if(!physicalTurn.incomingClockStarted){physicalTurn.incomingClockStarted=true;dt=0;}
   }
+  updatePrimaryPaperControl(dt);
   if(currentFolio===CODA_INDEX){
     if(closingWall)canvas.dataset.closingBeat=closingWall.update(dt,reducedMotion);
     return;
