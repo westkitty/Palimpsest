@@ -49,7 +49,7 @@ export function createPortedPaperAsset<T>(
     if(!shown){shown=true;mounted.scene.visible=true;}
   },dispose(){
     if(dead)return;dead=true;
-    timeline?.dispose();
+    timeline?.dispose?.();
     if(mounted)disposePaperModel(mounted.scene);
     timeline=undefined;mounted=undefined;root.clear();
   }};
