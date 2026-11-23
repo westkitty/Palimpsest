@@ -49,26 +49,37 @@ try{
     },{lift,captured,extra},{timeout:45000,polling:100}).then(h=>h.jsonValue());
     const arrival=await wait([0,.005],0,{record:false,horizon:false,litWindows:8,streaks:0});
     assert.equal(await stage.getAttribute('data-blender-folio'),'10');
-    assert.ok(arrival.wave.every(v=>v===0));await shot('arrival');
+    assert.ok(arrival.wave.every(v=>v===0));
+    assert.deepEqual(arrival.story.environment,{folds:Array(10).fill(0),moved:0,shelterWarmth:0});
+    await shot('arrival');
     if(motion==='no-preference')await p.evaluate(()=>window.__f10Proof.hold());
     await key('a');
     if(motion==='no-preference'){
       const wave=await wait([.37,.6],null);
       assert.ok(Math.max(...wave.wave)-Math.min(...wave.wave)>.55);
       assert.ok(wave.wave[6]>wave.wave[0]&&wave.wave[0]>wave.wave[5]);
+      assert.ok(Math.max(...wave.story.environment.folds)>.65);
+      assert.ok(Math.max(...wave.story.environment.folds)-Math.min(...wave.story.environment.folds)>.45);
       await shot('native-wave');await p.evaluate(()=>window.__f10Proof.release());
     }
     const secured=await wait([.9998,1],3);
     assert.ok(secured.wave.every(v=>v>=.99));
     assert.ok(secured.story.actors.every(v=>v==='below-lip'));
+    const held=secured.story.environment;
+    assert.equal(held.moved,9);assert.equal(held.shelterWarmth,1);
+    assert.ok(held.folds.reduce((a,b)=>a+b,0)>5.8);
     if(motion==='no-preference'){
       const seen=await p.evaluate(()=>window.__f10Proof.history.flatMap(s=>JSON.parse(s).story.actors));
       assert.ok(['braced','slipping','descending'].every(p=>seen.includes(p)),seen.join(','));
     }
     await shot('below-lip');
-    await key('b');await wait([.9998,1],3,{horizon:true,litWindows:8,streaks:1,record:false});await shot('inhabited-horizon');
+    await key('b');
+    const witnessed=await wait([.9998,1],3,{horizon:true,litWindows:8,streaks:1,record:false});
+    assert.deepEqual(witnessed.story.environment,held);await shot('inhabited-horizon');
     await key('c');await wait([.9998,1],3,{door:1,record:true,streaks:1,horizon:true});await shot('threshold-open');
-    await key('a');await wait([0,.005],0,{door:1,record:true,streaks:1,horizon:true});
+    await key('a');
+    const reset=await wait([0,.005],0,{door:1,record:true,streaks:1,horizon:true});
+    assert.deepEqual(reset.story.environment,arrival.story.environment);
     await key('c');await wait([0,.005],0,{door:0,record:false,streaks:1,horizon:true});
     await p.close();console.log('F10_STORY_WEBGL_PASS',label);
   }

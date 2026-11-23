@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { F10FolioWorld } from '../engine/folios/FoliosAftermath';
+import { createF10EnvironmentalResponse } from './f10EnvironmentalResponse.ts';
 
 const ease=(a:number,b:number,t:number)=>THREE.MathUtils.smoothstep(t,a,b);
 export function createF10StoryPaper(world:F10FolioWorld,pageY:(x:number)=>number) {
@@ -75,11 +76,12 @@ export function createF10StoryPaper(world:F10FolioWorld,pageY:(x:number)=>number
     const sign=new THREE.Mesh(new THREE.PlaneGeometry(1.63,.152),labelMaterial);
     sign.position.set(0,.386,.003);sign.rotation.x=-.30;gate.add(sign);touch(sign);title=sign;
   }
+  const environment=createF10EnvironmentalResponse(pageY,margin,horizon);root.add(environment.root);
   protocol.visible=false;
   const amberTarget=new THREE.Color(0xd49a58),dimTarget=new THREE.Color(0x87674a);
   for(const [i,n] of [...marginWindows,...bLights].entries())n.material=i%5===2?dimAmber:amber;
   let openness=0;
-  return {root,update(open:boolean,ground:boolean,lift:number,dt:number,reduce:boolean){
+  return {root,update(open:boolean,ground:boolean,lift:number,dt:number,reduce:boolean,localLift:(azimuth:number)=>number){
     if(reduce)openness=Number(open);
     else {
       const amount=Math.max(0,dt)/.69;
@@ -100,10 +102,10 @@ export function createF10StoryPaper(world:F10FolioWorld,pageY:(x:number)=>number
     const light=ease(.11,.94,lift);
     amber.color.setHex(0xffc977).lerp(amberTarget,light*.42);
     dimAmber.color.setHex(0xaf814d).lerp(dimTarget,light*.38);
-    return {door:Math.round(eased*100)/100,record:protocol.visible,horizon:ground,litWindows:ground?bLights.length:marginWindows.length,streaks:originalStreaks.filter(n=>n.visible&&horizon.visible).length};
+    return {environment:environment.update(lift,localLift,reduce),door:Math.round(eased*100)/100,record:protocol.visible,horizon:ground,litWindows:ground?bLights.length:marginWindows.length,streaks:originalStreaks.filter(n=>n.visible&&horizon.visible).length};
   },dispose(){
     for(const n of hits){const i=world.interactables.indexOf(n);if(i>=0)world.interactables.splice(i,1);}
-    texture?.dispose();labelMaterial?.dispose();protocol.visible=true;
+    environment.dispose();texture?.dispose();labelMaterial?.dispose();protocol.visible=true;
     protocol.position.copy(protocolRest);protocol.rotation.x=protocolRestPitch;
     horizonWindows.traverse(o=>{if(o instanceof THREE.Mesh)o.geometry.dispose();});
     horizonWindows.removeFromParent();amber.dispose();dimAmber.dispose();

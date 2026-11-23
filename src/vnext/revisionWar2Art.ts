@@ -501,7 +501,7 @@ function siege(root: THREE.Group, world: BaseFolioWorld, bump: THREE.Texture | u
       storyActors.push(!hold.visible?'below-lip':drop>.15?'descending':slip>.08?'slipping':brace>.1?'braced':'ready');
       rig.animate(clock+i*.47,!reduced&&brace<.06&&slip<.015);
     }
-    root.userData.f10Story={...story?.update(state.interactions.C.active,state.interactions.B.active,lift,dt,reduced),actors:storyActors};
+    root.userData.f10Story={...story?.update(state.interactions.C.active,state.interactions.B.active,lift,dt,reduced,ready?authored.localLift:()=>lift),actors:storyActors};
     root.userData.f10Captured=belowReceiver;
   };
 }
