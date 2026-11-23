@@ -29,3 +29,15 @@ test('The exact pre-existing vellum crossing now also anchors the world geometry
   assert.match(read('f02DepthField.ts'),/p=creasePoint\+\(p-creasePoint\)\*mix/);
   assert.match(read('previewV2.ts'),/controls\.target\.copy\(crease\)\.lerp\(f\.lookTo,cue\.recede\)/);
 });
+
+test('the exposed original captive has only a tiny body and unadorned head idle',async()=>{
+  const {f02CaptiveIdle}=await import('../src/vnext/f02Motion.ts');
+  assert.deepEqual(f02CaptiveIdle(0),{stretch:1,pitch:0,yaw:0});
+  assert.ok(f02CaptiveIdle(1).yaw>0);
+  const preview=readFileSync(new URL('../src/vnext/previewV2.ts',import.meta.url),'utf8');
+  const motion=preview.slice(preview.indexOf('updateF02Captive=(dt,visible)'),preview.indexOf('  const faceFill='));
+  assert.match(motion,/torso\.scale\.y/);
+  assert.match(motion,/head\.rotation/);
+  assert.doesNotMatch(motion,/\bring\b|\beye\b|inscription|geode\.rotation/);
+  assert.match(preview,/updateF02Captive\?\.\(dt,rig\.visible&&!physicalTurn&&!cameraFlight&&!document\.hidden&&state\.f02\.reveal===3\)/);
+});

@@ -1,5 +1,6 @@
 import { makeF09MechanicalSound } from './f09MechanicalSound.ts';
 import { invitationFrame, makePrimaryPaperGrip, primaryPaperSlot } from './primaryPaperControl.ts';
+import {f02CaptiveIdle} from './f02Motion.ts';
 import {F02_RETURN_CREASE,F02_RETURN_NEAR,F02_RETURN_SECONDS,f02WitnessReturn} from './f02WitnessReturn.ts';
 import {f10ReadingView,type F10ReadingView} from './f10ReadingViews.ts';
 import { TURN_PULL_SECONDS, TURN_RETURN_SECONDS, commitPageDrag, commonTurnCamera, pageDragTravel, pageSettlePosition, physicalLeafPosition, turnEase, turnTheatre } from './physicalPageTurn.ts';
@@ -498,6 +499,7 @@ let galaxyPaperLoom: THREE.Group | null = null;
 let witnessActive = false;
 let witnessCamera: {position: THREE.Vector3; target: THREE.Vector3} | null = null;
 let witnessCollapse=0;
+let updateF02Captive:((dt:number,visible:boolean)=>void)|null=null;
 let applyWitnessScene:((collapse:number,glint:number)=>void)|null=null;
 type CameraFlight = {from: THREE.Vector3; to: THREE.Vector3; lookFrom: THREE.Vector3; lookTo: THREE.Vector3; elapsed: number; seconds: number; destination: 'witness' | 'overhead' | 'f10'; collapseFrom:number;wallTick:number};
 let cameraFlight: CameraFlight | null = null;
@@ -1099,6 +1101,23 @@ function buildF02():THREE.Group {
   // landmark nor its separate, interior-gated inspection plate moves.
   originalGeode.rotation.y=-.84;
   geode.add(originalGeode);
+  // Keep the source cage and all four rings exactly fixed. The captive's
+  // original body/fissure and featureless head surfaces alone can flex.
+  const captive=originalGeode.children.find(o=>o instanceof THREE.Group&&Math.abs(o.rotation.z-Math.PI)<1e-6);
+  if(captive){
+    const [torso,fissure,head]=captive.children;
+    if(torso instanceof THREE.Mesh&&fissure instanceof THREE.Mesh&&head instanceof THREE.Mesh&&head.geometry instanceof THREE.IcosahedronGeometry){
+      let age=0;
+      const baseTorso=torso.scale.y,baseFissure=fissure.scale.y,basePitch=head.rotation.x,baseYaw=head.rotation.y;
+      updateF02Captive=(dt,visible)=>{
+        if(visible&&!reducedMotion)age+=Math.max(0,Math.min(dt,.065));
+        const idle=f02CaptiveIdle(age);
+        torso.scale.y=baseTorso*idle.stretch;fissure.scale.y=baseFissure*idle.stretch;
+        head.rotation.x=basePitch+idle.pitch;head.rotation.y=baseYaw+idle.yaw;
+        canvas.dataset.f02GeodeIdle=JSON.stringify({age,...idle});
+      };
+    }
+  }
   const faceFill=new THREE.PointLight(0xa7d5ff,2.6,2.35,2);
   faceFill.name='F02 book light on the Digital Geode cutaway';
   faceFill.position.set(3.02,1.53,.95);root.add(faceFill);
@@ -1246,7 +1265,8 @@ function disposeSubtree(root:THREE.Object3D):void {
   });
 }
 function clear():void {
-  witnessCollapse=0;applyWitnessScene=null;delete canvas.dataset.f02Return;
+  witnessCollapse=0;applyWitnessScene=null;updateF02Captive=null;
+  delete canvas.dataset.f02Return;delete canvas.dataset.f02GeodeIdle;
   disposeRevision(earlyRevision);disposeRevision(laterRevision);earlyRevision=null;laterRevision=null;closingWall=null;delete canvas.dataset.closingBeat;delete canvas.dataset.closingRest;
   if(inspection!=='overview')leaveMini();
   if (livingStagecraft) {
@@ -1746,6 +1766,7 @@ function animate(dt:number):void {
     const advance=Number(earlyRevision.root.userData.inkAdvance);
     tintVellumEdges(advance);
     canvas.dataset.inkAdvance=String(advance);
+    updateF02Captive?.(dt,rig.visible&&!physicalTurn&&!cameraFlight&&!document.hidden&&state.f02.reveal===3);
   }
   if(currentFolio<FIRST_LATER_FOLIO)animateEarlyPaperTabs(dt);
   if(currentFolio>=FIRST_LATER_FOLIO){

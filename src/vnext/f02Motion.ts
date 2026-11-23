@@ -26,3 +26,9 @@ export function f02AnchoredHeight(height:number,extension:number):number {
   const contact=.034;
   return height<=contact?height:contact+(height-contact)*extension;
 }
+
+/** Tiny flex of the existing captive card; no extra eyes or anatomy. */
+export function f02CaptiveIdle(seconds:number){
+  const t=Math.max(0,seconds);
+  return {stretch:1+.008*Math.sin(t*1.18),pitch:.013*Math.sin(t*.86),yaw:.034*Math.sin(t*.61)};
+}
