@@ -1,0 +1,104 @@
+import assert from 'node:assert/strict';
+import {test} from 'node:test';
+import * as THREE from 'three';
+import { advanceSignalledRelay, makeF04RelayWorkers, readSignalledRelay } from '../src/vnext/proof/f04RelayChoreography.ts';
+import { nextExpansionFrame } from '../src/vnext/proof/f04CandidateStage.ts';
+import { bindF05Workers, factorySnagHoldSeconds, makeF05FactorySnag, readFactorySnag } from '../src/vnext/proof/f05FactoryChoreography.ts';
+import { factoryRhythm, makeFactoryFloor } from '../src/vnext/proof/f05FactoryFloor.ts';
+
+test('F04 the shared clock stretches only the last relay; pause, reload sample, and reduced completion stay deterministic',()=>{
+  assert.equal(advanceSignalledRelay(20,1),21);
+  assert.ok(advanceSignalledRelay(31,1)-31<.24);
+  assert.ok(Math.abs(advanceSignalledRelay(advanceSignalledRelay(30,4),13)-advanceSignalledRelay(30,17))<1e-12);
+  assert.equal(nextExpansionFrame(32.347,false,.05,false),32.347);
+  assert.equal(nextExpansionFrame(32,true,.05,true),38);
+  assert.equal(advanceSignalledRelay(37.9,1),38);
+});
+test('F04 sender physically climbs, gives signal, then operator moves the press before the authored fifth lamp exposes on frame 36',()=>{
+  const group=new THREE.Group();
+  const workers=makeF04RelayWorkers(group);
+  const sender=group.getObjectByName('Anonymous sender');
+  const press=group.getObjectByName('Actual movable signal press');
+  const foot=group.getObjectByName('Anonymous sender / grounded boot 0');
+  const start=workers.update(30,false),initialBoot=foot.position.clone();
+  workers.update(30.25,false);
+  const heldBoot=group.getObjectByName('Anonymous sender / grounded boot 1').position.clone();
+  workers.update(30.45,false);
+  assert.ok(foot.position.distanceTo(initialBoot)>.03);
+  assert.ok(group.getObjectByName('Anonymous sender / grounded boot 1').position.distanceTo(heldBoot)<1e-9);
+  const call=workers.update(33.44,false),callX=sender.position.x;
+  assert.ok(call.climberX>start.climberX+.33&&call.climberHeight>start.climberHeight+.07);
+  assert.ok(call.call>.9);
+  const acknowledge=workers.update(33.87,false);
+  assert.equal(acknowledge.acknowledge,1);
+  assert.equal(acknowledge.dispatch,0);
+  const before=press.position.y;
+  assert.equal(workers.update(34.9,false).relayFiveLit,false);
+  assert.ok(press.position.y<before-.014);
+  assert.equal(workers.update(36,true).relayFiveLit,true);
+  assert.equal(workers.update(36.9,true).waits,1);
+  assert.equal(sender.position.x,callX);
+  const end=workers.update(38,true);
+  assert.equal(end.signalLowered,true);
+  assert.equal(end.waits,0);
+  workers.dispose();assert.equal(group.children.length,0);
+});
+test('F05 physical B2 hold extends the real line detent until after the strip lies flat',()=>{
+  const before=factoryRhythm(.80,.80,false,true,factorySnagHoldSeconds);
+  const clear=factoryRhythm(1.88,1.88,false,true,factorySnagHoldSeconds);
+  const after=factoryRhythm(2.52,2.52,false,true,factorySnagHoldSeconds);
+  assert.equal(before.arrested,true);
+  assert.equal(before.phase,clear.phase);
+  assert.equal(after.arrested,false);
+  assert.ok(after.phase>clear.phase);
+  const work=readFactorySnag(2,1.88,false);
+  assert.equal(work.cohere,1);assert.equal(work.hold,1);assert.equal(work.open,1);
+  assert.equal(readFactorySnag(2,2.43,false).crease,0);
+  assert.equal(readFactorySnag(3,1.88,false).beat,'ordinary');
+  assert.equal(readFactorySnag(2,1.88,true).beat,'settled');
+});
+test('F05 the actual worker translates and gestures, then returns; the downstream bonded base stays put',()=>{
+  const root=new THREE.Group(),gore=new THREE.Group(),ring=new THREE.Group();
+  const claw=new THREE.Object3D(),toe=new THREE.Object3D(),nozzle=new THREE.Object3D(),bonded=new THREE.Object3D();
+  claw.name='044 bone foreclaw';toe.name='044 rear crawler support';gore.add(claw,toe);
+  nozzle.name='029 flared bronze nozzle';bonded.name='029 bonded gantry foot';ring.add(nozzle,bonded);
+  root.add(gore,ring);
+  const actors=bindF05Workers(gore,ring),field=makeF05FactorySnag(root);
+  const crease=root.getObjectByName('Crease that snags and flattens again');
+  const start=actors(readFactorySnag(2,0,false),0);
+  field(readFactorySnag(2,.91,false));
+  const kinkY=crease.getWorldPosition(new THREE.Vector3()).y;
+  const call=actors(readFactorySnag(2,.91,false),.91);
+  assert.ok(call.workerX>start.workerX+.2);assert.ok(claw.position.y>.13);
+  field(readFactorySnag(2,2.42,false));
+  assert.ok(crease.getWorldPosition(new THREE.Vector3()).y<kinkY-.08);
+  actors(readFactorySnag(2,1.78,false),1.78);
+  assert.ok(nozzle.position.x<-.15);assert.equal(bonded.position.length(),0);
+  const reset=actors(readFactorySnag(2,3.2,false),3.2);
+  assert.equal(reset.workerX,start.workerX);assert.equal(reset.workerZ,start.workerZ);
+  assert.equal(claw.position.length(),0);assert.equal(nozzle.position.length(),0);
+});
+test('F05 all four operations keep their outcomes and the rare offcut is independent of the jam',()=>{
+  const {for:tag}=Symbol,sample=tag('palimpsest.qa.f05-offcut-sample');
+  const previous=globalThis[sample];globalThis[sample]=.021;
+  try{
+    const line=makeFactoryFloor(new THREE.Group());
+    assert.equal(line(1,.06,false).operation,'settle');
+    let live;
+    for(let i=0;i<24;i++)live=line(2,.06,false);
+    assert.equal(live.operation,'compress');
+    assert.equal(live.offcut.phase,'paper');
+    assert.equal(live.rhythm.arrested,true);
+    for(let i=0;i<25;i++)live=line(2,.06,false);
+    assert.equal(live.rhythm.arrested,false);
+    assert.equal(live.offcut.phase,'flame');
+    assert.equal(line(3,.06,false).operation,'extrude');
+    assert.equal(line(4,.06,false).operation,'close');
+    const reduced=makeFactoryFloor(new THREE.Group())(2,0,true);
+    assert.equal(reduced.rhythm.arrested,false);
+    assert.equal(reduced.snag.beat,'settled');
+    assert.equal(reduced.offcut.phase,'aftermath');
+  }finally{
+    if(previous===undefined)delete globalThis[sample];else globalThis[sample]=previous;
+  }
+});

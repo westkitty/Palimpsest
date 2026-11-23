@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { factoryStroke, makeFactoryFloor } from './f05FactoryFloor.ts';
 import type { FolioRuntimeState } from '../../types/atlas';
+import { bindF05Workers } from './f05FactoryChoreography';
 
 const fps=24;
 const bFrames=[42,65,85,105,126];
@@ -33,6 +34,7 @@ export function makeF05CandidateStage(ready:()=>void,failed:()=>void) {
   const ringSurface:{mat:THREE.MeshStandardMaterial;base:number}[]=[];
   let frames=[20,42,132];
   let line:ReturnType<typeof makeFactoryFloor>|undefined;
+  let shiftWorkers:ReturnType<typeof bindF05Workers>|undefined;
   const paperFilingLabels:THREE.Object3D[]=[];
   root.userData.assetState='loading';
 
@@ -107,6 +109,7 @@ export function makeF05CandidateStage(ready:()=>void,failed:()=>void) {
       fail();return;
     }
     line=makeFactoryFloor(asset);
+    shiftWorkers=bindF05Workers(draxis.find(o=>o.bay===1)!.node,draxis.find(o=>o.bay===2)!.node);
     root.add(asset);
     root.userData.assetState='ready';
     ready();
@@ -148,9 +151,10 @@ export function makeF05CandidateStage(ready:()=>void,failed:()=>void) {
       node.rotateX(idle.pitch+.095*a);
       node.rotateZ(idle.roll+(bay===1?-1:1)*.047*a);
     });
+    const workerPerformance=factory?shiftWorkers?.(factory.snag,factory.age):undefined;
     if(nativeFeedCursor)nativeFeedCursor.position.y+=.026*stroke(1.55);
     for(const item of paperFilingLabels)item.visible=B.step===0;
-    Object.assign(root.userData,{factory,ring:orbit.visible,step:markers.filter(m=>m.node.visible).length/2,record:frames[2]>=154,
+    Object.assign(root.userData,{factory:factory?{...factory,workerPerformance}:undefined,ring:orbit.visible,step:markers.filter(m=>m.node.visible).length/2,record:frames[2]>=154,
       planetPhase:green.rotation.y,orbitalPhase:reduced?0:clock*.81,nativeLineFrame:frames[1]});
   }
   function dispose():void {

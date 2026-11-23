@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {createF08ClearanceCrew} from './f08ClearanceCrew.ts';
 import {HOOKSHOT_PLANE,f08TrafficPhase,f08TrafficPosition,f08TrafficStep,restingF08Traffic} from './f08TrafficLogic.ts';
 
 export function createF08HookshotTraffic(pageY:(x:number)=>number){
@@ -38,11 +39,15 @@ export function createF08HookshotTraffic(pageY:(x:number)=>number){
     return signal;
   }
   const signals=[berth(-1.05,1.67,0,.42),berth(-3.17,-1.19,.4,-1.61)];
+  const clearance=createF08ClearanceCrew(pageY);root.add(clearance.root);
   let traffic={...restingF08Traffic};
   return {root,update(active:boolean,on:boolean,energy:number,dt:number,reduced:boolean){
     root.visible=active;
     if(!active)return;
-    const permitted=on&&energy>.94;
+    const nativeShuttersReady=on&&energy>.94;
+    // An already-open saved scene keeps the pre-existing parked restore behavior.
+    const crew=clearance.update(on,dt,reduced||(!traffic.started&&nativeShuttersReady));
+    const permitted=nativeShuttersReady&&crew.clear;
     traffic=f08TrafficStep(traffic,on,permitted,dt,reduced);
     signals.forEach(s=>s.material=permitted?green:amber);
     const [x,y,z]=f08TrafficPosition(traffic.p);
@@ -52,6 +57,6 @@ export function createF08HookshotTraffic(pageY:(x:number)=>number){
     const inFlight=THREE.MathUtils.smoothstep(traffic.p,.02,.12)*(1-THREE.MathUtils.smoothstep(traffic.p,.87,.995));
     ship.rotation.set(-Math.atan2(dy,Math.hypot(dx,dz))*.72*inFlight,Math.atan2(dx,dz),0,'YXZ');
     const phase=f08TrafficPhase(traffic,permitted);
-    return {phase,permitted,crossings:traffic.crossings,progress:traffic.p,x,y,z,plane:HOOKSHOT_PLANE};
+    return {phase,permitted,nativeShuttersReady,crew,crossings:traffic.crossings,progress:traffic.p,x,y,z,plane:HOOKSHOT_PLANE};
   }};
 }

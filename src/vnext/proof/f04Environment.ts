@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { makeF04RelayWorkers } from './f04RelayChoreography';
 
 export const f04Detents=[2.4,7.4,14.4,21.4,28.4,35.4] as const;
 export function f04EnvironmentalRead(frame:number){
@@ -81,6 +82,7 @@ export function createF04Environment(parent:THREE.Group,colony:THREE.Object3D,la
   box(shutter,'Burnished last inspection edge',trim,.111,.015,.012,0,.019,-.060);
   const receipt=box(terminal,'Existing last dock receipt slides under the cover',receiptStock,.068,.010,.073,0,.026,.032);
   box(terminal,'Terminal receiving rail stays on this card',trim,.136,.013,.013,0,.024,.060);
+  const relayWorkers=makeF04RelayWorkers(stage);
   let endpointAge=0;
   // Evidence on the already-authored reverse. These are broken print folds,
   // not extra attacks, destinations, or a chronological casualty diagram.
@@ -115,10 +117,12 @@ export function createF04Environment(parent:THREE.Group,colony:THREE.Object3D,la
       }
     }
     relays.forEach((r,i)=>{r.rotation.x=-1.07*story.relays[i];});
+    const relayChoreography=relayWorkers.update(frame,lamps[4].scale.x>.9);
     return {colonySignal:story.colonySignal,pulseSegment:story.segment,pulseAlong:story.along,
       relaysUnfolded:story.relays.filter(x=>x>.90).length,unfinishedLaneDark:true,
-      endpointRoutine:{active:endpoint,cover,receipt:check}};
+      endpointRoutine:{active:endpoint,cover,receipt:check},relayChoreography};
   },dispose(){
+    relayWorkers.dispose();
     all.forEach(n=>{n.removeFromParent();n.geometry.dispose();});
     mats.forEach(m=>m.dispose());stage.removeFromParent();signal.removeFromParent();
   }};

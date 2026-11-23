@@ -1,4 +1,5 @@
 import {paperFeedMotion,paperFeedStep} from './paperFeedMotion.ts';
+import {F12_FEED_START,F12_PORTRAIT_DWELL,f12FeedTime,f12PortraitPose,f12ProcessionStep,paperFoot} from './folioPaperProcession.ts';
 import * as THREE from 'three';
 import { getOpenPageY } from '../engine/BookAndDeskRig';
 import { createF11Challenger } from './challengerF11.ts';
@@ -558,28 +559,68 @@ function f12Art(world: BaseFolioWorld): MechanismArt {
     const mark=mesh(new THREE.CircleGeometry(.058,12),paper(0x884540,.87),p,vec(.066,.008,-.054));mark.rotation.x=-Math.PI/2;
     p.visible=false;return p;
   });
-  const stations=new THREE.Group();stations.name='living-f12-recruitment-stations';
-  stations.position.set(-3.37,.35,-.40);city.add(stations);
+  const stations=new THREE.Group();stations.name='living-f12-four-occupied-recruitment-stations';
+  // Keep the entire recruitment installation behind the two lower authored
+  // A claim slips. Their exact GLB contact surfaces and titles remain clear.
+  stations.position.set(-2.30,.35,-1.21);city.add(stations);
+  const procession=new THREE.Group();procession.name='F12 · original Administration role-figure procession';stations.add(procession);
+  const boothScale=.55;
+  const laneMarks=[-1.32,-.44,.44,1.32];
+  const portraits=[-1.03,-.343,.343,1.03];
+  const finalZ=1.28, sole=.079;
+  const platform=box(2.78,.041,.57,0x674956,procession,0,sole-.0205,finalZ);
+  platform.name='F12 · paper portrait plinth physically contiguous with the four stations';
+  for(const x of [-1.38,1.38])box(.019,.018,.56,0xb28d63,procession,x,sole-.01,finalZ);
+  box(2.78,.014,.018,0xd3a471,procession,0,sole-.005,finalZ+.285);
+  const portraitRail=new THREE.Group();portraitRail.name='F12 · portrait paper frame seats with stamp contact';
+  portraitRail.position.set(0,.052,finalZ-.26);procession.add(portraitRail);
+  const crest=box(2.49,.039,.035,0xca9365,portraitRail,0,.494,0);
+  crest.rotation.y=.006;
+  for(const x of [-1.235,1.235]){
+    box(.035,.53,.041,0xa9766a,portraitRail,x,.253,0);
+    box(.12,.055,.14,0x654554,procession,x,.060,finalZ-.26);
+  }
+  const pressedBorder=paper(0xfab978,.36);
+  const pressAccents=[-.95,.95].map(x=>mesh(new THREE.BoxGeometry(.26,.026,.010),pressedBorder,portraitRail,vec(x,.492,.022)));
+  const lines=laneMarks.map((x,i)=>{
+    const base=box(.205,.028,.89,0x786858,procession,(x+portraits[i])*.5,.039,.70);
+    base.rotation.y=Math.atan2(portraits[i]-x,.89);base.name='F12 · scored walk from role desk to portrait';
+    for(let n=0;n<3;n++)box(.138,.006,.012,0xb49c76,procession,x+(portraits[i]-x)*n*.23,.056,.44+n*.25);
+    return box(.16,.010,.024,0xd09a77,procession,portraits[i],sole+.005,finalZ+.14);
+  });
+  const roleLegs:{boot:THREE.Mesh;leg:THREE.Mesh}[][]=[];
   const roleFigures:{body:THREE.Group;head:THREE.Group;arm:THREE.Group}[]=[];
-  const roleStations=roles.map(([name],i)=>{
-    const g=new THREE.Group();g.name='living-f12-lit-station-'+i;stations.add(g);
+  const roleTitles:THREE.Group[]=[];
+  const rolePalette=[0x86665d,0x587679,0x8e7157,0x79677d];
+  roles.forEach(([name],i)=>{
+    const g=new THREE.Group();g.name='living-f12-lit-station-'+i;
+    g.position.x=laneMarks[i]+.13;g.scale.setScalar(boothScale);stations.add(g);
     const light=[0xe3a16d,0x86babd,0xe4b56d,0xc7a4c9][i];
-    box(1.62,.09,.90,0x614957,g,0,.025,.03);
+    box(1.53,.09,.90,0x614957,g,0,.025,.03);
     box(1.39,.85,.062,0x5c4d5f,g,0,.51,-.35);
     const screen=mesh(new THREE.PlaneGeometry(1.22,.72),paper(light,.43),g,vec(0,.53,-.309));
     screen.castShadow=false;screen.receiveShadow=false;
-    // Anonymous silhouettes: role, not character likeness or a new historical claim.
-    const body=new THREE.Group();body.position.set(-.29,.17,-.07);g.add(body);
+    // Move the actual anonymous role silhouette, not a second mascot or
+    // frozen duplicate. The original torso, head and work sleeve are reused.
+    const body=new THREE.Group();body.name='F12 · '+name+' walks to the official portrait';
+    body.scale.setScalar(.78);procession.add(body);
     mesh(new THREE.CylinderGeometry(.118,.151,.34,7),paper(0x372d39),body,vec(0,.14,0));
+    box(.157,.089,.045,rolePalette[i],body,0,.15,.095);
     body.rotation.z=i===1?-.20:i===0?.17:0;
     const head=new THREE.Group();head.position.set(0,.40,.005);body.add(head);
     mesh(new THREE.SphereGeometry(.095,8,5),paper(0x382c39),head);
     const sleeve=new THREE.Group();sleeve.position.set(.05,.26,.078);body.add(sleeve);
     const e=i===0?vec(.43,.22,.032):vec(.54,-.08,.062);
-    strip(vec(0,0,0),e,.085,0x372d39,sleeve);
+    const ePaper=e.multiplyScalar(.41);
+    strip(vec(0,0,0),ePaper,.085,rolePalette[i],sleeve);
+    const palm=box(.047,.045,.048,0x9b745c,sleeve,ePaper.x,ePaper.y,ePaper.z);
+    palm.name='F12 · plain cut-stock hand, no facial additions';
     roleFigures.push({body,head,arm:sleeve});
-    strip(vec(-.36,.20,-.05),vec(-.41,.086,-.04),.068,0x372d39,g);
-    strip(vec(-.24,.20,-.05),vec(-.19,.086,-.04),.068,0x372d39,g);
+    roleLegs.push([-1,1].map(()=>{
+      const leg=box(.058,1,.036,0x4a3946,procession);
+      const boot=box(.064,.020,.103,0x453440,procession);
+      return {boot,leg};
+    }));
     if(i===0){
       // Unfinished workbench lintel being set.
       box(.61,.07,.10,0x523742,g,.35,.62,.024);
@@ -606,15 +647,17 @@ function f12Art(world: BaseFolioWorld): MechanismArt {
       }
       box(.60,.064,.26,0x4f3b4f,g,.31,.096,.07);
     }
-    const nameplate=plate(g,1.31,.20,name,'POSTWAR RECRUITMENT',dusk,.014);
-    nameplate.position.set(0,1.03,-.285);
-    g.visible=i===0;
-    return g;
+    const title=plate(stations,1.40,.274,name,'POSTWAR RECRUITMENT',dusk,.014);
+    title.position.set(0,.735,-.29);
+    title.visible=i===0;roleTitles.push(title);
   });
   let mountedEnvironment=false;
   const stampPivot=arm.position.clone();
   root.userData.mountF12Environment=()=>{
     mountedEnvironment=true;city.visible=true;recruitment.visible=false;leaf.visible=false;
+    // Native loading can take longer than the first beat. Never mount
+    // midway through the entrance or skip the station work on first viewing.
+    cyclePosition=folioMotion=0;previousRoleTick=undefined;printed=0;
     // Remount the same press, towards the upright insert at z=0.22.
     stamp.position.set(3.75,.35,.535);stamp.scale.setScalar(.92);
     sign.visible=false;slip.visible=false;
@@ -634,8 +677,12 @@ function f12Art(world: BaseFolioWorld): MechanismArt {
     previousRoleTick=now;
     // The reading dwell is clock time, not a frame count. This also keeps
     // the role plates readable when the paper theatre is costly to render.
-    const dwell=reduced?5.5:4.4;
-    if(mountedEnvironment&&!reduced)roleDelta=paperFeedStep((cyclePosition%1)*dwell,roleDelta);
+    const dwell=reduced?5.5:mountedEnvironment?F12_PORTRAIT_DWELL:4.4;
+    if(mountedEnvironment&&!reduced){
+      const seconds=(cyclePosition%1)*dwell;
+      roleDelta=f12ProcessionStep(seconds,roleDelta);
+      if(seconds>=F12_FEED_START)roleDelta=paperFeedStep(f12FeedTime(seconds),roleDelta);
+    }
     folioMotion+=roleDelta;
     cyclePosition=(cyclePosition+roleDelta/dwell)%roles.length;
     const idx=Math.floor(cyclePosition);
@@ -655,8 +702,56 @@ function f12Art(world: BaseFolioWorld): MechanismArt {
     sealFlap=reduced?Number(state.interactions.C.active):THREE.MathUtils.lerp(sealFlap,Number(state.interactions.C.active),1-Math.exp(-8*step));
     hinge.rotation.x=-1.28*sealFlap;
     if(mountedEnvironment){
-      for(const [i,g] of roleStations.entries())g.visible=i===idx;
-      const feed=paperFeedMotion(cyc,reduced);
+      for(const [i,role] of roleTitles.entries())role.visible=i===idx;
+      const feed=paperFeedMotion(f12FeedTime(cyc),reduced);
+      const cue=f12PortraitPose(cyc,reduced);
+      portraitRail.rotation.x=cue.grouped?-.026*feed.press:-.46*(1-smooth(1.26,2.52,cyc))+.28*smooth(5.12,5.66,cyc);
+      for(const accent of pressAccents)accent.visible=feed.marked;
+      const stepsDashboard=[] as {x:number;z:number;glance:number;feet:number[]}[];
+      for(const [i,costume] of roleFigures.entries()){
+        const {move,miss,give,glance,returning}=cue.actors[i];
+        const towardMark=()=>laneMarks[i]+(portraits[i]-laneMarks[i])*move;
+        const x=towardMark()-give*.17+miss*.18,z=-.04+(finalZ+.04)*move+miss*.20;
+        const floor=(z:number)=>.051+smooth(.85,1.07,z)*(sole-.051);
+        const idleTime=reduced?0:folioMotion*[1.87,1.34,1.58,2.36][i];
+        const land=move<=.0001||move>=.9999;
+        // Only the leading toe lifts; each supported foot stays on its cut
+        // mark. Retain the old job gestures until the character leaves it.
+        const swing=land?0:Math.sin(move*Math.PI*8);
+        costume.body.position.set(x,floor(z)+.108+Math.abs(swing)*.015,z);
+        costume.body.rotation.set(-.028*Math.abs(swing),returning?Math.PI*(1-smooth(5.97,F12_PORTRAIT_DWELL,cyc)):
+          [-.19,.15,-.18,.14][i]*(1-move)+glance*(i===2?.47:-.61),reduced?0:.045*swing+.062*miss-.04*give);
+        costume.head.rotation.y=glance*(i===2?.33:-.29);
+        costume.head.rotation.x=reduced?0:.050*Math.sin(idleTime*.71+.6*i)*(1-move)-.13*glance;
+        costume.arm.rotation.x=swing*.25;
+        costume.arm.rotation.z=reduced?-.86:(1-move)*Math.sin(idleTime+.6)*[.18,.08,.11,.14][i]
+          -move*.86+glance*(i===2?.74:-.36);
+        const footLifts:number[]=[];
+        roleLegs[i].forEach(({boot,leg},j)=>{
+          const offset=(j-.5)*.143;
+          const [advance,raise]=paperFoot(returning?1-move:move,4,j as 0|1);
+          const footprint=returning?1-advance:advance;
+          // The small correction is two alternating sidesteps as well. The
+          // out-of-line figure cannot drift both shoes sideways at once.
+          const delay=j===1?.08:0;
+          const keepGap=reduced||i!==2?0:smooth(1.66+delay,1.92+delay,cyc)*(1-smooth(2.26+delay,2.43+delay,cyc));
+          const stillLate=reduced||i!==3?0:smooth(1.11+delay,1.37+delay,cyc)*(1-smooth(2.12+delay,2.33+delay,cyc));
+          const laterFootX=laneMarks[i]+(portraits[i]-laneMarks[i])*footprint+offset-keepGap*.17+stillLate*.18;
+          const laterFootZ=-.04+(finalZ+.04)*footprint+stillLate*.20;
+          const correction=i===2?Math.abs(keepGap-give):i===3?Math.abs(stillLate-miss):0;
+          const lift=raise*.046+correction*.066;
+          const bottom=vec(laterFootX,floor(laterFootZ)+.019+lift,laterFootZ);
+          const knee=vec(x+offset*.92,costume.body.position.y+.030,z);
+          boot.position.copy(bottom);boot.position.y-=.01;
+          boot.rotation.y=costume.body.rotation.y;
+          leg.position.copy(bottom).lerp(knee,.5);
+          const axis=knee.clone().sub(bottom);leg.scale.y=axis.length();
+          leg.quaternion.setFromUnitVectors(vec(0,1,0),axis.normalize());
+          footLifts.push(Number(lift.toFixed(3)));
+        });
+        stepsDashboard.push({x:Number(x.toFixed(3)),z:Number(z.toFixed(3)),glance,feet:footLifts});
+      }
+      lines.forEach((mark,i)=>{mark.scale.x=1-.24*cue.actors[i].miss;});
       const ord=Math.floor(folioMotion/dwell);
       printed=Math.max(printed,Math.min(4,ord+Number(feed.stage==='residue'||reduced)));
       for(const [i,residue] of residues.entries())residue.visible=i<printed;
@@ -668,13 +763,8 @@ function f12Art(world: BaseFolioWorld): MechanismArt {
       slipSeal.visible=feed.marked;
       movingSlip.visible=reduced||feed.eject<.999;
       const figure=roleFigures[idx];
-      const idle=reduced?0:folioMotion*[1.87,1.34,1.58,2.36][idx];
-      const rest=[.17,-.20,0,0][idx];
-      figure.body.rotation.z=rest+(reduced?0:Math.sin(idle)*[.075,.034,.044,.027][idx]);
-      figure.head.rotation.x=reduced?0:[-.04,.14,.02,.18][idx]+.09*Math.sin(idle*.71+.6*idx);
-      figure.arm.rotation.z=reduced?0:Math.sin(idle+.6)*[.18,.08,.11,.14][idx];
       root.userData.paperFeed={...feed,residues:printed,roller:roller.rotation.x,body:figure.body.rotation.z,
-        head:figure.head.rotation.x,arm:figure.arm.rotation.z};
+        head:figure.head.rotation.x,arm:figure.arm.rotation.z,portrait:{phase:cue.phase,grouped:cue.grouped,poses:stepsDashboard}};
       // The same transmission closes the arm only after the slip seats.
       const press=feed.press;
       arm.rotation.x=-1.16-.54*press;
@@ -685,7 +775,7 @@ function f12Art(world: BaseFolioWorld): MechanismArt {
       sign.visible=false;
       facadeMark.visible=feed.marked;
       root.userData.stationIndex=idx;
-      root.userData.stationCount=roleStations.length;
+      root.userData.stationCount=roles.length;
       root.userData.stampPress=press;
       root.userData.stampFaceMarked=facadeMark.visible;
       root.userData.archiveRecessVisible=recess.visible;

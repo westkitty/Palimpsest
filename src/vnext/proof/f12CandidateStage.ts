@@ -18,6 +18,14 @@ export function makeF12CandidateStage(ready:()=>void,failed:()=>void){
         if(!n)throw new Error('missing F12 binding '+name);
         return n;
       };
+      // The new cut-stock procession occupies the old printed-title zone.
+      // Re-impose the same two original native type meshes as one line in the
+      // untouched fore-margin, between the inert mark and binding footer.
+      const title=get('Spread_title'),titleTail=get('Spread_title_second_line');
+      title.position.z=1.82;
+      titleTail.position.x=-1.25;
+      titleTail.position.z=title.position.z;
+      titleTail.scale.multiplyScalar(.82);
       const paperLeft=get('A__ClaimI'),paperRight=get('A__ClaimII');
       const crease=get('C__ArchivalCrease'),pin=get('C__FixedOriginalPin');
       get('C__PublicSyrinRecord');

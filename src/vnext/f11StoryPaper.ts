@@ -172,7 +172,7 @@ export function createF11StoryPaper(pageY:Stock) {
     return g;
   });
   let rootsComplete=false,splitComplete=false,pilotComplete=false;
-  return {root,update(frame:number,reduced:boolean){
+  return {root,update(frame:number,reduced:boolean,marcel?:{x:number;z:number}){
     const b=f11PaperBeats(frame);
     patch.visible=b.patch>.01;patch.scale.setScalar(Math.max(.001,b.patch));
     gravity.visible=b.fibers>.015;
@@ -220,6 +220,7 @@ export function createF11StoryPaper(pageY:Stock) {
     }
     for(const [i,g] of cheers.entries()){
       const amount=f11Ease(135+i*3,149+i*2,frame);
+      if(i===0&&marcel)g.position.set(marcel.x,pageY(marcel.x),marcel.z);
       g.visible=amount>.005;g.scale.setScalar(Math.max(.001,amount));
     }
     return b;

@@ -1,6 +1,7 @@
-import {historicalMachineBeat,reliefFoldCue} from './livingPaperBeats';
+import {historicalMachineBeat} from './livingPaperBeats';
 import { makeF09RuptureBed, newF09CollapsingPaperGround } from './f09EnvironmentalTheatre.ts';
 import * as THREE from 'three';
+import { createF07ReliefChoreography } from './f07ReliefChoreography.ts';
 import { f08CueClock, f08Cue } from './f08Motion.ts';
 import { newF08ThresholdResponse } from './f08ThresholdResponse.ts';
 import { createF08HookshotTraffic } from './f08HookshotTraffic.ts';
@@ -69,128 +70,6 @@ function disposeArt(root: THREE.Object3D) {
   materials.forEach(material => material.dispose());
   // Maps are shared with the existing scene or the DRAXIS model library.
   root.removeFromParent();
-}
-
-// Relief tableaux are illustrations of the recorded supply system, not a
-// reconstructed encounter. Anonymous figures, simple parcels, no named event.
-function relief(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
-  const cream = paper(0xecd6aa, bump), brass = paper(0xab895b, bump, .58, .2);
-  const rust = paper(0x874d42, bump), dark = paper(0x2e303a, bump);
-  const slate = paper(0x567078, bump), parcel = paper(0xd1b592, bump);
-  const cloth = paper(0xa38370, bump);
-  const reliefBase = new THREE.Group();
-  reliefBase.name = 'F07 · illustrated Administration relief supplies';
-  reliefBase.position.set(-1.85, pageY(-1.85) + .017, 1.29);
-  root.add(reliefBase);
-  slab(reliefBase, 1.10, .027, .65, dark);
-  slab(reliefBase, 1.05, .022, .60, cream, 0, .020);
-  for (const x of [-.40,-.18,.04,.26,.45]) slab(reliefBase, .11,.006,.009,brass,x,.035,.23);
-  const bench = new THREE.Group();
-  bench.name = 'F07 · relief bench scored hinge';
-  bench.position.set(0, .034, -.14);
-  reliefBase.add(bench);
-  for(const x of [-.21,.21]){
-    slab(bench, .05,.15,.12, dark,x,.075,0);
-    slab(bench, .075,.023,.17,brass,x,.013,0);
-  }
-  const topSlat=slab(bench,.60,.043,.20,rust,0,.15);
-  const topCrease=slab(bench,.54,.013,.017,brass,0,.173,.084);
-  for(let i=0;i<3;i++){
-    const x=-.17+.17*i, h=.09+i%2*.035;
-    slab(bench,.125,h,.12,i===1?cloth:parcel,x,.175+h/2,0);
-    slab(bench,.022,h+.006,.124,cream,x,.175+h/2,0);
-  }
-  const figures = [-1,1].map((sign, i) => {
-    const f=new THREE.Group();
-    f.name=i===0?'F07 · anonymous relief worker':'F07 · anonymous recipient';
-    f.position.set(sign*.39,.037,.07); reliefBase.add(f);
-    const body = new THREE.Group(); f.add(body);
-    for(const x of [-.031,.031]) slab(f,.041,.085,.06,dark,x,.043,0);
-    const coat=mesh(body,new THREE.CylinderGeometry(.073,.091,.16,5,5),i===0?slate:rust,0,.17);
-    coat.scale.z=.72;
-    const meshPose=coat.geometry.getAttribute('position');
-    const original=meshPose.clone();
-    if(i===0) slab(body,.10,.022,.007,cream,0,.205,.049); // uniform trim, not an invented insignia
-    const head=mesh(body,new THREE.IcosahedronGeometry(.048,0),parcel,0,.278);
-    const wrist=slab(body,.11,.035,.055,i===0?slate:cloth,sign*.063,.196,.013);
-    wrist.rotation.z=-sign*.31;
-    return {body,head,wrist,coat,meshPose,original};
-  });
-  // Only the two anonymous existing paper workers. A separate ply of stock
-  // visibly moves from hand to hand rather than pulsing a supply icon.
-  const handoff=slab(reliefBase,.136,.084,.113,parcel);
-  handoff.name='F07 · actual paper parcel crossing between the hands';
-  slab(handoff,.142,.011,.023,cream,0,.041,0);
-  const hands=[-1,1].map((sign,i)=>{
-    const reach=slab(reliefBase,1,.047,.066,i===0?slate:cloth);
-    const hand=slab(reliefBase,.073,.061,.065,parcel);
-    hand.name='F07 · paper hinge at wrist';
-    return {shoulder:new THREE.Vector3(sign*.345,.254,.108),reach,hand};
-  });
-  const brace=slab(reliefBase,.055,.060,.070,slate);
-  brace.name='F07 · sender steadies the folding recipient';
-  const edgeStock=paper(0x9c6648,bump);
-  const apron=slab(reliefBase,1.00,.008,.10,edgeStock,0,.041,.245);
-  apron.name='F07 · stock catches the ruby cast shadow';
-  const xAxis=new THREE.Vector3(1,0,0);
-  let t=0, hinge=.50, onceComplete=false;
-  return (state, dt, reduced) => {
-    t+=reduced?0:Math.min(.09,Math.max(0,dt));
-    const ruby=Number(root.userData.f07RubyShadow??0);
-    const target = state.interactions.C.active ? 1 : .50;
-    hinge = reduced ? target : toward(hinge, target, dt);
-    bench.rotation.x = .58 * (1-hinge);
-    const phase=reduced?2.95:t%6.4;
-    const cue=reliefFoldCue(phase,reduced);
-    topSlat.position.y=.15-.019*cue.load;
-    topSlat.rotation.z=cue.load*.11;
-    topCrease.position.y=.173-.019*cue.load;
-    topCrease.rotation.z=topSlat.rotation.z;
-    figures.forEach(({body,head,wrist,coat,meshPose,original},i) => {
-      const fold=i===1?cue.receive:0;
-      body.rotation.y=(i===0?.35:-.35)+(reduced?0:Math.sin(t*.9+i*1.5)*.045);
-      body.rotation.z=(i===0?-.09:.09)+(reduced?0:Math.sin(t*1.12+i*.8)*.023)+fold*.12;
-      head.position.y=.278-fold*.086;
-      head.rotation.y=(i===0?1:-1)*cue.look*.59;
-      wrist.position.y=.196-fold*.047;
-      if(coat.userData.fold!==fold){
-        for(let j=0;j<meshPose.count;j++){
-          const v=(original.getY(j)+.08)/.16;
-          meshPose.setXYZ(j,original.getX(j)+fold*Math.sin(v*Math.PI*5)*.022*v,
-            original.getY(j)-fold*.081*v,original.getZ(j)+fold*Math.sin(v*Math.PI*5)*.038*v);
-        }
-        meshPose.needsUpdate=true;coat.geometry.computeVertexNormals();coat.userData.fold=fold;
-      }
-    });
-    brace.visible=cue.brace>.15;
-    brace.position.set(.335,.24-cue.receive*.053,.144);
-    reliefBase.userData.recipientFold=cue.receive;
-    reliefBase.userData.parcelLoad=cue.load;
-    const pass=ease(1.35,4.35,phase);
-    const up=ease(.15,1.35,phase)*(1-ease(4.5,5.64,phase));
-    const x=THREE.MathUtils.lerp(-.255,.255,pass);
-    const y=.10+.186*up,z=.175+.035*up;
-    handoff.position.set(x,y,z);
-    handoff.rotation.z=(pass-.5)*.11;
-    // Set down inside the bench's parcel rack. None of the transfer is
-    // blocked by the vellum or gated by A/B; the routine continues after A.
-    handoff.visible=reduced||phase>.18&&phase<5.54;
-    const driveLeft=1-ease(.49,.70,pass),driveRight=ease(.27,.48,pass);
-    hands.forEach(({shoulder,reach,hand},i)=>{
-      const strength=(i===0?driveLeft:driveRight)*(.30+.70*up);
-      const wrist=new THREE.Vector3((i===0?-.25:.25),.207,.143);
-      const target=new THREE.Vector3(x+(i===0?-.054:.054),y,z);
-      wrist.lerp(target,strength);
-      const d=wrist.clone().sub(shoulder);reach.position.copy(shoulder).addScaledVector(d,.50);
-      reach.scale.x=d.length();reach.quaternion.setFromUnitVectors(xAxis,d.normalize());
-      hand.position.copy(wrist);
-    });
-    edgeStock.color.setHex(0x9c6648).lerp(new THREE.Color(0xea8d51),ruby*.67);
-    parcel.emissive.setHex(0x6e2715);parcel.emissiveIntensity=.09+ruby*.34;
-    if(pass>.96)onceComplete=true;
-    reliefBase.userData.transfer=pass;reliefBase.userData.parcelX=x;reliefBase.userData.workClock=t;
-    reliefBase.userData.passed=onceComplete;
-  };
 }
 
 /** Re-seat the unchanged functional portal and Marcel inside the Blender paper theatre. */
@@ -295,13 +174,20 @@ function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
   const actor=buildMarcelFigure(bumpSource,1.0);
   actor.name='F08 · Marcel';actor.position.set(1.59,pageY(1.59)+.025,.38);
   root.add(actor);
+  // Turn only the three original head meshes. The feet and crook remain on
+  // their original marks; no facial likeness or character geometry is invented.
+  const neck=new THREE.Group();neck.name='F08 · Marcel follows the carrier with the authored head';
+  neck.position.set(0,.535,0);
+  const headParts=actor.children.filter(o=>o.position.y>.55&&o.position.y<.63);
+  actor.add(neck);
+  for(const part of headParts){neck.add(part);part.position.y-=neck.position.y;}
   if(!bump) actor.userData.revisionOwnedBump=bumpSource;
   const shoes=new THREE.Group();shoes.name='F08 · Marcel paper foot anchors';
   shoes.position.set(1.59,pageY(1.59)+.012,.38);root.add(shoes);
   for(const dz of [-.075,.075])slab(shoes,.40,.018,.06,ink,0,0,dz);
   const threshold=newF08ThresholdResponse(pageY,shoes);root.add(threshold.root);
   const traffic=createF08HookshotTraffic(pageY);root.add(traffic.root);
-  let t=0,cueTime=0,wasOn=false,initialized=false;
+  let t=0,cueTime=0,wasOn=false,initialized=false,follow=0;
   return (state,dt,reduced) => {
     const on = state.interactions.A.active;
     cueTime=typeof root.userData.authoredCue==='number'?root.userData.authoredCue:
@@ -318,7 +204,7 @@ function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
     threshold.root.visible=liveThreshold;
     const witness=threshold.update(liveThreshold?cueTime:0,liveThreshold&&on,reduced,dt);
     root.userData.thresholdResponse=liveThreshold?witness:undefined;
-    root.userData.hookshotTraffic=traffic.update(liveThreshold,on,cue.plasma,dt,reduced);
+    const carrier=traffic.update(liveThreshold,on,cue.plasma,dt,reduced);
     root.userData.marcelLight=liveThreshold?witness.actorLight:cue.plasma*.84+cue.impulse*.68;
     plasma.visible=cue.plasma>.005;
     plasmaMaterial.uniforms.uEnergy.value=cue.plasma*.96;
@@ -336,6 +222,12 @@ function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
     actor.rotation.y=-.52-cue.plasma*.22+(reduced?0:Math.sin(t*.8)*.035);
     actor.rotation.z=-cue.plasma*.048-cue.impulse*.059+(reduced?0:Math.sin(t*.9)*.020);
     actor.position.y=pageY(1.59)+.025; // anchored paper weight shift, not levitation
+    const watches=carrier?.crew.clear&&carrier.permitted;
+    const angle=carrier?Math.atan2(carrier.x-actor.position.x,carrier.z-actor.position.z)-actor.rotation.y:0;
+    const target=watches?THREE.MathUtils.clamp(angle,-1.19,.45):0;
+    follow=reduced?target:THREE.MathUtils.lerp(follow,target,1-Math.exp(-Math.min(.085,Math.max(0,dt))*9));
+    neck.rotation.set(watches?-.06+Math.max(0,(carrier.y-.55))*.19:0,follow,0);
+    root.userData.hookshotTraffic=carrier?{...carrier,marcelLook:Number(follow.toFixed(3))}:undefined;
   };
 }
 
@@ -570,7 +462,7 @@ export function createRevisionWar2Art(index:6|7|8|9,world:BaseFolioWorld):Revisi
   const root=new THREE.Group();
   root.name='Living-only Palimpsest revision / F'+String(index+1).padStart(2,'0');
   const bump=paperBump(world);
-  const update=index===6?relief(root,bump):index===7?aureal(root,bump):
+  const update=index===6?createF07ReliefChoreography(root,bump):index===7?aureal(root,bump):
     index===8?heliocide(root,bump):siege(root,world,bump);
   return {root,update,dispose:()=>{
     root.userData.f10Dispose?.();

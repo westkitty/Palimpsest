@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createF04Environment } from './f04Environment';
+import { advanceSignalledRelay } from './f04RelayChoreography';
 import { paperKey } from './portedPaperAsset';
 import type { FolioRuntimeState } from '../../types/atlas';
 
@@ -10,7 +11,7 @@ type Slot=(typeof slots)[number];
 const between=(current:number,target:number,step:number)=>current+Math.sign(target-current)*Math.min(Math.abs(target-current),step);
 export function nextExpansionFrame(frame:number,active:boolean,dt:number,reduced:boolean):number {
   if(!active)return frame;
-  return reduced?routeEnd:Math.min(routeEnd,frame+fps*Math.min(.07,Math.max(0,dt)));
+  return reduced?routeEnd:advanceSignalledRelay(frame,fps*Math.min(.07,Math.max(0,dt)));
 }
 
 function disposeAsset(root:THREE.Object3D):void{

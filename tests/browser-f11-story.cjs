@@ -38,7 +38,11 @@ try {
           samples[index]={frame,...JSON.parse(stage.dataset.f11Story)};
         }
         if(reached){raf(again);return;}
-        sim+=!Number.isFinite(frame)||frames[index]-frame>7?205:67;
+        // Walk through the main roots and acting holds without spending
+        // twenty-plus software renders on the revised three-second bird beat.
+        // Close to a requested checkpoint, step narrowly as before.
+        const left=frames[index]-frame;
+        sim+=!Number.isFinite(frame)||left>7?335:left>3?185:67;
         cb(sim);
        }
        return raf(again);
@@ -47,7 +51,7 @@ try {
     await p.goto(origin+'/folio-vnext.html?folio=11');
     await p.waitForFunction(()=>document.querySelector('#stage')?.dataset.blenderFolio==='11',null,{timeout:35000,polling:100});
     for(const [i,[name,target]] of beats.entries()){
-      const s=await p.waitForFunction(i=>window.__f11Proof.samples[i]||false,i,{timeout:55000,polling:100}).then(h=>h.jsonValue()).catch(async error=>{
+      const s=await p.waitForFunction(i=>window.__f11Proof.samples[i]||false,i,{timeout:120000,polling:100}).then(h=>h.jsonValue()).catch(async error=>{
         const status=await p.evaluate(()=>({held:window.__f11Proof.held,frame:document.querySelector('#stage').dataset.f11AuthoredFrame,samples:window.__f11Proof.samples.length}));
         throw new Error(`Timed out: ${label} ${name}: ${JSON.stringify(status)}`,{cause:error});
       });

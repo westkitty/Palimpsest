@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { makeF05Offcut } from './f05Offcut';
+import { factorySnagHoldSeconds, makeF05FactorySnag, readFactorySnag } from './f05FactoryChoreography';
 const stations=[-.98,.53,2.03,3.53];
 export function factoryRead(step:number,age:number,reduced:boolean){
   const bay=Math.max(0,Math.min(4,step));
@@ -16,10 +17,10 @@ export function factoryStroke(phase:number,bay:number){
   const h=(phase-bay*.118+1)%1;
   return THREE.MathUtils.smoothstep(h,.025,.20)*(1-THREE.MathUtils.smoothstep(h,.30,.49));
 }
-export function factoryRhythm(age:number,clock:number,reduced:boolean,allowArrest:boolean){
+export function factoryRhythm(age:number,clock:number,reduced:boolean,allowArrest:boolean,duration=.36){
   // A short mechanical detent after the batch seats. Freeze the *whole*
   // line, then continue from exactly that phase; no speed catch-up/jump.
-  const start=.79,duration=.36;
+  const start=.79;
   const pause=allowArrest?THREE.MathUtils.clamp(age-start,0,duration):0;
   const turns=(clock-pause)/1.68;
   return {phase:reduced?0:turns-Math.floor(turns),
@@ -45,6 +46,7 @@ export function makeFactoryFloor(parent:THREE.Group){
     return pin;
   });
   const offcut=makeF05Offcut(root);
+  const snagModel=makeF05FactorySnag(root);
   const carrier=new THREE.Group();carrier.name='The one batch of material through all four bays';root.add(carrier);
   box(.31,.038,.23,stock,0,-.035,0,carrier);
   const raw=new THREE.Mesh(new THREE.IcosahedronGeometry(.137,0),ochre);raw.position.y=.105;carrier.add(raw);
@@ -58,13 +60,15 @@ export function makeFactoryFloor(parent:THREE.Group){
   let last=-1,age=0,clock=0,banked=0;
   return (step:number,dt:number,reduced:boolean,allowArrest=true)=>{
     if(last!==step){
-      banked+=factoryRhythm(age,clock,false,allowArrest&&last>1).settleDelay;
+      banked+=factoryRhythm(age,clock,false,allowArrest&&last>1,last===2?factorySnagHoldSeconds:.36).settleDelay;
       last=step;age=0;
     }
     const delta=reduced?0:Math.min(.075,Math.max(0,dt));
     age+=delta;
     if(step>0)clock+=delta;
-    const rhythm=factoryRhythm(age,clock-banked,reduced,allowArrest&&step>1);
+    const snag=readFactorySnag(step,age,!allowArrest||reduced);
+    const rhythm=factoryRhythm(age,clock-banked,reduced,allowArrest&&step>1,step===2?factorySnagHoldSeconds:.36);
+    snagModel(snag);
     const state=factoryRead(step,age,rhythm.arrested?true:reduced);
     pins.forEach((pin,i)=>{
       const lift=factoryStroke(rhythm.phase,i/3.67);
@@ -79,7 +83,7 @@ export function makeFactoryFloor(parent:THREE.Group){
     if(step===2){pressed.scale.set(1+.24*beat,1.92-.92*beat,1+.13*beat);}
     if(step===3){strip.scale.x=.15+.85*beat;strip.position.x=.12*(1-beat);}
     if(step===4){halves[0].position.x=-.24*(1-beat);halves[1].position.x=.24*(1-beat);}
-    const offcutState=offcut.update(step>1&&(reduced||age>=.84),delta,reduced);
-    return {...state,rhythm,offcut:offcutState};
+    const offcutState=offcut.update(step>1&&(reduced||age>=(step===2&&allowArrest?snag.releaseAt+.28:.84)),delta,reduced);
+    return {...state,rhythm,snag,age,offcut:offcutState};
   };
 }

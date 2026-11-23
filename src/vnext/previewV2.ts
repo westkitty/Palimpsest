@@ -3,6 +3,7 @@ import { invitationFrame, makePrimaryPaperGrip, primaryPaperSlot } from './prima
 import {f02CaptiveIdle} from './f02Motion.ts';
 import {F02_RETURN_CREASE,F02_RETURN_NEAR,F02_RETURN_SECONDS,f02WitnessReturn} from './f02WitnessReturn.ts';
 import {f10ReadingView,type F10ReadingView} from './f10ReadingViews.ts';
+import { ADMINISTRATION_EXTERIOR_ORBIT, isAdministrationExteriorPlate } from './administrationReadingCamera.ts';
 import { TURN_PULL_SECONDS, TURN_RETURN_SECONDS, commitPageDrag, commonTurnCamera, pageDragTravel, pageSettlePosition, physicalLeafPosition, turnEase, turnTheatre } from './physicalPageTurn.ts';
 import { F09_AFTERMATH_SECONDS, armsF09, f09ForcedBeat, F09_INDEX } from './f09ForcedTurn.ts';
 import {closingReadingPose,createEnvironmentalClosing} from './environmentClosing.ts';
@@ -1313,13 +1314,24 @@ function discardOutgoingStage():void {
 function revisionCopy(index:LaterFolioIndex):ReturnType<typeof getLaterCopy>{
   const existing=getLaterCopy(index);
   if(index===3)return {...existing,actions:[existing.actions[0],'Light the expansion route',existing.actions[2]],
-    description:'Year zero. Follow the planet lights as expansion advances. The pulse stops at the final lit state.'};
-  if(index===7)return {...existing,description:'The Aureal Gate is a circular Hookshot portal. Operate its mechanisms to see the test of the gate and its consequences.',visuals:['A circular, plasma-filled Hookshot portal; plasma activates with the event.','Marcel stands by the gate. The fold-out records the twenty worlds.']};
-  if(index===10)return {...existing,description:'Thirty-one days after the war. Codec, Marcel and Tiger arrive in that order. The theatrical paper jungle depicts what the loam could make possible, not the restoration of Nacreous VI.',visuals:['Codec works on the barren remnant.','Marcel arrives with gravity and Wordstreaming. Roots run through the paper, then a jungle erupts.','Tiger arrives last. Codec’s posture drops while Marcel and Tiger are still celebratory.']};
+    description:'Year zero. Follow the planet lights as expansion advances. The pulse stops at the final lit state.',
+    visuals:[...existing.visuals,'An illustrated dock worker climbs to signal another. The fifth relay answers; the unfinished spur stays dark.']};
+  if(index===4)return {...existing,
+    visuals:[...existing.visuals,'Two paper workers pause the demonstration to clear a snag together before the line resumes.']};
+  if(index===5)return {...existing,
+    visuals:[...existing.visuals,'The last crossing tears. Two paper figures pass a dispatch across its attached flap without crossing the gap. The loss ledger remains blank.']};
+  if(index===6)return {...existing,
+    visuals:[...existing.visuals,'Two relief workers steady one load together as their folded ramp bends under them.']};
+  if(index===7)return {...existing,
+    description:'The Aureal Gate is a circular Hookshot portal. Operate its mechanisms to see the test of the gate and its consequences.',
+    visuals:['A circular, plasma-filled Hookshot portal; plasma activates with the event.','Ground crew clear the lane before the ship crosses. Marcel follows the crossing. The fold-out records the twenty worlds.']};
+  if(index===10)return {...existing,
+    description:'Thirty-one days after the war. Codec, Marcel and Tiger arrive in that order. The theatrical paper jungle depicts what the loam could make possible, not the restoration of Nacreous VI.',
+    visuals:['Codec works on the barren remnant. Marcel arrives with gravity and Wordstreaming; they meet over the loam before the first root.','Roots run through the paper and a jungle erupts. Marcel pauses to let a paper bird pass.','Tiger arrives last. Marcel steps toward him, while Codec starts to follow, stops and turns away.']};
   if(index===11)return {...existing,description:'The Administration turns from containment and harm to a call to serve. The closing imprint has its own page.',
     mechanicalDescriptions:[existing.mechanicalDescriptions[0],existing.mechanicalDescriptions[1],
       'Open the public Syrin 4 archival leaf. The destruction is recorded; exact dates and casualty counts remain unknown.'],
-    visuals:['The containment and harm cards are separate.','The Administration cycles through celebratory service roles, then stamps its endorsement.','The closing imprint is on the following leaf.']};
+    visuals:['The containment and harm cards are separate.','Four service figures leave their stations to form an official portrait. One makes room for the last arrival; the stamp lands when the group is ready.','The closing imprint is on the following leaf.']};
   return existing;
 }
 function updateNav():void {
@@ -1333,7 +1345,10 @@ function updateNav():void {
     setWitnessButton();
     return;
   }
-  prevButton.textContent='← Prev';miniButton.disabled=false;updateInspectButton();
+  prevButton.textContent='← Prev';
+  miniButton.disabled=isAdministrationExteriorPlate(currentFolio);
+  miniButton.title=miniButton.disabled?'This plate is read from above the paper.':'';
+  updateInspectButton();
   if (currentFolio >= FIRST_LATER_FOLIO) {
     const index=currentFolio as LaterFolioIndex;
     const copy=revisionCopy(index);
@@ -1545,9 +1560,9 @@ function goFolio(index:number, deferCameraReset=false):void {
         if(staged.root.userData.assetState==='ready'){
           staged.update(actual,dt,reduce);
           const {colonyFrame,expansionFrame,foldFrame,litPlanets,litEchoes,expansion,
-            colonySignal,pulseSegment,pulseAlong,relaysUnfolded,unfinishedLaneDark,endpointRoutine}=staged.root.userData;
+            colonySignal,pulseSegment,pulseAlong,relaysUnfolded,unfinishedLaneDark,endpointRoutine,relayChoreography}=staged.root.userData;
           canvas.dataset.f04CandidateState=JSON.stringify({colonyFrame,expansionFrame,foldFrame,litPlanets,litEchoes,expansion,
-            colonySignal,pulseSegment,pulseAlong,relaysUnfolded,unfinishedLaneDark,endpointRoutine});
+            colonySignal,pulseSegment,pulseAlong,relaysUnfolded,unfinishedLaneDark,endpointRoutine,relayChoreography});
         }else art.update(actual,dt,reduce);
       },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
     }
@@ -1586,8 +1601,8 @@ function goFolio(index:number, deferCameraReset=false):void {
       laterRevision={root:staged.root,update:(actual,dt,reduce)=>{
         if(staged.root.userData.assetState==='ready'){
           staged.update(actual,dt,reduce);
-          const {era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell,physicalBlankApertures,specimenYaw,wearMask,routeLayerCount,paperRipple,terrainStress,climateCurl,bridgeFailure,geographyRibs,weather,weatherRoll,crossingTorn,tearOpen}=staged.root.userData;
-          canvas.dataset.f06CandidateState=JSON.stringify({era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell,physicalBlankApertures,specimenYaw,wearMask,routeLayerCount,paperRipple,terrainStress,climateCurl,bridgeFailure,geographyRibs,weather,weatherRoll,crossingTorn,tearOpen});
+          const {era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell,physicalBlankApertures,specimenYaw,wearMask,routeLayerCount,paperRipple,terrainStress,climateCurl,bridgeFailure,geographyRibs,weather,weatherRoll,crossingTorn,tearOpen,crossingDispatch}=staged.root.userData;
+          canvas.dataset.f06CandidateState=JSON.stringify({era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell,physicalBlankApertures,specimenYaw,wearMask,routeLayerCount,paperRipple,terrainStress,climateCurl,bridgeFailure,geographyRibs,weather,weatherRoll,crossingTorn,tearOpen,crossingDispatch});
         }else art.update(actual,dt,reduce);
       },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
     }
@@ -1603,8 +1618,8 @@ function goFolio(index:number, deferCameraReset=false):void {
         // vignette beneath supplies is not duplicated by the Blender GLB.
         folioRig.add(art.root);
         const relief=art.root.getObjectByName('F07 · illustrated Administration relief supplies');
-        relief?.position.set(-3.66,.19,1.055);
-        relief?.scale.setScalar(1.23);
+        relief?.position.set(-3.68,.19,.907);
+        relief?.scale.setScalar(1.38);
         staged.update(laterStates[3],0,reducedMotion);
         for(const node of legacy)node.visible=false;
         canvas.dataset.blenderFolio='07';
@@ -1622,7 +1637,7 @@ function goFolio(index:number, deferCameraReset=false):void {
             reliefActors:Number(Boolean(art.root.getObjectByName('F07 · anonymous relief worker')))+
               Number(Boolean(art.root.getObjectByName('F07 · anonymous recipient'))),
             reliefParcelX:relief?.userData.parcelX,reliefWorkClock:relief?.userData.workClock,
-            reliefPassed:relief?.userData.passed,
+            reliefPassed:relief?.userData.passed,reliefChoreography:relief?.userData.choreography,
           });
         }else art.update(actual,dt,reduce);
       },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
@@ -1893,7 +1908,7 @@ function chooseF10View(view:F10ReadingView):void {
   setWitnessButton();
   canvas.dataset.f10ViewMotion='traveling';
   beginFlight(pose.position,pose.target,'f10',.86);
-  announce(view==='containment'?'Containment edge. The mechanism continues on the same page.':
+  announce(view==='wall'?'Wall overview from above the paper. The mechanism continues on the same page.':
     view==='street'?'Inhabited street. The mechanism continues on the same page.':'Whole-book view.');
 }
 function readF10Pose(view:F10ReadingView):ReadingPose {
@@ -2055,6 +2070,10 @@ function resetCamera():void {
   controls.minDistance=1.2;controls.maxDistance=Math.max(19,camera.position.distanceTo(controls.target)+5);controls.maxPolarAngle=1.51;controls.update();
 }
 function enterMini():void {
+  if(isAdministrationExteriorPlate(currentFolio)){
+    announce('Read this Administration plate from above the paper.');
+    return;
+  }
   cameraFlight=null;witnessActive=false;witnessCamera=null;
   if(controls)controls.enabled=true;
   inspection='miniature';discovered=false;setWitnessButton();
@@ -2205,6 +2224,17 @@ function onBridgeMessage(event:MessageEvent):void {
   if(!fallback.hidden)fallbackPage(message.folio);
 }
 
+function setAdministrationReadingLimits():void {
+  if(!controls)return;
+  const exterior=isAdministrationExteriorPlate(currentFolio);
+  controls.enablePan=!exterior;
+  controls.minAzimuthAngle=exterior?ADMINISTRATION_EXTERIOR_ORBIT.minAzimuthAngle:-Infinity;
+  controls.maxAzimuthAngle=exterior?ADMINISTRATION_EXTERIOR_ORBIT.maxAzimuthAngle:Infinity;
+  if(exterior){
+    controls.maxPolarAngle=ADMINISTRATION_EXTERIOR_ORBIT.maxPolarAngle;
+    controls.minDistance=ADMINISTRATION_EXTERIOR_ORBIT.minDistance;
+  }
+}
 function resize():void {
   if(!renderer)return;
   const w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);
@@ -2354,7 +2384,14 @@ try{
   function step(now:number):void {
     const dt=lastTime?Math.min(0.06,(now-lastTime)/1000):0;
     lastTime=now;
-    updatePhysicalBinding(dt);animate(dt);advanceF09Run(dt);moveMini(dt);advanceFlight(dt);revealTick();if(!physicalTurn)controls?.update();renderer?.render(scene,camera);
+    updatePhysicalBinding(dt);animate(dt);advanceF09Run(dt);moveMini(dt);advanceFlight(dt);revealTick();
+    if(!physicalTurn){
+      setAdministrationReadingLimits();controls?.update();
+      if(isAdministrationExteriorPlate(currentFolio)&&controls){
+        canvas.dataset.administrationView=JSON.stringify({position:camera.position.toArray(),target:controls.target.toArray()});
+      }else if(canvas.dataset.administrationView!==undefined)delete canvas.dataset.administrationView;
+    }
+    renderer?.render(scene,camera);
     frame=requestAnimationFrame(step);
   }
   frame=requestAnimationFrame(step);

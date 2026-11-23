@@ -21,7 +21,9 @@ test('F04 actual dock flaps follow the same B clock and the colony lantern mount
  const scene=new THREE.Group(),colony=new THREE.Group();scene.add(colony);
  const lamps=Array.from({length:5},(_,i)=>{const n=new THREE.Group();n.position.set(-.52+i*.26,.243+(i%2)*.08,-.76);return n});
  const field=createF04Environment(scene,colony,lamps);
- assert.deepEqual(field.update(1),{colonySignal:false,pulseSegment:-1,pulseAlong:0,relaysUnfolded:0,unfinishedLaneDark:true,endpointRoutine:{active:false,cover:0,receipt:0}});
+ const {relayChoreography,...initial}=field.update(1);
+ assert.equal(relayChoreography.beat,'ready');
+ assert.deepEqual(initial,{colonySignal:false,pulseSegment:-1,pulseAlong:0,relaysUnfolded:0,unfinishedLaneDark:true,endpointRoutine:{active:false,cover:0,receipt:0}});
  assert.ok(colony.getObjectByName('Paper first lamp amber insert'));
  const pause=field.update(18.2);assert.equal(pause.relaysUnfolded,2);assert.equal(pause.pulseSegment,2);
  assert.deepEqual(field.update(18.2),pause);

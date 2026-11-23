@@ -34,6 +34,9 @@ export function f11WildlifeBeats(frame:number) {
     wingFold:f11Ease(99,103,frame),
     approach:f11Ease(91,97,frame),
     bow:f11Ease(97,101,frame)*(1-f11Ease(104,109,frame)),
+    enterLane:f11Ease(101.5,104.2,frame),
+    retreat:f11Ease(106.8,108.75,frame),
+    encounter:frame<101.5?'none':frame<104.2?'entering-lane':frame<106.8?'in-path':frame<108.75?'ducking-away':'clear',
   } as const;
 }
 
@@ -132,21 +135,26 @@ export function createF11PaperWildlife(owner:THREE.Group,frond:THREE.Object3D) {
     }
     if(bird.visible){
       const walk=reduced?1:b.approach;
-      const x=THREE.MathUtils.lerp(2.85,2.51,walk);
-      bird.position.set(x,getOpenPageY(x)+.01,.88);
-      const tread=walk*Math.PI*5;
+      const x=THREE.MathUtils.lerp(THREE.MathUtils.lerp(1.95,1.39,walk),.77,b.enterLane)+.53*b.retreat;
+      const z=THREE.MathUtils.lerp(.90,.60,b.enterLane)-.40*b.retreat;
+      bird.position.set(x,getOpenPageY(x)+.01,z);
+      bird.rotation.y=-.40*b.enterLane-2.02*f11Ease(106.55,107.06,frame)+.22*b.retreat;
+      const moving=walk>0&&walk<1||b.enterLane>0&&b.enterLane<1||b.retreat>0&&b.retreat<1;
+      const tread=(walk*5+b.enterLane*5+b.retreat*5.5)*Math.PI;
       feet.forEach((foot,i)=>{
-        const stride=reduced||walk===1?0:Math.sin(tread+i*Math.PI);
+        const stride=reduced||!moving?0:Math.sin(tread+i*Math.PI);
         foot.position.y=Math.max(0,stride)*.030;foot.rotation.z=-stride*.21;
       });
-      trunk.position.y=reduced?0:Math.abs(Math.sin(tread))*(walk===1?.0:.019);
-      trunk.rotation.z=.21*b.bow+.014*resting;
-      neck.rotation.z=.66*b.bow+.026*resting;
+      trunk.position.y=reduced||!moving?0:Math.abs(Math.sin(tread))*.019;
+      trunk.rotation.z=.21*b.bow+.014*resting+.15*b.retreat;
+      neck.rotation.z=.66*b.bow+.026*resting+.24*b.retreat;
       for(const eye of eyes)eye.scale.y=1-.88*blink;
       neck.rotation.y=-.34*f11Ease(99,106,frame)+.25*f11Ease(106,109,frame);
     }
     return {moth:reduced&&moth.visible?'perched':b.moth,bird:b.bird,perch:b.moth==='perched'||reduced&&moth.visible?F11_MOTH_FROND:null,
-      birdBow:Number(b.bow.toFixed(3)),birdBlink:Number(blink.toFixed(3)),birdIdle:Number(resting.toFixed(3)),boundToFrond:moth.visible&&(b.moth==='perched'||reduced)};
+      birdBow:Number(b.bow.toFixed(3)),birdBlink:Number(blink.toFixed(3)),birdIdle:Number(resting.toFixed(3)),
+      encounter:b.encounter,birdX:Number(bird.position.x.toFixed(3)),birdZ:Number(bird.position.z.toFixed(3)),
+      boundToFrond:moth.visible&&(b.moth==='perched'||reduced)};
   };
   const dispose=()=>{
     const geos=new Set<THREE.BufferGeometry>(),mats=new Set<THREE.Material>();

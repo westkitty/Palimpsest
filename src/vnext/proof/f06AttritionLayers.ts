@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { startF06CrossingDispatch } from './f06CrossingDispatch';
 
 const WEAR_KEY='palimpsest.living.f06.paper-wear.v1';
 const TEAR_KEY='palimpsest.living.f06.crossing-tear.v1';
@@ -127,9 +128,11 @@ function tornCrossingStock(crossing:THREE.Group){
     e.rotation.y=.35*(i%2===0?1:-1);
     return e;
   });
+  const couriers=startF06CrossingDispatch(crossing,anchor);
   let permanent=readTear(),tear=permanent?.43:0;
   return (era:number,stressNow:number,dt:number,reduced:boolean)=>{
-    const opening=era===3?ease((stressNow-.80)/.18):0;
+    const canTear=couriers.beforeTear(era,dt,reduced);
+    const opening=canTear?ease((stressNow-.80)/.18):0;
     // A completed rupture persists as a local scar, but does not change any
     // selected-era geography reading, print or casualties in the ledger.
     if(opening>=.80&&!permanent){permanent=true;recordTear();}
@@ -142,7 +145,8 @@ function tornCrossingStock(crossing:THREE.Group){
     for(const [i,e] of strands.entries()){
       e.visible=tear>.12;e.scale.x=.25+.75*tear;e.rotation.z=(i%2?-.24:.21)*tear;
     }
-    return {crossingTorn:permanent,tearOpen:Math.round(tear*1000)/1000};
+    return {crossingTorn:permanent,tearOpen:Math.round(tear*1000)/1000,
+      crossingDispatch:couriers.update(era,reduced)};
   };
 }
 // These are four readings of the same teaching stock, not four planets,

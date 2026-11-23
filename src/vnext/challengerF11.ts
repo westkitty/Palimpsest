@@ -5,10 +5,12 @@ import motion from './assets/palimpsest-f11-motion.json';
 import { createF11WaterWick } from './f11WaterWick.ts';
 import { createF11PaperWildlife, F11_MOTH_FROND } from './f11PaperWildlife.ts';
 import { createF11StoryPaper, f11Ease, f11WitnessClip, F11_GUTTER_PLANT } from './f11StoryPaper.ts';
+import { createF11ApproachCuts, createF11PaperFeet, f11Choreography } from './f11Choreography.ts';
 
 const cues: [number,number][]=[
-  [0,1],[1.32,11],[2.65,34],[3.35,42],[4.05,49],[4.77,58],[5.34,62],[6.10,72],
-  [7.78,92],[8.98,104],[10.39,112],[11.48,129],[12.42,143],[13.40,155],[15.38,180]
+  [0,1],[1.32,11],[2.65,34],[3.62,42],[4.51,47.8],[4.98,49],[5.66,58],[6.19,62],[6.95,72],
+  [8.63,92],[9.88,101],[10.59,104.2],[11.49,106.8],[12.04,108.8],[12.79,112],
+  [13.88,129],[14.68,136],[15.24,140],[16.23,154],[18.10,180]
 ];
 export function f11BlenderFrame(t:number):number {
   for(let i=1;i<cues.length;i++){
@@ -45,13 +47,15 @@ export function createF11Challenger(pageY:(x:number)=>number){
   root.userData.assetState='loading';
   const paper=createF11StoryPaper(pageY);paper.root.visible=false;root.add(paper.root);
   const water=createF11WaterWick(paper.root,pageY);
+  paper.root.add(createF11ApproachCuts(pageY));
   let disposed=false,scene:THREE.Group|null=null,mixer:THREE.AnimationMixer|null=null;
   let actions:THREE.AnimationAction[]=[];
   const idles: Array<{node:THREE.Object3D;motion:typeof motion.idles[keyof typeof motion.idles]}>=[];
   const eyes:THREE.Mesh[]=[];
-  const anchors:THREE.Object3D[]=[];
+  const anchors:THREE.Group[]=[];
   let wildlife:ReturnType<typeof createF11PaperWildlife>|undefined;
   let witnessStem:THREE.Object3D|undefined, codecHead:THREE.Object3D|undefined;
+  const performers: {body:THREE.Object3D;head:THREE.Object3D;feet:ReturnType<typeof createF11PaperFeet>}[]=[];
   const trees: Array<{ holder:THREE.Object3D;x:number;z:number;s:number;delay:number;edge:number }>=[];
   let elapsed=0,idleTime=0, reduced=false,lastRender=0;
   function sample(){
@@ -72,7 +76,8 @@ export function createF11Challenger(pageY:(x:number)=>number){
     mixer.update(0);
     const storyIndex=THREE.MathUtils.clamp(Math.round(frame)-1,0,motion.last-1);
     const tick=Math.floor(idleTime*motion.fps);
-    const beats=paper.update(frame,reduced);
+    const acting=f11Choreography(frame,reduced);
+    const beats=paper.update(frame,reduced,acting.marcel);
     for(const spec of idles){
       const frames=spec.motion.samples;
       const index=Math.max(tick-spec.motion.offset,0)%(frames.length-1);
@@ -108,10 +113,19 @@ export function createF11Challenger(pageY:(x:number)=>number){
       t.holder.scale.set(t.s*(1+.20*peak),t.s*stretch,t.s*(1+.09*peak));
       t.holder.rotation.set(near?.14*peak: .47*peak,0,lean);
     }
-    // A quiet withdrawal layered on the source pose and idle envelope.
-    anchors[0].rotation.y=-.66*beats.withdraw;
-    anchors[1].rotation.y=.14*f11Ease(133,147,frame);
-    anchors[2].rotation.y=.11*f11Ease(133,150,frame);
+    // Layer grounded paper walking on top of the imported upper-body acting.
+    // The mixer re-applies source story transforms before these offsets, so
+    // a stopped stance never accumulates a turn or a lean between samples.
+    for(const [i,pose] of [acting.codec,acting.marcel].entries()){
+      const anchor=anchors[i],performer=performers[i];
+      anchor.position.set(pose.x,pageY(pose.x)+.025+pose.bob,pose.z);
+      anchor.rotation.y=pose.yaw;
+      performer.body.rotateX(pose.pitch);
+      performer.head.rotateX(pose.watch);
+      performer.feet(pose,pageY,anchor);
+    }
+    anchors[2].rotation.y=acting.tigerYaw;
+    anchors[3].position.set(acting.marcel.x,pageY(acting.marcel.x)+.40,acting.marcel.z);
     const storyBeat=frame<11?'ash':frame<34?'single-patch':frame<49?'gravity-redirect':frame<62?'gutter-root':frame<66?'fine-roots':
       frame<72?'gutter-cut':frame<88?'unfold-wave':frame<98?'canopy-full':frame<106?'canopy-parts':
       frame<112?'held-opening':frame<129?'tiger-late':'codec-withdraws';
@@ -119,6 +133,11 @@ export function createF11Challenger(pageY:(x:number)=>number){
       codecIdle:Math.round((1-beats.withdraw)*100)/100,tiger:anchors[2].visible,
       wildlife:wildlife?.update(frame,reduced,idleTime),wetStock:water.update(frame),
       codecHeadPitch:Math.round(180/Math.PI*(codecHead?.rotation.x??0)),
+      choreography:{
+        beat:acting.beat,
+        codec:acting.codec,marcel:acting.marcel,
+        groundContact:[acting.codec,acting.marcel].every(({left,right})=>Math.min(left.lift,right.lift)===0),
+      },
       rootedCanopy:trees.filter(t=>t.holder.visible).length,
       witness:trees[F11_GUTTER_PLANT].holder.visible?{
         id:'PLANT_22',x:trees[F11_GUTTER_PLANT].x,z:trees[F11_GUTTER_PLANT].z,
@@ -148,6 +167,12 @@ export function createF11Challenger(pageY:(x:number)=>number){
       };
       for(const [name,x,z,scale] of [['ACTOR_CODEC',-1.29,0.32,0.64],['ACTOR_MARCEL',0.74,0.38,0.70],['ACTOR_TIGER',1.80,0.56,0.74]] as const){
         anchors.push(move(get(name),x,pageY(x)+0.025,z,scale));
+      }
+      for(const [name,shoes] of [['CODEC',['PAPER_000','PAPER_001']],['MARCEL',['PAPER_009','PAPER_010']]] as const){
+        performers.push({
+          body:get(name+'_BODY_STORY'),head:get(name+'_HEAD_STORY'),
+          feet:createF11PaperFeet(get('ACTOR_'+name),[...shoes]),
+        });
       }
       anchors.push(move(get('MARCEL_EFFECT'),0.74,pageY(0.74)+0.40,0.38,0.60));
       for(let i=0;i<27;i++){
