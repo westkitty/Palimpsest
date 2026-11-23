@@ -16,7 +16,7 @@ const checks=[
   ['camera beat explicit not automatic',scene.includes("witnessButton.addEventListener('click',toggleWitness)")],
   ['camera affordance hidden until final stage',scene.includes('state.f02.reveal===3 && inspection')&&scene.includes('witnessButton.hidden=!available')],
   ['no cutscene can silently force entry',!f02.includes('toggleWitness(')&&!f02.includes('beginFlight(')],
-  ['camera path one existing animation loop',scene.includes('advanceFlight(dt);revealTick();controls?.update();renderer?.render(scene,camera)')],
+  ['camera path one existing animation loop',scene.includes('updatePhysicalBinding(dt);animate(dt);advanceF09Run(dt);moveMini(dt);advanceFlight(dt);revealTick();if(!physicalTurn)controls?.update();renderer?.render(scene,camera)')],
   ['motion-safe direct state',scene.includes('if(reducedMotion)advanceFlight(1)')],
   ['prior view restored',scene.includes('witnessCamera={position:camera.position.clone(),target:controls.target.clone()}')&&scene.includes('witnessCamera?.position.clone()')],
   ['controls resume after camera flight',scene.includes('controls.enabled=true;\n    cameraFlight=null;')],

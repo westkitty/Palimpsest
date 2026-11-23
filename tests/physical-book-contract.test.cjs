@@ -5,6 +5,7 @@ const preview = fs.readFileSync('src/vnext/previewV2.ts','utf8');
 const html = fs.readFileSync('folio-vnext.html','utf8');
 const originals = fs.readFileSync('src/engine/BookAndDeskRig.ts','utf8');
 
+const turn = fs.readFileSync('src/vnext/physicalPageTurn.ts','utf8');
 const checks = [
  ['real original hinged book precedent', originals.includes('setBookOpenProgress') && originals.includes('updateTurningLeaf') && originals.includes('cornerRightHit')],
  ['closed cover has physical pivot and embossed print', physical.includes('this.coverPivot.rotation.z') && physical.includes('coverPrinting()') && physical.includes('new THREE.BoxGeometry(4.94, 0.18, 6.26)')],
@@ -14,9 +15,9 @@ const checks = [
  ['default route begins with cover shut', preview.includes("const startWithClosedCover = !bridgeEmbedded && initialFolio === 0") && preview.includes("bookPhase: BookPhase = startWithClosedCover ? 'closed' : 'open'")],
  ['clicking cover starts animated opening', preview.includes('bookHit(event,binding.coverHit)') && preview.includes("bookPhase='opening'")],
  ['no automatic opening before physical user interaction', !preview.includes("openPhysicalCover();resize()") && preview.includes('coverAnimation=Math.min(1')],
- ['real pointer drag changes paper geometry before release', preview.includes('onPhysicalPointerMove') && preview.includes('binding.setLeafProgress(turn.progress,true)')],
+ ['real pointer drag changes paper geometry before release', preview.includes('turn.desired=pageDragTravel(') && preview.includes('if(turn.dragging){') && preview.includes('binding.setLeafProgress(physicalLeafPosition(turn.direction,turn.travel),true)')],
  ['pointer movement captures real cursor input', preview.includes('event.clientX-turn.fromX') && preview.includes('canvas.setPointerCapture(event.pointerId)')],
- ['short or cancelled turns return to their starting leaf', preview.includes('travelled>14 && distance>=0.35') && preview.includes('physicalTurn.commit=false')],
+ ['short or cancelled turns return to their starting leaf', preview.includes('turn.commit=commitPageDrag(delta,turn.desired)') && turn.includes('travel>=.21') && preview.includes('physicalTurn.commit=false') && preview.includes('turn.travel===(turn.commit?1:0)')],
  ['the next leaf includes the separate closing pop-out', preview.includes('if(!playableIndex(target))return')],
  ['source stages remain independently authored', preview.includes('buildF01()') && preview.includes('createLaterFolio(')],
  ['keyboard accessibility remains without visual buttons', preview.includes("if(k==='enter'||k===' ')") && preview.includes("if(k==='arrowleft'")],

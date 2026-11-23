@@ -1,3 +1,4 @@
+import { TURN_PULL_SECONDS, TURN_RETURN_SECONDS, commitPageDrag, commonTurnCamera, pageDragTravel, pageSettlePosition, physicalLeafPosition, turnEase, turnTheatre } from './physicalPageTurn.ts';
 import { F09_AFTERMATH_SECONDS, armsF09, f09ForcedBeat, F09_INDEX } from './f09ForcedTurn.ts';
 import {closingReadingPose,createEnvironmentalClosing} from './environmentClosing.ts';
 import { makeF07CandidateStage } from './proof/f07CandidateStage';
@@ -112,20 +113,26 @@ binding.setCoverProgress(coverAnimation);
 rig.visible = !startWithClosedCover;
 canvas.dataset.bookPhase = bookPhase;
 canvas.dataset.pageTurn = 'idle';
+type ReadingPose={position:THREE.Vector3;target:THREE.Vector3};
 type PhysicalTurn = {
-  pointerId: number | null;
-  fromIndex: number;
-  toIndex: number;
-  direction: -1 | 1;
-  fromX: number;
-  currentX: number;
-  progress: number;
-  destination: number;
-  dragging: boolean;
-  commit: boolean;
-  swapped: boolean;
+  pointerId:number|null;
+  fromIndex:number;
+  toIndex:number;
+  direction:-1|1;
+  fromX:number;
+  desired:number;
+  travel:number;
+  phase:'pull'|'leaf'|'return';
+  elapsed:number;
+  settleFrom:number;
+  settleElapsed:number;
+  dragging:boolean;
+  commit:boolean;
+  swapped:boolean;
+  readingStart:ReadingPose;
 };
 let physicalTurn: PhysicalTurn | null = null;
+let queuedBridgeFolio:number|null=null;
 let f09Run:number|null=null;
 let f09LastBeat:ReturnType<typeof f09ForcedBeat>|null=null;
 let f09FallbackDeadline:number|undefined;
@@ -182,19 +189,24 @@ function beginPhysicalTurn(direction:-1|1,pointerId:number|null,startX:number):v
   if(bookPhase!=='open' || physicalTurn || f09Run!==null || inspection!=='overview')return;
   const target=currentFolio+direction;
   if(!playableIndex(target))return;
-  const startProgress=direction===1?0:1;
+  if(!controls)return;
+  cameraFlight=null;witnessActive=false;witnessCamera=null;setWitnessButton();
   physicalTurn={
     pointerId,fromIndex:currentFolio,toIndex:target,direction,
-    fromX:startX,currentX:startX,progress:startProgress,destination:startProgress,
-    dragging:pointerId!==null,commit:pointerId===null,swapped:false,
+    fromX:startX,desired:0,travel:0,phase:'pull',elapsed:0,
+    settleFrom:0,settleElapsed:0,dragging:pointerId!==null,commit:pointerId===null,
+    swapped:false,readingStart:{position:camera.position.clone(),target:controls.target.clone()},
   };
   const [right,left]=direction===1?[currentFolio,target]:[target,currentFolio];
   binding.setLeafTitles(folioLeafTitle(right),right,folioLeafTitle(left),left,
     studyStates[1].f02.reveal===3);
-  binding.setLeafProgress(startProgress,true);
-  if(pointerId===null)physicalTurn.destination=direction===1?1:0;
+  // Start from the actual perspective (including a panned or zoomed reader).
+  // Do not expose a moving edge until the neutral whole-book camera is ready.
   canvas.dataset.pageTurn=pointerId===null?'settling':'dragging';
-  if(controls)controls.enabled=false;
+  canvas.dataset.turnPhase='pull';
+  canvas.dataset.turnTravel='0';
+  controls.enabled=false;
+
 }
 function onPhysicalPointerDown(event:PointerEvent):void {
   if(event.button!==0 || !event.isPrimary)return;
@@ -237,16 +249,8 @@ function onPhysicalPointerMove(event:PointerEvent):void {
   const turn=physicalTurn;
   if(!turn || !turn.dragging || turn.pointerId!==event.pointerId)return;
   event.preventDefault();event.stopImmediatePropagation();
-  turn.currentX=event.clientX;
-  const delta=event.clientX-turn.fromX;
-  const fraction=THREE.MathUtils.clamp(
-    turn.direction===1?-delta/(canvas.clientWidth*0.34):delta/(canvas.clientWidth*0.34),
-    0,1);
-  turn.progress=turn.direction===1?fraction:1-fraction;
-  binding.setLeafProgress(turn.progress,true);
-  // Stage sculpture folds toward its card as the material leaf lifts, without
-  // altering source-authored A/B/C state or disposing a scene mid-drag.
-  rig.scale.y=reducedMotion?1:1-0.52*Math.sin(turn.progress*Math.PI);
+  turn.desired=pageDragTravel(turn.direction,event.clientX-turn.fromX,canvas.clientWidth);
+
 }
 function onPhysicalPointerUp(event:PointerEvent):void {
   if(coverDrag && coverDrag.pointerId===event.pointerId){
@@ -263,25 +267,92 @@ function onPhysicalPointerUp(event:PointerEvent):void {
   if(!turn || !turn.dragging || turn.pointerId!==event.pointerId)return;
   event.preventDefault();event.stopImmediatePropagation();
   turn.dragging=false;
-  const travelled=Math.abs(turn.currentX-turn.fromX);
-  const distance=turn.direction===1?turn.progress:1-turn.progress;
-  turn.commit=travelled>14 && distance>=0.35;
-  turn.destination=turn.commit?(turn.direction===1?1:0):(turn.direction===1?0:1);
+  const delta=event.clientX-turn.fromX;
+  turn.desired=pageDragTravel(turn.direction,delta,canvas.clientWidth);
+  turn.commit=commitPageDrag(delta,turn.desired);
+  turn.settleFrom=turn.travel;
   canvas.dataset.pageTurn='settling';
   canvas.style.cursor='grab';
   try{if(canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId);}catch{}
+
 }
 function onPhysicalPointerCancel(event:PointerEvent):void {
   if(coverDrag && coverDrag.pointerId===event.pointerId){
     coverDrag=null;bookPhase='closing';canvas.dataset.bookPhase='closing';
     canvas.style.cursor='grab';return;
   }
-  if(!physicalTurn || physicalTurn.pointerId!==event.pointerId)return;
+  if(!physicalTurn || !physicalTurn.dragging || physicalTurn.pointerId!==event.pointerId)return;
   event.preventDefault();event.stopImmediatePropagation();
   physicalTurn.dragging=false;
   physicalTurn.commit=false;
-  physicalTurn.destination=physicalTurn.direction===1?0:1;
+  physicalTurn.settleFrom=physicalTurn.travel;
   canvas.dataset.pageTurn='settling';
+  canvas.style.cursor='grab';
+}
+function mountIncomingStage(turn:PhysicalTurn):void {
+  if(!turn.commit||turn.swapped)return;
+  parkOutgoingStage();
+  goFolio(turn.toIndex,true);
+  turn.swapped=true;
+  rig.visible=false;
+  rig.scale.y=.025;
+}
+const turnPosition=new THREE.Vector3(),turnLook=new THREE.Vector3();
+function dialTurnCamera(from:ReadingPose,to:ReadingPose,amount:number):void {
+  camera.position.copy(from.position).lerp(to.position,amount);
+  turnLook.copy(from.target).lerp(to.target,amount);
+  controls?.target.copy(turnLook);
+  camera.lookAt(turnLook);
+  canvas.dataset.turnCamera=camera.position.toArray().map(n=>n.toFixed(4)).join(',');
+}
+function bookAspect():number {return Math.max(.35,canvas.clientWidth/Math.max(1,canvas.clientHeight));}
+function turnPose():ReadingPose {
+  const shared=commonTurnCamera(bookAspect());
+  return {position:turnPosition.fromArray(shared.position),target:new THREE.Vector3(...shared.target)};
+}
+function updateTurnTheatre(turn:PhysicalTurn):void {
+  const shape=turnTheatre(turn.travel);
+  if(outgoingStage){
+    outgoingStage.root.visible=shape.outgoing>.003;
+    outgoingStage.root.scale.y=.025+.975*shape.outgoing;
+    rig.visible=shape.incoming>.003;
+    rig.scale.y=.025+.975*shape.incoming;
+    applyFolioLighting(turn.fromIndex,turn.toIndex,turnEase((turn.travel-.24)/.52));
+  }else{
+    // In-progress hand drags only lower the existing theatre. No folio state
+    // can be promoted or discarded until a release has committed the turn.
+    const lift=turnTheatre(Math.min(turn.travel,.41)).outgoing;
+    rig.scale.y=.025+.975*lift;
+  }
+  canvas.dataset.turnTravel=turn.travel.toFixed(4);
+  recordTurnPose(turn);
+}
+function recordTurnPose(turn:PhysicalTurn):void {
+  const outgoing=outgoingStage?.root??(!turn.swapped?rig:null);
+  const incoming=turn.swapped?rig:null;
+  const describe=(object:THREE.Group|null)=>({visible:object?.visible??false,height:object?.scale.y??0});
+  const from=describe(outgoing),to=describe(incoming);
+  canvas.dataset.turnTheatre=[from.height,to.height].map(n=>n.toFixed(4)).join(',');
+  canvas.dataset.turnPose=JSON.stringify({phase:turn.phase,travel:turn.travel,desired:turn.desired,
+    direction:turn.direction,commit:turn.commit,swapped:turn.swapped,from,to,
+    position:camera.position.toArray(),target:turnLook.toArray()});
+}
+function finishPhysicalTurn(turn:PhysicalTurn):void {
+  binding.setLeafProgress(physicalLeafPosition(turn.direction,turn.travel),false);
+  discardOutgoingStage();
+  physicalTurn=null;
+  canvas.dataset.pageTurn='idle';
+  delete canvas.dataset.turnPhase;delete canvas.dataset.turnTravel;delete canvas.dataset.turnCamera;delete canvas.dataset.turnTheatre;delete canvas.dataset.turnPose;
+  rig.visible=true;rig.scale.y=1;
+  binding.setPageIndex(currentFolio);
+  if(controls){
+    controls.minDistance=1.2;controls.maxDistance=Math.max(19,camera.position.distanceTo(controls.target)+5);
+    controls.maxPolarAngle=1.51;
+    controls.enabled=true;
+  }
+  if(turn.commit)presentFolio(currentFolio);
+  const queued=queuedBridgeFolio;queuedBridgeFolio=null;
+  if(queued!==null&&queued!==currentFolio)goFolio(queued);
 }
 function updatePhysicalBinding(dt:number):void {
   if(bookPhase==='closing'){
@@ -304,49 +375,57 @@ function updatePhysicalBinding(dt:number):void {
     }
   }
   const turn=physicalTurn;
-  if(!turn || turn.dragging)return;
-  if(reducedMotion)turn.progress=turn.destination;
-  else{
-    const difference=turn.destination-turn.progress;
-    const step=Math.max(0,dt)*2.1;
-    turn.progress+=Math.sign(difference)*Math.min(Math.abs(difference),step);
+  if(!turn)return;
+  if(reducedMotion){
+    if(turn.dragging)return;
+    turn.travel=turn.commit?1:0;
+    mountIncomingStage(turn);
+    if(turn.commit){applyFolioLighting(turn.toIndex,turn.toIndex,1);dialTurnCamera(turn.readingStart,readingPose(turn.toIndex,1),1);}
+    finishPhysicalTurn(turn);
+    return;
   }
-  binding.setLeafProgress(turn.progress,true);
-  const unfolded=turn.direction===1?turn.progress:1-turn.progress;
-  if(turn.commit && !turn.swapped){
-    // Never discard a sculpture at the midpoint. Retain the departing paper
-    // theatre, build the arriving one underneath the same moving leaf, and
-    // fold each physical stage on opposite halves of the same motion.
-    parkOutgoingStage();
-    goFolio(turn.toIndex,true);
-    turn.swapped=true;
-    if(controls)controls.enabled=false;
-  }
-  if(outgoingStage){
-    const collapse=Math.min(1,unfolded*1.88);
-    outgoingStage.root.scale.y=reducedMotion?1:Math.max(0.055,1-collapse*0.94);
-    outgoingStage.root.visible=unfolded<0.57;
-    const rising=THREE.MathUtils.clamp((unfolded-0.40)/0.60,0,1);
-    rig.scale.y=reducedMotion?1:Math.max(0.055,rising*rising*(3-2*rising));
-    rig.visible=unfolded>0.40;
-  }else{
-    // A declined page turn is still an elastic page: the original scene
-    // returns to its plinth rather than changing folio or losing study state.
-    rig.scale.y=reducedMotion?1:Math.max(0.055,1-0.78*Math.sin(turn.progress*Math.PI));
-  }
-  if(Math.abs(turn.progress-turn.destination)<0.001){
-    if(turn.commit && !turn.swapped){
-      parkOutgoingStage();goFolio(turn.toIndex,true);
-      turn.swapped=true;
+  const neutral=turnPose();
+  if(turn.phase==='pull'){
+    turn.elapsed+=dt;
+    dialTurnCamera(turn.readingStart,neutral,turnEase(turn.elapsed/TURN_PULL_SECONDS));
+    if(turn.commit&&!turn.dragging)mountIncomingStage(turn);
+    if(turn.elapsed>=TURN_PULL_SECONDS){
+      turn.phase='leaf';turn.elapsed=0;
+      canvas.dataset.turnPhase='leaf';
     }
-    binding.setLeafProgress(turn.progress,false);
-    discardOutgoingStage();
-    physicalTurn=null;canvas.dataset.pageTurn='idle';
-    rig.visible=true;rig.scale.y=1;
-    binding.setPageIndex(currentFolio);
-    if(turn.commit)resetCamera();
-    if(controls)controls.enabled=true;
+    recordTurnPose(turn);
+    return;
   }
+  if(turn.phase==='return'){
+    turn.elapsed+=dt;
+    const destination=turn.commit?readingPose(turn.toIndex,1):turn.readingStart;
+    dialTurnCamera(neutral,destination,turnEase(turn.elapsed/TURN_RETURN_SECONDS));
+    recordTurnPose(turn);
+    if(turn.elapsed>=TURN_RETURN_SECONDS)finishPhysicalTurn(turn);
+    return;
+  }
+  dialTurnCamera(neutral,neutral,1);
+  if(turn.dragging){
+    // Keep the last bit of the leaf in reserve until release; the camera and
+    // sheet never snap to a different pose even when a fast drag hits the cap.
+    turn.travel+=(Math.min(turn.desired,.88)-turn.travel)*(1-Math.exp(-dt*15));
+  }else{
+    mountIncomingStage(turn);
+    turn.settleElapsed+=dt;
+    turn.travel=pageSettlePosition(turn.settleFrom,turn.commit?1:0,turn.settleElapsed);
+  }
+  binding.setLeafProgress(physicalLeafPosition(turn.direction,turn.travel),true);
+  updateTurnTheatre(turn);
+  if(!turn.dragging&&turn.travel===(turn.commit?1:0)){
+    // Land the stock first; push in only after the physical turn is over.
+    binding.setLeafProgress(physicalLeafPosition(turn.direction,turn.travel),false);
+    binding.setPageIndex(currentFolio);
+    discardOutgoingStage();
+    rig.visible=true;rig.scale.y=1;
+    turn.phase='return';turn.elapsed=0;
+    canvas.dataset.turnPhase='return';
+  }
+
 }
 
 let renderer: THREE.WebGLRenderer | null = null;
@@ -1579,18 +1658,23 @@ function goFolio(index:number, deferCameraReset=false):void {
       },dispose(){staged.dispose();if(mounted)world.unmountLivingBlender();art.root.removeFromParent();art.dispose();}};
     }
   }
-  ambientLight.intensity=index===2?0.46:0.78;
-  keyLight.intensity=index===2?2.66:1.96;rimLight.intensity=index===2?0.56:0.97;
-  overhead.intensity=index===2?2.2:13.5;
-  if(renderer)renderer.toneMappingExposure=index===2?1.18:1.24;
-  if(!deferCameraReset){binding.setPageIndex(index);resetCamera();}
-  updateNav();
+  if(!deferCameraReset){applyFolioLighting(index,index,1);binding.setPageIndex(index);resetCamera();presentFolio(index);}
   // A page change must never expose the story through a closed cover or
   // re-enable orbit controls while an actual paper leaf is moving.
   rig.visible=bookPhase==='open'||bookPhase==='opening'&&coverAnimation>0.57;
   if(controls && (bookPhase!=='open'||physicalTurn))controls.enabled=false;
   canvas.dataset.authoredSculptures=String(authoredFigureCount);
   canvas.dataset.sourceAuthoredScene=String(index>=FIRST_LATER_FOLIO&&index<CODA_INDEX);
+}
+function applyFolioLighting(from:number,to:number,amount:number):void {
+  const blend=(normal:number,notebook:number)=>THREE.MathUtils.lerp(from===2?notebook:normal,to===2?notebook:normal,amount);
+  ambientLight.intensity=blend(.78,.46);
+  keyLight.intensity=blend(1.96,2.66);rimLight.intensity=blend(.97,.56);
+  overhead.intensity=blend(13.5,2.2);
+  if(renderer)renderer.toneMappingExposure=blend(1.24,1.18);
+}
+function presentFolio(index:number):void {
+  updateNav();
   if(index===CODA_INDEX)announce('Closing imprint. '+ADMINISTRATION_SLOGAN);
   else{
     announce(`Folio ${index+1} of 12. ${index<3?(overviewCopy as readonly string[])[index]:revisionCopy(index as LaterFolioIndex).description}`);
@@ -1670,7 +1754,7 @@ function animate(dt:number):void {
   }
 }
 function handleAction(slot:Slot):void {
-  if(currentFolio===CODA_INDEX)return;
+  if(physicalTurn||currentFolio===CODA_INDEX)return;
   if(currentFolio>=FIRST_LATER_FOLIO){
     if(inspection!=='overview'){announce('Return to the overview before operating a mechanism.');return;}
     const idx=currentFolio-FIRST_LATER_FOLIO;
@@ -1706,6 +1790,7 @@ function handleAction(slot:Slot):void {
   if(before===state)throw Error('Folio state failed to advance');
 }
 function resetStudy():void{
+  if(physicalTurn)return;
   if(inspection!=='overview')leaveMini();
   studyStates=restoreFolioStudy(null);
   laterStates=restoreLaterStudy(null);f04ExpansionFrame=null;resetF06TerrainWear();
@@ -1751,7 +1836,7 @@ function advanceFlight(dt:number):void {
   }
 }
 function toggleWitness():void {
-  if(!renderer||!controls||inspection!=='overview'||state.folio!==1||state.f02.reveal!==3)return;
+  if(physicalTurn||!renderer||!controls||inspection!=='overview'||state.folio!==1||state.f02.reveal!==3)return;
   if(!witnessActive){
     witnessCamera={position:camera.position.clone(),target:controls.target.clone()};
     witnessActive=true;
@@ -1767,61 +1852,67 @@ function toggleWitness():void {
   }
   setWitnessButton();
 }
-function fitBookCamera(openProgress:number):void {
+function readingPose(index:number,openProgress:number):ReadingPose {
+  const position=new THREE.Vector3(),target=new THREE.Vector3();
   // The sealed book and the open stage need different composition. Fit the
   // actual page width inside portrait viewports instead of cropping its
   // covers, while preserving the inspectable original book geometry.
-  const aspect=Math.max(0.35,canvas.clientWidth/Math.max(1,canvas.clientHeight));
+  const aspect=bookAspect();
   const closedScale=Math.max(0.82,0.76/aspect);
   const openScale=Math.max(1,1.28/aspect);
   const scale=THREE.MathUtils.lerp(closedScale,openScale,
     THREE.MathUtils.clamp(openProgress,0,1));
-  if(currentFolio===CODA_INDEX&&openProgress>.99){
+  if(index===CODA_INDEX&&openProgress>.99){
     const {distance,focusY,focusZ}=closingReadingPose(aspect);
-    camera.position.set(.028*distance,focusY+.38*distance,focusZ+.924*distance);
-    controls?.target.set(0,focusY,focusZ);
-  }else if(currentFolio===1&&openProgress>.99){
+    position.set(.028*distance,focusY+.38*distance,focusZ+.924*distance);
+    target.set(0,focusY,focusZ);
+  }else if(index===1&&openProgress>.99){
     // Read the low warm Zentrum hardware and the taller blue open Geode as
     // foreground / middle stage, against the raised spiral in the rear.
     const storyScale=scale*THREE.MathUtils.lerp(.89,1,THREE.MathUtils.smoothstep(aspect,.48,1.25));
     const side=THREE.MathUtils.lerp(1.65,3.05,THREE.MathUtils.smoothstep(aspect,.48,1.2));
-    camera.position.set(side*storyScale,7.34*storyScale,9.92*storyScale);
-    controls?.target.set(0,.55,.01);
-  }else if(currentFolio===9&&openProgress>.99){
+    position.set(side*storyScale,7.34*storyScale,9.92*storyScale);
+    target.set(0,.55,.01);
+  }else if(index===9&&openProgress>.99){
     const witnessScale=scale*THREE.MathUtils.lerp(.68,.98,THREE.MathUtils.smoothstep(aspect,.52,1.28));
-    camera.position.set(.20*witnessScale,6.18*witnessScale,9.05*witnessScale);
-    controls?.target.set(.38,.42,.05);
-  }else if(currentFolio===2&&openProgress>.99){
-    camera.position.set(4.0*scale,7.4*scale,9.8*scale);
-    controls?.target.set(0,.56,.08);
-  }else if(currentFolio===10&&openProgress>.99){
+    position.set(.20*witnessScale,6.18*witnessScale,9.05*witnessScale);
+    target.set(.38,.42,.05);
+  }else if(index===2&&openProgress>.99){
+    position.set(4.0*scale,7.4*scale,9.8*scale);
+    target.set(0,.56,.08);
+  }else if(index===10&&openProgress>.99){
     // F11 action and all three levers live near the gutter. On narrow screens
     // frame the populated stock rather than shrinking it to fit blank margins.
     const storyScale=scale*THREE.MathUtils.lerp(.66,.96,THREE.MathUtils.smoothstep(aspect,.52,1.28));
-    camera.position.set(0,6.05*storyScale,8.85*storyScale);
-    controls?.target.set(0,.54,.02);
-  }else if(currentFolio===4&&openProgress>.99){
-    camera.position.set(.55*scale,6.9*scale,9.25*scale);
-    controls?.target.set(0,.38,.10);
-  }else if(currentFolio===5&&openProgress>.99){
+    position.set(0,6.05*storyScale,8.85*storyScale);
+    target.set(0,.54,.02);
+  }else if(index===4&&openProgress>.99){
+    position.set(.55*scale,6.9*scale,9.25*scale);
+    target.set(0,.38,.10);
+  }else if(index===5&&openProgress>.99){
     const readingScale=Math.max(.94,1.06/aspect);
-    camera.position.set(-.28*readingScale,8.32*readingScale,7.85*readingScale);
-    controls?.target.set(0,.41,-.10);
-  }else if(currentFolio===6&&openProgress>.99&&aspect<.85){
+    position.set(-.28*readingScale,8.32*readingScale,7.85*readingScale);
+    target.set(0,.41,-.10);
+  }else if(index===6&&openProgress>.99&&aspect<.85){
     // Tighter, steeper whole-spread framing keeps the painted field and
     // the small foreground relief readable together on a portrait phone.
     const readingScale=Math.max(1,1.17/aspect);
-    camera.position.set(.20*readingScale,7.2*readingScale,9.4*readingScale);
-    controls?.target.set(-.06,.34,.06);
+    position.set(.20*readingScale,7.2*readingScale,9.4*readingScale);
+    target.set(-.06,.34,.06);
   }else{
-    const angleF01=currentFolio===0?THREE.MathUtils.clamp(openProgress,0,1):0;
-    camera.position.set(0.58*angleF01*scale,(6.5+1.30*angleF01)*scale,(9.9-0.75*angleF01)*scale);
-    controls?.target.set(0,0.25,0);
+    const angleF01=index===0?THREE.MathUtils.clamp(openProgress,0,1):0;
+    position.set(0.58*angleF01*scale,(6.5+1.30*angleF01)*scale,(9.9-0.75*angleF01)*scale);
+    target.set(0,0.25,0);
   }
-  // OrbitControls otherwise clamps the responsive portrait fit back to its
-  // original 19-unit desktop cap, cropping both physical page corners.
-  if(controls)controls.maxDistance=Math.max(19,camera.position.distanceTo(controls.target)+5);
-  camera.updateProjectionMatrix();
+  return {position,target};
+}
+function fitBookCamera(openProgress:number):void {
+  const posed=readingPose(currentFolio,openProgress);
+  camera.position.copy(posed.position);
+  controls?.target.copy(posed.target);
+  // Portrait fitting exceeds the default 19 world units.
+  if(controls)controls.maxDistance=Math.max(19,posed.position.distanceTo(posed.target)+5);
+  camera.lookAt(posed.target);camera.updateProjectionMatrix();
 }
 function resetCamera():void {
   cameraFlight=null;witnessActive=false;witnessCamera=null;
@@ -1854,7 +1945,7 @@ function leaveMini():void {
   inspectButton.textContent='Inspect (I)';
   resetCamera();updateInspectButton();
 }
-function toggleMini():void {if(inspection==='overview')enterMini();else leaveMini();}
+function toggleMini():void {if(physicalTurn)return;if(inspection==='overview')enterMini();else leaveMini();}
 function gazeTo(target:THREE.Vector3):boolean {
   camera.getWorldDirection(clockDirection);
   cursorToSecret.copy(target).sub(camera.position);
@@ -1976,6 +2067,7 @@ function onBridgeMessage(event:MessageEvent):void {
   const message=event.data;
   if(!message || message.channel!=='palimpsest-living' || message.action!=='navigate')return;
   if(typeof message.folio!=='number' || !isLivingIndex(message.folio))return;
+  if(physicalTurn){queuedBridgeFolio=message.folio;return;}
   goFolio(message.folio);
   if(!fallback.hidden)fallbackPage(message.folio);
 }
@@ -1984,7 +2076,7 @@ function resize():void {
   if(!renderer)return;
   const w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);
   camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);
-  if((bookPhase!=='open'||currentFolio===CODA_INDEX) && inspection==='overview')fitBookCamera(coverAnimation);
+  if(!physicalTurn && (bookPhase!=='open'||currentFolio===CODA_INDEX) && inspection==='overview')fitBookCamera(coverAnimation);
 }
 function wireButtons():void {
   prevButton.addEventListener('click',()=>nextFolio(-1));
@@ -2075,6 +2167,7 @@ function destroy():void {
   canvas.removeEventListener('pointermove',onPhysicalPointerMove,true);
   canvas.removeEventListener('pointerup',onPhysicalPointerUp,true);
   canvas.removeEventListener('pointercancel',onPhysicalPointerCancel,true);
+  canvas.removeEventListener('lostpointercapture',onPhysicalPointerCancel,true);
   discardOutgoingStage();
   clear();binding.dispose();controls?.dispose();renderer?.dispose();sharedMats.forEach(m=>m.dispose());fiber.dispose();paperShadow?.dispose();
 }
@@ -2107,6 +2200,7 @@ try{
   canvas.addEventListener('pointermove',onPhysicalPointerMove,{capture:true});
   canvas.addEventListener('pointerup',onPhysicalPointerUp,{capture:true});
   canvas.addEventListener('pointercancel',onPhysicalPointerCancel,{capture:true});
+  canvas.addEventListener('lostpointercapture',onPhysicalPointerCancel,{capture:true});
   canvas.addEventListener('pointerdown',onPaperPointerDown);
   canvas.addEventListener('pointerup',onPaperPointerUp);
   canvas.addEventListener('pointercancel',onPaperPointerCancel);
@@ -2124,7 +2218,7 @@ try{
   function step(now:number):void {
     const dt=lastTime?Math.min(0.06,(now-lastTime)/1000):0;
     lastTime=now;
-    updatePhysicalBinding(dt);animate(dt);advanceF09Run(dt);moveMini(dt);advanceFlight(dt);revealTick();controls?.update();renderer?.render(scene,camera);
+    updatePhysicalBinding(dt);animate(dt);advanceF09Run(dt);moveMini(dt);advanceFlight(dt);revealTick();if(!physicalTurn)controls?.update();renderer?.render(scene,camera);
     frame=requestAnimationFrame(step);
   }
   frame=requestAnimationFrame(step);
