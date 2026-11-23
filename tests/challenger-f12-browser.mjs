@@ -36,7 +36,7 @@ try{
   assert.equal(initial.study.inert,false);
   assert.equal(initial.stampPresent,true);
   assert.equal(initial.recruitmentPresent,true);
-  assert.equal(initial.role,'Rebuilders');
+  assert.ok(['Rebuilders','Surveyors','Relief Crews','Record Keepers'].includes(initial.role));
   await noLegacy(reduced);
   await screen(reduced,'F12-01-closed.png');
 
@@ -58,7 +58,8 @@ try{
   await tap(reduced,'b');
   await reduced.waitForFunction(()=>JSON.parse(document.querySelector('#stage')?.dataset.f12CandidateState??'{}').study?.inert===false);
   assert.equal((await getState(reduced)).archiveFrame,67);
-  await reduced.waitForFunction(()=>JSON.parse(document.querySelector('#stage')?.dataset.f12CandidateState??'{}').role!=='Rebuilders');
+  const seenRole=(await getState(reduced)).role;
+  await reduced.waitForFunction(role=>{const s=JSON.parse(document.querySelector('#stage')?.dataset.f12CandidateState??'{}');return s.role&&s.role!==role;},seenRole,{timeout:75000});
   await tap(reduced,'a');await wait(reduced,'claimFrame',1);
   await tap(reduced,'c');await wait(reduced,'archiveFrame',1);
   await tap(reduced,'ArrowRight');

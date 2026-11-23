@@ -470,12 +470,17 @@ function f12Art(world: BaseFolioWorld): MechanismArt {
     strip(vec(Math.cos(a)*0.027,0.008,Math.sin(a)*0.027),vec(Math.cos(a)*0.064,0.008,Math.sin(a)*0.064),0.009,0x65352e,sign);
   }
 
-  let cyclePosition=0, folioMotion=0, sealFlap=0;
+  let cyclePosition=0, folioMotion=0, sealFlap=0, previousRoleTick:number|undefined;
   const update:MechanismArt['update']=(state,dt,reduced)=>{
     const step=Math.max(0,Math.min(dt,1));
-    folioMotion+=step;
+    const now=performance.now();
+    const roleDelta=previousRoleTick===undefined||step===0||document.hidden?0:Math.min(.55,(now-previousRoleTick)/1000);
+    previousRoleTick=now;
+    // The reading dwell is clock time, not a frame count. This also keeps
+    // the role plates readable when the paper theatre is costly to render.
+    folioMotion+=roleDelta;
     const dwell=reduced?5.5:4.4;
-    cyclePosition=(cyclePosition+step/dwell)%roles.length;
+    cyclePosition=(cyclePosition+roleDelta/dwell)%roles.length;
     const idx=Math.floor(cyclePosition);
     const cyc=(cyclePosition-idx)*dwell;
     const turn=idx!==0||folioMotion>=dwell;
