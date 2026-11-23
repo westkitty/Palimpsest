@@ -1449,7 +1449,7 @@ function goFolio(index:number, deferCameraReset=false):void {
                 canvas.dataset.f02Detent=String(challenger.root.userData.detent);
                 canvas.dataset.f02Clip=String(challenger.root.userData.clip);
                 canvas.dataset.f02Arms=JSON.stringify(challenger.root.userData.armExtensions);
-                canvas.dataset.f02Depth=JSON.stringify({lift:challenger.root.userData.lift,wake:challenger.root.userData.wake,beat:challenger.root.userData.depthBeat});
+                canvas.dataset.f02Depth=JSON.stringify({lift:challenger.root.userData.lift,wake:challenger.root.userData.wake,beat:challenger.root.userData.depthBeat,shadowAt:challenger.root.userData.shadowAt,shadowStrength:challenger.root.userData.shadowStrength});
               }
             },
             dispose(){challenger.dispose();disposeSubtree(procedural.root);stage.clear();},
@@ -1686,7 +1686,7 @@ function goFolio(index:number, deferCameraReset=false):void {
           art.root.userData.sampleF12NativeClaims(splitDistance);
           const {cityGap,stationIndex,stationCount,stampPress,stampFaceMarked,archiveRecessVisible}=art.root.userData;
           canvas.dataset.f12CandidateState=JSON.stringify({claimFrame,archiveFrame,splitDistance,archiveAngle,horizonPieces,creaseFixed,
-            study:world.symbolicStudyState(),role:art.root.userData.role,stampPresent:art.root.visible&&stamp?.visible===true,
+            study:world.symbolicStudyState(),role:art.root.userData.role,paperFeed:art.root.userData.paperFeed,stampPresent:art.root.visible&&stamp?.visible===true,
             recruitmentPresent:stationCount===4,cityGap,stationIndex,stationCount,stampPress,stampFaceMarked,archiveRecessVisible});
         }
       },dispose(){staged.dispose();if(mounted)world.unmountLivingBlender();art.root.removeFromParent();art.dispose();}};

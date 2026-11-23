@@ -1,3 +1,4 @@
+import {paperFeedMotion} from './paperFeedMotion.ts';
 import * as THREE from 'three';
 import { getOpenPageY } from '../engine/BookAndDeskRig';
 import { createF11Challenger } from './challengerF11.ts';
@@ -525,8 +526,41 @@ function f12Art(world: BaseFolioWorld): MechanismArt {
   const facadeMark=mesh(new THREE.CircleGeometry(.105,18),paper(0x9e423c,.14),facade,vec(0,.52,.122));
   facadeMark.visible=false;facadeMark.name='living-f12-facade-stamp-impression';
 
+  // The existing endorsement arm acts on real bent slips running between
+  // two desk rails and a visible roller. The strained sheet retains its
+  // scored line and pressed seal as a small bounded tray of earlier slips.
+  const feedRig=new THREE.Group();feedRig.name='living-f12-coupled-paper-feed';feedRig.position.set(3.75,.365,.70);city.add(feedRig);
+  for(const side of [-1,1]){
+    const rail=box(.036,.080,.86,0x73635a,feedRig,side*.30,.05,.36);
+    rail.rotation.x=.15;
+    box(.022,.018,.82,0xb79871,feedRig,side*.28,.094,.36).rotation.x=.15;
+    strip(vec(side*.28,.085,.21),vec(side*.28,.31,-.45),.031,0x94796a,feedRig);
+  }
+  const roller=new THREE.Group();roller.position.set(0,.14,.63);feedRig.add(roller);
+  const rollerAxle=mesh(new THREE.CylinderGeometry(.045,.045,.56,12),paper(0x8f7260),roller);
+  rollerAxle.rotation.z=Math.PI/2;
+  for(let j=0;j<5;j++)box(.49,.013,.013,0xbca586,roller,0,.031*Math.cos(j*1.26),.031*Math.sin(j*1.26));
+  const movingSlip=new THREE.Group();movingSlip.name='F12 actual cutting, bending and marked recruitment slip';feedRig.add(movingSlip);
+  box(.40,.014,.48,0xe1c9a0,movingSlip);
+  for(let j=0;j<3;j++)box(.23-.042*j,.003,.009,0x918064,movingSlip,-.034,.009,.117-j*.068);
+  const scoredTip=new THREE.Group();scoredTip.position.z=-.23;movingSlip.add(scoredTip);
+  box(.399,.012,.18,0xd5ba8b,scoredTip,0,0,-.084);
+  box(.39,.003,.012,0x9f8362,scoredTip,0,.008,.009);
+  const slipSeal=mesh(new THREE.CircleGeometry(.074,14),paper(0x9e443f,.83),movingSlip,vec(.09,.010,-.109));
+  slipSeal.rotation.x=-Math.PI/2;
+  const tray=new THREE.Group();tray.position.set(-.62,.015,.24);feedRig.add(tray);
+  box(.48,.04,.61,0x705750,tray);
+  const residues=Array.from({length:4},(_,i)=>{
+    const p=new THREE.Group();p.position.set(-.018+i*.018,.031+i*.013,-.047+i*.022);p.rotation.y=-.15+i*.10;tray.add(p);
+    box(.34,.010,.42,i%2?0xc9ad83:0xdfc49b,p);
+    box(.33,.004,.013,0xa08361,p,0,.006,-.097);
+    const curl=box(.33,.011,.105,0xc6a984,p,0,.011,-.228);curl.rotation.x=.15;
+    const mark=mesh(new THREE.CircleGeometry(.058,12),paper(0x884540,.87),p,vec(.066,.008,-.054));mark.rotation.x=-Math.PI/2;
+    p.visible=false;return p;
+  });
   const stations=new THREE.Group();stations.name='living-f12-recruitment-stations';
   stations.position.set(-3.37,.35,-.40);city.add(stations);
+  const roleFigures:{body:THREE.Group;head:THREE.Group;arm:THREE.Group}[]=[];
   const roleStations=roles.map(([name],i)=>{
     const g=new THREE.Group();g.name='living-f12-lit-station-'+i;stations.add(g);
     const light=[0xe3a16d,0x86babd,0xe4b56d,0xc7a4c9][i];
@@ -535,11 +569,15 @@ function f12Art(world: BaseFolioWorld): MechanismArt {
     const screen=mesh(new THREE.PlaneGeometry(1.22,.72),paper(light,.43),g,vec(0,.53,-.309));
     screen.castShadow=false;screen.receiveShadow=false;
     // Anonymous silhouettes: role, not character likeness or a new historical claim.
-    const body=mesh(new THREE.CylinderGeometry(.118,.151,.34,7),paper(0x372d39),g,vec(-.29,.31,-.07));
+    const body=new THREE.Group();body.position.set(-.29,.17,-.07);g.add(body);
+    mesh(new THREE.CylinderGeometry(.118,.151,.34,7),paper(0x372d39),body,vec(0,.14,0));
     body.rotation.z=i===1?-.20:i===0?.17:0;
-    mesh(new THREE.SphereGeometry(.095,8,5),paper(0x382c39),g,vec(-.29,.575,-.065));
-    const b=vec(-.24,.43,.008),e=i===0?vec(.19,.65,.04):vec(.30,.35,.07);
-    strip(b,e,.085,0x372d39,g);
+    const head=new THREE.Group();head.position.set(0,.40,.005);body.add(head);
+    mesh(new THREE.SphereGeometry(.095,8,5),paper(0x382c39),head);
+    const sleeve=new THREE.Group();sleeve.position.set(.05,.26,.078);body.add(sleeve);
+    const e=i===0?vec(.43,.22,.032):vec(.54,-.08,.062);
+    strip(vec(0,0,0),e,.085,0x372d39,sleeve);
+    roleFigures.push({body,head,arm:sleeve});
     strip(vec(-.36,.20,-.05),vec(-.41,.086,-.04),.068,0x372d39,g);
     strip(vec(-.24,.20,-.05),vec(-.19,.086,-.04),.068,0x372d39,g);
     if(i===0){
@@ -588,7 +626,7 @@ function f12Art(world: BaseFolioWorld): MechanismArt {
     harm.position.x=cityCenters[1]+shift;
     root.userData.cityGap=harm.position.x-containment.position.x-2.42;
   };
-  let cyclePosition=0, folioMotion=0, sealFlap=0, previousRoleTick:number|undefined;
+  let cyclePosition=0, folioMotion=0, sealFlap=0, previousRoleTick:number|undefined, printed=0;
   const update:MechanismArt['update']=(state,dt,reduced)=>{
     const step=Math.max(0,Math.min(dt,1));
     const now=performance.now();
@@ -617,15 +655,34 @@ function f12Art(world: BaseFolioWorld): MechanismArt {
     hinge.rotation.x=-1.28*sealFlap;
     if(mountedEnvironment){
       for(const [i,g] of roleStations.entries())g.visible=i===idx;
-      const press=reduced?0:Math.sin(Math.PI*unit((cyc-.27)/.80))**2;
-      // Actual plate travels toward the facade and turns flush for contact.
+      const feed=paperFeedMotion(cyc,reduced);
+      const ord=Math.floor(folioMotion/dwell);
+      printed=Math.max(printed,Math.min(4,ord+Number(feed.stage==='residue'||reduced)));
+      for(const [i,residue] of residues.entries())residue.visible=i<printed;
+      roller.rotation.x=(feed.feed+.31*feed.eject)*-6.2;
+      movingSlip.position.set(-.58*feed.eject,.105+.30*feed.feed-.35*feed.eject,.61-1.08*feed.feed+.64*feed.eject);
+      movingSlip.rotation.x=.10+1.36*feed.feed-1.38*feed.eject;
+      movingSlip.rotation.z=.12*feed.eject;
+      scoredTip.rotation.x=.07-.36*feed.grip+.15*feed.eject;
+      slipSeal.visible=feed.marked;
+      movingSlip.visible=reduced||feed.eject<.999;
+      const figure=roleFigures[idx];
+      const idle=reduced?0:folioMotion*[1.87,1.34,1.58,2.36][idx];
+      const rest=[.17,-.20,0,0][idx];
+      figure.body.rotation.z=rest+(reduced?0:Math.sin(idle)*[.075,.034,.044,.027][idx]);
+      figure.head.rotation.x=reduced?0:[-.04,.14,.02,.18][idx]+.09*Math.sin(idle*.71+.6*idx);
+      figure.arm.rotation.z=reduced?0:Math.sin(idle+.6)*[.18,.08,.11,.14][idx];
+      root.userData.paperFeed={...feed,residues:printed,roller:roller.rotation.x,body:figure.body.rotation.z,
+        head:figure.head.rotation.x,arm:figure.arm.rotation.z};
+      // The same transmission closes the arm only after the slip seats.
+      const press=feed.press;
       arm.rotation.x=-1.16-.54*press;
       arm.position.set(stampPivot.x,stampPivot.y+.16+.28*press,stampPivot.z+.09-.004*press);
       stampHead.rotation.x=.25-.12*press;
-      grip.rotation.x=stampHead.rotation.x;
-      stampBacking.position.y=.037-.010*press;
+      grip.rotation.x=.45+.12*press;
+      stampBacking.position.y=.037-.005*press;
       sign.visible=false;
-      facadeMark.visible=reduced||cyc>1.05;
+      facadeMark.visible=feed.marked;
       root.userData.stationIndex=idx;
       root.userData.stationCount=roleStations.length;
       root.userData.stampPress=press;

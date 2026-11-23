@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {depthShadowPosition} from './paperFeedMotion.ts';
 import {F02_RETURN_CREASE} from './f02WitnessReturn.ts';
 
 const clamp=(x:number)=>THREE.MathUtils.clamp(x,0,1);
@@ -32,6 +33,8 @@ void main(){
 }`;
 const fragment=/*glsl*/`
 uniform float wake;
+uniform float slowShadow;
+uniform float shadowStrength;
 uniform float lift;
 uniform float creaseCollapse;
 uniform float clock;
@@ -60,6 +63,10 @@ void main(){
   float ink=smoothstep(.304,.75,billow+filament*.18);
   vec3 color=mix(outerInk,innerInk,smoothstep(.52,.98,filament*1.35+ink*.65));
   color*=.73+billow*.56;
+  // A broad occlusion travels through XYZ instead of over screen UV:
+  // vertically separated paper laminae enter and leave at different times.
+  float penumbra=1.-smoothstep(.18,1.38,abs(sceneP.x+.46*sceneP.z-.57*sceneP.y-slowShadow));
+  color*=1.-penumbra*shadowStrength;
   // Keep both actual source landmarks as foreground anchors, not silhouettes
   // covered up by an additive screen wash.
   float geode=smoothstep(.22,.87,length((sceneP.xz-vec2(2.27,.24))*vec2(1.,.83)));
@@ -75,6 +82,8 @@ attribute float order;
 attribute float heft;
 attribute vec3 ink;
 uniform float lift;
+uniform float slowShadow;
+uniform float shadowStrength;
 uniform float clock;
 uniform float creaseCollapse;
 uniform vec3 creasePoint;
@@ -87,11 +96,12 @@ void main(){
   p.y=.23+(p.y-.23)*local*lift;
   float wobble=sin(clock*.64+order*44.+heft*13.) *local*lift;
   p.x+=wobble*.065; p.z+=wobble*.039;
+  float penumbra=1.-smoothstep(.18,1.38,abs(p.x+.46*p.z-.57*p.y-slowShadow));
   p=creasePoint+(p-creasePoint)*mix(vec3(1.),vec3(.006,.014,.032),creaseCollapse);
   vec4 mv=modelViewMatrix*vec4(p,1.);
   gl_Position=projectionMatrix*mv;
   gl_PointSize=clamp(heft*230./max(1.,-mv.z),1.1,12.);
-  luminous=ink;
+  luminous=ink*(1.-penumbra*shadowStrength*.68);
   emergence=local*(.66+.34*sin(clock*1.7+order*21.))*(1.-smoothstep(.82,1.,creaseCollapse));
   grain=heft;
 }`;
@@ -134,6 +144,8 @@ const palettes=[
 export function makeF02DepthField(parent:THREE.Group){
   const root=new THREE.Group();root.name='F02 • ink becomes suspended deep field';root.visible=false;parent.add(root);
   const wake={value:0},lift={value:0},clock={value:0},creaseCollapse={value:0},creasePoint={value:new THREE.Vector3(...F02_RETURN_CREASE)};
+  const slowShadow={value:3.8},shadowStrength={value:0};
+  let shadowTime=0;
   const owned: {geometry:THREE.BufferGeometry;material:THREE.Material}[]=[];
   for(let strand=0;strand<12;strand++){
     const arm=strand%4, layer=Math.floor(strand/4);
@@ -157,7 +169,7 @@ export function makeF02DepthField(parent:THREE.Group){
     const material=new THREE.ShaderMaterial({
       vertexShader:vertex,fragmentShader:fragment,transparent:true,depthWrite:false,side:THREE.DoubleSide,
       toneMapped:false,
-      uniforms:{lift,wake,clock,creaseCollapse,creasePoint,strand:{value:strand},innerInk:{value:new THREE.Color(inside)},outerInk:{value:new THREE.Color(outside)}},
+      uniforms:{lift,wake,clock,creaseCollapse,creasePoint,slowShadow,shadowStrength,strand:{value:strand},innerInk:{value:new THREE.Color(inside)},outerInk:{value:new THREE.Color(outside)}},
     });
     material.forceSinglePass=true;
     const strip=new THREE.Mesh(geometry,material);
@@ -185,7 +197,7 @@ export function makeF02DepthField(parent:THREE.Group){
   geometry.setAttribute('ink',new THREE.Float32BufferAttribute(ink,3));
   const material=new THREE.ShaderMaterial({
     vertexShader:dustVert,fragmentShader:dustFrag,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false,
-    uniforms:{lift,clock,creaseCollapse,creasePoint},
+    uniforms:{lift,clock,creaseCollapse,creasePoint,slowShadow,shadowStrength},
   });
   const dust=new THREE.Points(geometry,material);dust.name='F02 • shear knots seeded off the actual folds';
   dust.renderOrder=7;dust.frustumCulled=false;root.add(dust);owned.push({geometry,material});
@@ -195,7 +207,12 @@ export function makeF02DepthField(parent:THREE.Group){
     root.visible=read.lift>.002;
     wake.value=read.wake;lift.value=read.lift;
     if(root.visible&&!reduce)clock.value+=Math.min(.065,Math.max(0,dt));
-    return read;
+    const pageHidden=typeof document!=='undefined'&&document.hidden;
+    const presented=root.visible&&!reduce&&!pageHidden&&creaseCollapse.value<.98;
+    if(presented)shadowTime+=Math.min(.065,Math.max(0,dt));
+    slowShadow.value=depthShadowPosition(shadowTime);
+    shadowStrength.value=presented? .37*read.lift*(1-creaseCollapse.value):0;
+    return {...read,shadowAt:slowShadow.value,shadowStrength:shadowStrength.value};
   },dispose(){
     root.removeFromParent();owned.forEach(({geometry,material})=>{geometry.dispose();material.dispose();});
   }};

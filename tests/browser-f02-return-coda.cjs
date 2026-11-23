@@ -1,5 +1,6 @@
 const assert=require('node:assert/strict');
 const path=require('node:path');
+const {writeFileSync}=require('node:fs');
 const {chromium}=require(process.env.PALIMPSEST_PLAYWRIGHT||'playwright');
 const base=(process.env.PALIMPSEST_PREVIEW_URL||'http://127.0.0.1:8841')+'/folio-vnext.html';
 const output=process.env.PALIMPSEST_PROOF_DIR;
@@ -15,19 +16,32 @@ const attr=async(p,k,v)=>p.waitForFunction(([key,expected])=>document.querySelec
       const p=await browser.newPage({viewport,hasTouch:label==='phone',reducedMotion:reduced?'reduce':'no-preference'});
       p.on('pageerror',e=>errors.push(e.message));
       p.on('console',m=>{if(m.type()==='error'&&/shader|webgl/i.test(m.text()))errors.push(m.text());});
-      await p.addInitScript(()=>{
-        window.proofTrace=[];
+      await p.addInitScript(({save,seed})=>{
+        if(seed&&location.search.includes('folio=2'))sessionStorage.setItem('palimpsest.folio.review.study-state.v1',JSON.stringify({version:1,folios:[null,{folio:1,f02:{reveal:3}}]}));
+        if(save){
+          // QA-only readback avoids compositor screenshot timeouts on software
+          // WebGL without changing the production animation or its scene.
+          const get=HTMLCanvasElement.prototype.getContext;
+          HTMLCanvasElement.prototype.getContext=function(kind,opts){return get.call(this,kind,kind.startsWith('webgl')?{...opts,preserveDrawingBuffer:true}:opts);};
+        }
+        window.proofTrace=[];window.proofCradle=null;
         function remember(){
           const stage=document.querySelector('#stage');
           if(stage?.dataset.f02Return){
             const q=JSON.parse(stage.dataset.f02Return);
             if(window.proofTrace.at(-1)?.at!==q.at)window.proofTrace.push(q);
+            if(save&&q.stage==='crease-hold'&&!window.proofCradle)window.proofCradle=stage.toDataURL('image/png');
           }
           requestAnimationFrame(remember);
         }
         requestAnimationFrame(remember);
-      });
-      const shot=async n=>{if(output)await p.screenshot({path:path.join(output,label+'-'+n+'.png')});};
+      },{save:Boolean(output),seed:process.env.PALIMPSEST_PROOF_SEED==='1'});
+      const shot=async n=>{
+        if(!output)return;
+        const raw=await p.evaluate(n=>n==='02-crease-hold'&&window.proofCradle?window.proofCradle:document.querySelector('#stage').toDataURL('image/png'),n);
+        assert.ok(raw.startsWith('data:image/png;base64,'));
+        writeFileSync(path.join(output,label+'-'+n+'.png'),Buffer.from(raw.split(',')[1],'base64'));
+      };
       await p.goto(base+'?folio=2',{waitUntil:'domcontentloaded'});
       await attr(p,'data-f02-challenger','ready');
       await key(p,'a');await key(p,'b');await key(p,'c');
