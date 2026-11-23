@@ -16,7 +16,7 @@ const embedGltf={
     plugin.onLoad({filter:/\.js$/},async args=>{
       if(!args.path.startsWith(path.join(dist,'assets')+path.sep))return;
       const source=await readFile(args.path,'utf8');
-      const urls=/new URL\(`([a-zA-Z0-9_.-]+\.glb(?:\.gz)?)`,import\.meta\.url\)\.href/g;
+      const urls=/new URL\(`([a-zA-Z0-9_.-]+\.glb(?:[-A-Za-z0-9_]*\.gz)?)`,import\.meta\.url\)\.href/g;
       let result=source;
       for(const match of source.matchAll(urls)){
         const data=await readFile(path.join(path.dirname(args.path),match[1]));
