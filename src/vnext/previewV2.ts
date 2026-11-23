@@ -1,3 +1,4 @@
+import { makeF04CandidateStage } from './proof/f04CandidateStage';
 import { makeF05CandidateStage } from './proof/f05CandidateStage';
 import { cssStock, folioStock, isDarkStock } from './livingPaperStock.ts';
 import * as THREE from 'three';
@@ -316,6 +317,7 @@ function loadLaterStudy() {
   catch { return restoreLaterStudy(null); }
 }
 let laterStates = loadLaterStudy();
+let f04ExpansionFrame:number|null=null;
 let laterWorld: ReturnType<typeof createLaterFolio> | null = null;
 let livingStagecraft: LivingStagecraft | null = null;
 type RevisionLayer<S>={root:THREE.Group;update(state:S,dt:number,reduced:boolean):void;dispose?():void};
@@ -396,7 +398,7 @@ function onPaperPointerUp(e:PointerEvent):void {
     }
     return;
   }
-  if(currentFolio===4&&canvas.dataset.blenderFolio==='05'){
+  if((currentFolio===3&&canvas.dataset.blenderFolio==='04')||(currentFolio===4&&canvas.dataset.blenderFolio==='05')){
     const slots:THREE.Mesh[]=laterRevision?.root.userData.interactables??[];
     for(const hit of mechanismRaycaster.intersectObjects(slots,false)){
       const slot=hit.object.userData.slot;
@@ -1180,7 +1182,7 @@ function goFolio(index:number, deferCameraReset=false):void {
   if(!playableIndex(index))return;
   clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
   canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
-  delete canvas.dataset.revisionPhase;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;
+  delete canvas.dataset.revisionPhase;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;
   delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;
   if(index===CODA_INDEX){
     if(renderer)buildCoda();
@@ -1272,6 +1274,28 @@ function goFolio(index:number, deferCameraReset=false):void {
     laterRevision=art;
     laterWorld.root.add(art.root);
     art.update(laterStates[laterIndex-FIRST_LATER_FOLIO],0,reducedMotion);
+    if(index===3){
+      const folioRig=rig;
+      const legacy=[...folioRig.children];
+      const staged=makeF04CandidateStage(f04ExpansionFrame,frame=>{
+        if(rig===folioRig)f04ExpansionFrame=frame;
+      },()=>{
+        if(rig!==folioRig||currentFolio!==3)return;
+        staged.update(laterStates[0],0,reducedMotion);
+        for(const node of legacy)node.visible=false;
+        canvas.dataset.blenderFolio='04';
+      },()=>{if(rig===folioRig)canvas.dataset.blenderFolio='unavailable';});
+      staged.root.userData.interactables=staged.controls;
+      folioRig.add(staged.root);
+      const priorOwner=laterRevision;
+      laterRevision={root:staged.root,update:(actual,dt,reduce)=>{
+        if(staged.root.userData.assetState==='ready'){
+          staged.update(actual,dt,reduce);
+          const {colonyFrame,expansionFrame,foldFrame,litPlanets,litEchoes,expansion}=staged.root.userData;
+          canvas.dataset.f04CandidateState=JSON.stringify({colonyFrame,expansionFrame,foldFrame,litPlanets,litEchoes,expansion});
+        }else art.update(actual,dt,reduce);
+      },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
+    }
     if(index===4){
       const folioRig=rig;
       const legacy=[...folioRig.children];
@@ -1328,8 +1352,10 @@ function animate(dt:number):void {
   if(currentFolio<FIRST_LATER_FOLIO)animateEarlyPaperTabs(dt);
   if(currentFolio>=FIRST_LATER_FOLIO){
     activeTime+=dt;
-    laterWorld?.update(dt,activeTime,reducedMotion);
-    livingStagecraft?.update(dt,reducedMotion);
+    if(currentFolio!==3||canvas.dataset.blenderFolio!=='04'){
+      laterWorld?.update(dt,activeTime,reducedMotion);
+      livingStagecraft?.update(dt,reducedMotion);
+    }
     laterRevision?.update(laterStates[currentFolio-FIRST_LATER_FOLIO],dt,reducedMotion);
     if(currentFolio===10&&laterRevision)canvas.dataset.revisionPhase=String(laterRevision.root.userData.phase);
     return;
@@ -1401,7 +1427,7 @@ function handleAction(slot:Slot):void {
 function resetStudy():void{
   if(inspection!=='overview')leaveMini();
   studyStates=restoreFolioStudy(null);
-  laterStates=restoreLaterStudy(null);
+  laterStates=restoreLaterStudy(null);f04ExpansionFrame=null;
   try{sessionStorage.removeItem(STUDY_STORAGE_KEY);sessionStorage.removeItem(LATER_STUDY_STORAGE_KEY);}catch{}
   const current=currentFolio;
   goFolio(current);
