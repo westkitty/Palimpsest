@@ -1,4 +1,6 @@
 import { makeF07CandidateStage } from './proof/f07CandidateStage';
+import { F08FolioWorld } from '../engine/folios/FoliosWar2';
+import { makeF08CandidateStage } from './proof/f08CandidateStage.ts';
 import { makeF04CandidateStage } from './proof/f04CandidateStage';
 import { makeF05CandidateStage } from './proof/f05CandidateStage';
 import { cssStock, folioStock, isDarkStock } from './livingPaperStock.ts';
@@ -16,7 +18,7 @@ import { createRevisionEarlyArt, REVISION_VAULT_TEMPLATES } from './revisionEarl
 import { createF01Challenger } from './challengerF01.ts';
 import { createF02Challenger } from './challengerF02.ts';
 import { createRevisionWar1Art } from './revisionWar1Art.ts';
-import { createRevisionWar2Art } from './revisionWar2Art.ts';
+import { createRevisionWar2Art, mountF08FunctionalTheatre } from './revisionWar2Art.ts';
 import { createRevisionAftermathArt } from './revisionAftermathArt.ts';
 import type { FolioRuntimeState } from '../types/atlas';
 import { makeF03CandidateStage } from './proof/f03CandidateStage';
@@ -415,7 +417,18 @@ function onPaperPointerUp(e:PointerEvent):void {
     return;
   }
   if(!laterWorld)return;
-  const targets=laterWorld.getInteractables();
+  if(currentFolio===7&&canvas.dataset.blenderFolio==='08'){
+    const targets:THREE.Object3D[]=laterRevision?.root.userData.interactables??[];
+    for(const hit of mechanismRaycaster.intersectObjects(targets,true)){
+      let n:THREE.Object3D|null=hit.object;
+      while(n&&n!==laterRevision?.root){
+        const slot=n.userData.slot;
+        if(slot==='A'||slot==='B'||slot==='C'){handleAction(slot);return;}
+        n=n.parent;
+      }
+    }
+  }
+  const targets=laterWorld.getInteractables().filter(n=>canvas.dataset.blenderFolio!=='08'||!n.userData.f08Understudy);
   const hits=mechanismRaycaster.intersectObjects(targets,true);
   for(const hit of hits){
     let obj:THREE.Object3D|null=hit.object;
@@ -1192,7 +1205,7 @@ function goFolio(index:number, deferCameraReset=false):void {
   if(!playableIndex(index))return;
   clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
   canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
-  delete canvas.dataset.revisionPhase;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;delete canvas.dataset.f11AuthoredFrame;delete canvas.dataset.f07CandidateState;
+  delete canvas.dataset.revisionPhase;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;delete canvas.dataset.f11AuthoredFrame;delete canvas.dataset.f07CandidateState;delete canvas.dataset.f08CandidateState;
   delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;
   delete canvas.dataset.f02Challenger;delete canvas.dataset.f02Frame;delete canvas.dataset.f02Detent;delete canvas.dataset.f02Clip;
   if(index===CODA_INDEX){
@@ -1386,6 +1399,25 @@ function goFolio(index:number, deferCameraReset=false):void {
           });
         }
       },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
+    }
+    if(index===7&&laterWorld instanceof F08FolioWorld){
+      const stageOwner=rig, world=laterWorld, scenic=livingStagecraft;
+      const staged=makeF08CandidateStage(()=>{
+        if(rig!==stageOwner||currentFolio!==7)return;
+        mountF08FunctionalTheatre(art.root);
+        world.mountBlenderTheatre();
+        scenic.root.visible=false;
+        staged.update(laterStates[4],0,reducedMotion);
+        canvas.dataset.blenderFolio='08';
+      },()=>{if(rig===stageOwner)canvas.dataset.blenderFolio='unavailable';});
+      stageOwner.add(staged.root);
+      laterRevision={root:staged.root,update(actual,dt,reduce){
+        art.update(actual,dt,reduce);staged.update(actual,dt,reduce);
+        if(rig===stageOwner&&staged.root.userData.assetState==='ready'){
+          const {authoredFrames,rings}=staged.root.userData;
+          canvas.dataset.f08CandidateState=JSON.stringify({authoredFrames,rings,plasma:art.root.userData.portalPower});
+        }
+      },dispose(){staged.dispose();art.dispose();}};
     }
   }
   ambientLight.intensity=index===2?0.46:0.78;

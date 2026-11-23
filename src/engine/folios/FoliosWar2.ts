@@ -190,8 +190,30 @@ export class F08FolioWorld extends BaseFolioWorld {
   private stripExpand = 0.2;
   private stripScaleTarget = 0.2;
 
+  private blenderUnderstudy: THREE.Object3D[] = [];
+  private gateWitnesses: THREE.Object3D[] = [];
+
+  /** The Living Book swaps only the legacy paper dioramas; Archive still uses these authored scenes. */
+  public mountBlenderTheatre(): void {
+    this.blenderUnderstudy.forEach(n=>{
+      n.visible=false;
+      n.traverse(obj=>obj.userData.f08Understudy=true);
+    });
+    // Keep the real controls reachable, but off the Blender plate's printed legend.
+    for(const [i,lever] of this.levers.entries()){
+      const x=(i-1)*2.30;
+      lever.tabGroup.position.set(x,this.pageY(x)+.024,2.58);
+    }
+    const [tiger,codec]=this.gateWitnesses;
+    tiger.position.set(-2.96,this.pageY(-2.96)+.037,.87);
+    tiger.scale.multiplyScalar(.81);
+    codec.position.set(-.26,this.pageY(-.26)+.037,.79);
+    codec.scale.multiplyScalar(.91);
+  }
+
   public build(state: FolioRuntimeState): void {
     this.buildApertureAndLevers(state);
+    const sharedControls=new Set(this.root.children);
 
     // Aureal Gate celestial portal backdrop arch
     const arch = this.buildIllustratedBackdropArch(4.55, 1.44, {
@@ -335,6 +357,8 @@ export class F08FolioWorld extends BaseFolioWorld {
     lbl.position.set(0.2, this.pageY(0.2) + 0.055, -1.24);
     this.root.add(lbl);
 
+    this.gateWitnesses=[shardGod,codec];
+    this.blenderUnderstudy=this.root.children.filter(n=>!sharedControls.has(n)&&!this.gateWitnesses.includes(n));
     this.syncState(state);
   }
 

@@ -118,6 +118,19 @@ function relief(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
   };
 }
 
+/** Re-seat the unchanged functional portal and Marcel inside the Blender paper theatre. */
+export function mountF08FunctionalTheatre(root:THREE.Group):void{
+  const gate=root.getObjectByName('F08 · circular Hookshot portal');
+  const collar=root.getObjectByName('F08 · Hookshot registration collar');
+  const marcel=root.getObjectByName('F08 · Marcel');
+  const shoes=root.getObjectByName('F08 · Marcel paper foot anchors');
+  if(!gate||!collar||!marcel||!shoes)throw new Error('F08 functional portal assembly is incomplete');
+  gate.position.set(-1.66,.965,-.287);gate.scale.setScalar(1.14);
+  // Shoulder-height aperture fits the original left theatrical cut; collar still leads into it.
+  collar.position.set(-.47,.285,-.27);collar.rotation.y=.31;
+  for(const n of [marcel,shoes])n.position.z=1.46;
+}
+
 function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
   const ink = paper(0x1b2432,bump), brass = paper(0xbe985c,bump,.50,.21);
   const innerPaper = paper(0x37647a,bump), pearl = paper(0x8bd4d4,bump,.68);
@@ -192,9 +205,9 @@ function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
   actor.name='F08 · Marcel';actor.position.set(1.59,pageY(1.59)+.025,.38);
   root.add(actor);
   if(!bump) actor.userData.revisionOwnedBump=bumpSource;
-  for(const dz of [-.075,.075]){
-    slab(root,.40,.018,.06,ink,1.59,pageY(1.59)+.012,.38+dz);
-  }
+  const shoes=new THREE.Group();shoes.name='F08 · Marcel paper foot anchors';
+  shoes.position.set(1.59,pageY(1.59)+.012,.38);root.add(shoes);
+  for(const dz of [-.075,.075])slab(shoes,.40,.018,.06,ink,0,0,dz);
   let t=0,p=0,initialized=false;
   return (state,dt,reduced) => {
     const on = state.interactions.A.active;
@@ -202,12 +215,13 @@ function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
     else p=toward(p,Number(on),dt,on?2.8:7);
     initialized=true;
     t+=reduced?0:dt;
-    const power=ease(.45,.87,p);
+    const power=on?ease(.45,.87,p):0;
+    root.userData.portalPower=power;
     plasma.visible=power>.008;
     plasmaMaterial.uniforms.uEnergy.value=power*.92;
     plasmaMaterial.uniforms.uTime.value=reduced?0:t;
     clip.rotation.z=-.24+p*.27;
-    leads.forEach((light,i)=>{light.visible=p>.055+i*.058;});
+    leads.forEach((light,i)=>{light.visible=on&&p>.055+i*.058;});
     actor.rotation.y=-.52-p*.22+(reduced?0:Math.sin(t*.8)*.035);
     actor.rotation.z=-p*.055+(reduced?0:Math.sin(t*.9)*.026);
     actor.position.y=pageY(1.59)+.025; // weight shift, not levitation
