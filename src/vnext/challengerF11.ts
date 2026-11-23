@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import assetUrl from './assets/palimpsest-f11-challenger.glb.gz?url';
 import motion from './assets/palimpsest-f11-motion.json';
+import { createF11WaterWick } from './f11WaterWick.ts';
 import { createF11PaperWildlife, F11_MOTH_FROND } from './f11PaperWildlife.ts';
 import { createF11StoryPaper, f11Ease, f11WitnessClip, F11_GUTTER_PLANT } from './f11StoryPaper.ts';
 
@@ -43,6 +44,7 @@ export function createF11Challenger(pageY:(x:number)=>number){
   const root=new THREE.Group();root.name='F11 dimensional Blender challenger';
   root.userData.assetState='loading';
   const paper=createF11StoryPaper(pageY);paper.root.visible=false;root.add(paper.root);
+  const water=createF11WaterWick(paper.root,pageY);
   let disposed=false,scene:THREE.Group|null=null,mixer:THREE.AnimationMixer|null=null;
   let actions:THREE.AnimationAction[]=[];
   const idles: Array<{node:THREE.Object3D;motion:typeof motion.idles[keyof typeof motion.idles]}>=[];
@@ -115,7 +117,7 @@ export function createF11Challenger(pageY:(x:number)=>number){
       frame<112?'held-opening':frame<129?'tiger-late':'codec-withdraws';
     root.userData.story={beat:storyBeat,...Object.fromEntries(Object.entries(beats).map(([k,v])=>[k,Math.round(v*100)/100])),
       codecIdle:Math.round((1-beats.withdraw)*100)/100,tiger:anchors[2].visible,
-      wildlife:wildlife?.update(frame,reduced),
+      wildlife:wildlife?.update(frame,reduced),wetStock:water.update(frame),
       codecHeadPitch:Math.round(180/Math.PI*(codecHead?.rotation.x??0)),
       rootedCanopy:trees.filter(t=>t.holder.visible).length,
       witness:trees[F11_GUTTER_PLANT].holder.visible?{
@@ -226,7 +228,7 @@ export function createF11Challenger(pageY:(x:number)=>number){
     dispose(){
       disposed=true;mixer?.stopAllAction();
       if(scene){mixer?.uncacheRoot(scene);destroy(scene);}
-      scene=null;actions=[];wildlife?.dispose();paper.dispose();root.removeFromParent();
+      scene=null;actions=[];wildlife?.dispose();water.dispose();paper.dispose();root.removeFromParent();
     },
   };
 }
