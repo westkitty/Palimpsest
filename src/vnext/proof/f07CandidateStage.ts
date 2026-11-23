@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { FolioRuntimeState } from '../../types/atlas';
+import { createF07Environment } from './f07Environment';
 import { authoredSlotMixer, createPortedPaperAsset, paperKey } from './portedPaperAsset';
 
 const slots=['A','B','C'] as const;
@@ -47,6 +48,7 @@ export function makeF07CandidateStage(phase:(value:'loading'|'ready'|'fallback')
         const slot=clip.name[0] as Slot;
         return slots.includes(slot)&&clip.name.startsWith(slot+'__')?slot:undefined;
       },fps);
+      const field=createF07Environment(scene);
       const frames:Record<Slot,number>={A:1,B:1,C:1};
       let initialized=false;
       const angle=(object:THREE.Object3D,axis:'x'|'y')=>2*Math.atan2(object.quaternion[axis],object.quaternion.w);
@@ -58,13 +60,15 @@ export function makeF07CandidateStage(phase:(value:'loading'|'ready'|'fallback')
             frames[slot]=!initialized||reduced?to:frames[slot]+Math.sign(to-frames[slot])*Math.min(Math.abs(to-frames[slot]),step);
           }
           initialized=true;player.sample(slots.map(slot=>[slot,frames[slot]]));
+          const planAngle=angle(hinge,'x'),outcomeLift=(outcome.position.y-.105)*scale;
+          const environment=field.update(planAngle,outcomeLift);
           Object.assign(audit,{
-            planAngle:angle(hinge,'x'),outcomeLift:(outcome.position.y-.105)*scale,
+            planAngle,outcomeLift,fieldOpen:environment.open,rubyShadow:environment.shadow,costReading:environment.cost,
             armAngle:angle(arm,'y'),gearAngle:angle(gear,'y'),
             frameA:frames.A,frameB:frames.B,frameC:frames.C,
           });
         },
-        dispose:()=>player.dispose(),
+        dispose:()=>{player.dispose();field.dispose();},
       };
     },
     phase,

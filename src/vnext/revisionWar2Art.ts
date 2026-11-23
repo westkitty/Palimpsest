@@ -102,13 +102,28 @@ function relief(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
     coat.scale.z=.72;
     if(i===0) slab(body,.10,.022,.007,cream,0,.205,.049); // uniform trim, not an invented insignia
     mesh(body,new THREE.IcosahedronGeometry(.048,0),parcel,0,.278);
-    slab(body,.11,.035,.055,i===0?slate:cloth,-sign*.065,.202,.017).rotation.z=sign*.27;
-    slab(body,.082,.062,.070,parcel,-sign*.11,.192,.021).rotation.z=-sign*.12;
+    slab(body,.11,.035,.055,i===0?slate:cloth,sign*.063,.196,.013).rotation.z=-sign*.31;
     return body;
   });
-  let t=0, hinge=.50;
+  // Only the two anonymous existing paper workers. A separate ply of stock
+  // visibly moves from hand to hand rather than pulsing a supply icon.
+  const handoff=slab(reliefBase,.136,.084,.113,parcel);
+  handoff.name='F07 · actual paper parcel crossing between the hands';
+  slab(handoff,.142,.011,.023,cream,0,.041,0);
+  const hands=[-1,1].map((sign,i)=>{
+    const reach=slab(reliefBase,1,.047,.066,i===0?slate:cloth);
+    const hand=slab(reliefBase,.073,.061,.065,parcel);
+    hand.name='F07 · paper hinge at wrist';
+    return {shoulder:new THREE.Vector3(sign*.345,.254,.108),reach,hand};
+  });
+  const edgeStock=paper(0x9c6648,bump);
+  const apron=slab(reliefBase,1.00,.008,.10,edgeStock,0,.041,.245);
+  apron.name='F07 · stock catches the ruby cast shadow';
+  const xAxis=new THREE.Vector3(1,0,0);
+  let t=0, hinge=.50, onceComplete=false;
   return (state, dt, reduced) => {
-    t+=reduced?0:dt;
+    t+=reduced?0:Math.min(.09,Math.max(0,dt));
+    const ruby=Number(root.userData.f07RubyShadow??0);
     const target = state.interactions.C.active ? 1 : .50;
     hinge = reduced ? target : toward(hinge, target, dt);
     bench.rotation.x = .58 * (1-hinge);
@@ -116,6 +131,31 @@ function relief(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
       figure.rotation.y=(i===0?.35:-.35)+(reduced?0:Math.sin(t*.9+i*1.5)*.045);
       figure.rotation.z=(i===0?-.09:.09)+(reduced?0:Math.sin(t*1.12+i*.8)*.023);
     });
+    const phase=reduced?2.95:t%6.4;
+    const pass=ease(1.35,4.35,phase);
+    const up=ease(.15,1.35,phase)*(1-ease(4.5,5.64,phase));
+    const x=THREE.MathUtils.lerp(-.255,.255,pass);
+    const y=.10+.186*up,z=.175+.035*up;
+    handoff.position.set(x,y,z);
+    handoff.rotation.z=(pass-.5)*.11;
+    // Set down inside the bench's parcel rack. None of the transfer is
+    // blocked by the vellum or gated by A/B; the routine continues after A.
+    handoff.visible=reduced||phase>.18&&phase<5.54;
+    const driveLeft=1-ease(.49,.70,pass),driveRight=ease(.27,.48,pass);
+    hands.forEach(({shoulder,reach,hand},i)=>{
+      const strength=(i===0?driveLeft:driveRight)*(.30+.70*up);
+      const wrist=new THREE.Vector3((i===0?-.25:.25),.207,.143);
+      const target=new THREE.Vector3(x+(i===0?-.054:.054),y,z);
+      wrist.lerp(target,strength);
+      const d=wrist.clone().sub(shoulder);reach.position.copy(shoulder).addScaledVector(d,.50);
+      reach.scale.x=d.length();reach.quaternion.setFromUnitVectors(xAxis,d.normalize());
+      hand.position.copy(wrist);
+    });
+    edgeStock.color.setHex(0x9c6648).lerp(new THREE.Color(0xea8d51),ruby*.67);
+    parcel.emissive.setHex(0x6e2715);parcel.emissiveIntensity=.09+ruby*.34;
+    if(pass>.96)onceComplete=true;
+    reliefBase.userData.transfer=pass;reliefBase.userData.parcelX=x;reliefBase.userData.workClock=t;
+    reliefBase.userData.passed=onceComplete;
   };
 }
 

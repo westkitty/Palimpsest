@@ -1407,7 +1407,8 @@ function goFolio(index:number, deferCameraReset=false):void {
         // vignette beneath supplies is not duplicated by the Blender GLB.
         folioRig.add(art.root);
         const relief=art.root.getObjectByName('F07 · illustrated Administration relief supplies');
-        relief?.position.set(-3.77,.19,1.02);
+        relief?.position.set(-3.66,.19,1.055);
+        relief?.scale.setScalar(1.23);
         staged.update(laterStates[3],0,reducedMotion);
         for(const node of legacy)node.visible=false;
         canvas.dataset.blenderFolio='07';
@@ -1416,14 +1417,18 @@ function goFolio(index:number, deferCameraReset=false):void {
       folioRig.add(staged.root);
       const priorOwner=laterRevision;
       laterRevision={root:staged.root,update:(actual,dt,reduce)=>{
-        art.update(actual,dt,reduce);
         if(staged.root.userData.assetState==='ready'){
           staged.update(actual,dt,reduce);
+          art.root.userData.f07RubyShadow=staged.audit.rubyShadow;
+          art.update(actual,dt,reduce);
+          const relief=art.root.getObjectByName('F07 · illustrated Administration relief supplies');
           canvas.dataset.f07CandidateState=JSON.stringify({...staged.audit,
             reliefActors:Number(Boolean(art.root.getObjectByName('F07 · anonymous relief worker')))+
               Number(Boolean(art.root.getObjectByName('F07 · anonymous recipient'))),
+            reliefParcelX:relief?.userData.parcelX,reliefWorkClock:relief?.userData.workClock,
+            reliefPassed:relief?.userData.passed,
           });
-        }
+        }else art.update(actual,dt,reduce);
       },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
     }
     if(index===7&&laterWorld instanceof F08FolioWorld){
@@ -1700,6 +1705,12 @@ function fitBookCamera(openProgress:number):void {
   }else if(currentFolio===4&&openProgress>.99){
     camera.position.set(.55*scale,6.9*scale,9.25*scale);
     controls?.target.set(0,.38,.10);
+  }else if(currentFolio===6&&openProgress>.99&&aspect<.85){
+    // Tighter, steeper whole-spread framing keeps the painted field and
+    // the small foreground relief readable together on a portrait phone.
+    const readingScale=Math.max(1,1.17/aspect);
+    camera.position.set(.20*readingScale,7.2*readingScale,9.4*readingScale);
+    controls?.target.set(-.06,.34,.06);
   }else{
     const angleF01=currentFolio===0?THREE.MathUtils.clamp(openProgress,0,1):0;
     camera.position.set(0.58*angleF01*scale,(6.5+1.30*angleF01)*scale,(9.9-0.75*angleF01)*scale);
