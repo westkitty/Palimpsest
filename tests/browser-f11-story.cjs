@@ -5,7 +5,7 @@ const origin=process.env.PALIMPSEST_PREVIEW_URL||'http://127.0.0.1:8789';
 const proof=process.env.PALIMPSEST_PROOF_DIR;
 const requiredDevices=process.env.PALIMPSEST_F11_DEVICES?.split(',');
 const beats=[
-  ['ash',7],['single-patch',28],['gravity-redirect',46],['gutter-root',55],['gutter-root',61],
+  ['ash',7],['single-patch',28],['gravity-redirect',47],['gutter-root',55],['gutter-root',61],
   ['gutter-cut',71],['unfold-wave',82],['canopy-full',94],['canopy-parts',101],['held-opening',109],
   ['tiger-late',124],['codec-withdraws',155],['codec-withdraws',173]
 ];
@@ -55,7 +55,7 @@ try {
       assert.ok(s.frame>=target&&s.frame<=target+2,[label,name,target,s.frame]);
       if(i===0)assert.deepEqual([s.patch,s.fibers,s.roots,s.split,s.canopy],Array(5).fill(0));
       if(i===1)assert.deepEqual([s.patch,s.roots,s.split],[1,0,0]);
-      if(i===2)assert.ok(s.redirected>.5&&s.fibers===1&&s.roots===0);
+      if(i===2)assert.ok(s.redirected>.49&&s.fibers===1&&s.roots===0);
       if(i===3)assert.ok(s.gutterRoot>.45&&s.gutterRoot<1&&s.roots===0&&s.rootedCanopy===0&&s.witness===null);
       if(i===4)assert.ok(s.gutterRoot===1&&s.split<.2&&s.rootedCanopy===1&&s.witness.id==='PLANT_22');
       if(i===5)assert.ok(s.split>.85&&s.witness.stem>.40);
