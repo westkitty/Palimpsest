@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import {test} from 'node:test';
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {bindF01Mechanisms} from '../src/vnext/challengerF01.ts';
+
+const bytes=fs.readFileSync(new URL('../src/vnext/assets/palimpsest-f01-challenger.glb',import.meta.url));
+test('Three canon-bounded teaching mounts receive different actions from fixed A stations',async()=>{
+  assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),'711d0b7733605dee1ac916d602e15783d0f7b74a0efad15bfc9a9aa4ce7387fe');
+  const {scene,animations}=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
+  const motion=bindF01Mechanisms(scene,animations);
+  const get=n=>{const x=scene.getObjectByName(n);assert.ok(x,n);return x;};
+  const mounts=['F01 neutral mount and footing','F01 typographic register','F01 recurrence press'].map(get);
+  const pressNotes=Array.from({length:4},(_,i)=>get('F01 recurrence sheet '+i));
+  const slugs=Array.from({length:6},(_,i)=>get('F01 letterpress slug '+(i+1)));
+  let result=motion.update(0,0,false).stage.consequences;
+  const restSlug=slugs.map(x=>x.position.clone());
+  const restMounts=mounts.map(x=>x.position.clone());
+  assert.equal(result.impressionCount,1);
+  const step=(target,t)=>{for(let i=0;i<t;i++)result=motion.update(target,.05,false).stage.consequences;};
+  step(1,21);
+  assert.deepEqual(result,{mountOpening:1,lineRegistered:0,recurrenceSpread:0,impressionCount:1});
+  assert.ok(get('F01 registered mounting rib 2').rotation.x<.01);
+  step(1,21);
+  assert.deepEqual(result,{mountOpening:1,lineRegistered:1,recurrenceSpread:0,impressionCount:1});
+  assert.equal(new Set(slugs.map(x=>x.position.z)).size,1);
+  assert.ok(slugs.every((x,i)=>x.position.distanceTo(restSlug[i])>.14));
+  step(1,43);
+  assert.deepEqual(result,{mountOpening:1,lineRegistered:1,recurrenceSpread:1,impressionCount:4});
+  assert.ok(pressNotes[3].position.x>1.18);
+  assert.ok(mounts.every((x,i)=>x.position.equals(restMounts[i])));
+  const done=motion.update(7,0,true).stage.consequences;
+  assert.deepEqual(done,result,'B and C remain document mechanisms');
+  const reset=motion.update(6,0,true).stage.consequences;
+  assert.deepEqual(reset,{mountOpening:0,lineRegistered:0,recurrenceSpread:0,impressionCount:1});
+  motion.dispose();
+});

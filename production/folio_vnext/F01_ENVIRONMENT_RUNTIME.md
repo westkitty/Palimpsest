@@ -8,3 +8,5 @@ The public Living Book preserves the reviewed Blender GLB byte for byte. Its ori
 - Two narrow physical links align the existing arches into one continuous profile only after NiAlBu has finished rising. B and C retain the independent authored detail and comparison clips; neither drives the environmental staging.
 
 Proof commands: `node --import tsx --test tests/challenger-f01.test.mjs tests/f01-environment.test.mjs`; `npm run lint`; `npm run build`. The focused Chromium harness is `tests/browser-f01-environment.cjs`.
+
+The three stations also open a tactile comparison in the field between the actors and their printed names. Tiger's fixture only exposes how the figure is mounted; it does not assign him a domain. Wordstreamer's loose, non-linguistic letterpress stock locks into a single line. NiAlBu's source impression opens into four matched pieces of paper, its first sheet retained beside the repeat. Each consequence travels on its own scored track and is driven by its own A station; the apparatus is an editorial model, not a claim that the figures stood together or performed these acts. No lights, stars, magical glyphs, or new visible text.

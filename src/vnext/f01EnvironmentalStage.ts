@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bindF01PaperConsequences } from './f01PaperConsequences.ts';
 
 export const F01_STATIONS = ['Tiger','Wordstreamer','NiAlBu'] as const;
 const edges=[-3.98,-1.335,1.335,3.98] as const;
@@ -53,6 +54,7 @@ export function bindF01EnvironmentalStage(model:THREE.Group){
   const archBase=arches.map(x=>x!.quaternion.clone());
   const layer=new THREE.Group();layer.name='F01 connected three-panel depth stage';
   stageParent.add(layer);
+  const consequences=bindF01PaperConsequences(layer);
   const black=card(0x171a21),edge=card(0x353013);
   const gapMat=card(0x20252f),score=card(0x534935);
   const fold=new THREE.Quaternion(),ax=new THREE.Vector3(1,0,0),az=new THREE.Vector3(0,0,1);
@@ -129,7 +131,8 @@ export function bindF01EnvironmentalStage(model:THREE.Group){
       pivot.rotation.y=(i===0?1:-1)*(1-join)*1.18;
     });
     return {stations,archJoin:join,depths:y.map(n=>Number(n.toFixed(3))),
-      territories:raised.map(n=>Number((.16+.61*n).toFixed(3)))};
+      territories:raised.map(n=>Number((.16+.61*n).toFixed(3))),
+      consequences:consequences.update(stations)};
   }
   update(0);
   return {update};
