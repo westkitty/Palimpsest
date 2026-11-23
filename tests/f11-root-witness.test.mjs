@@ -1,0 +1,26 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {gunzipSync} from 'node:zlib';
+import {createF11StoryPaper,F11_GUTTER_MARK,F11_GUTTER_PLANT,f11PaperBeats,f11WitnessClip} from '../src/vnext/f11StoryPaper.ts';
+const bytes=gunzipSync(readFileSync(new URL('../src/vnext/assets/palimpsest-f11-challenger.glb.gz',import.meta.url)));
+const gltf=JSON.parse(bytes.subarray(20,20+bytes.readUInt32LE(12)));
+test('first pilot is the sole root at the gutter before wider growth and shares the exact foot of native plant 22',()=>{
+ const node=gltf.nodes.find(n=>n.name==='PLANT_'+F11_GUTTER_PLANT);
+ assert.ok(node);assert.ok(Math.abs(node.translation[0]*.70-F11_GUTTER_MARK.x)<1e-7);
+ assert.ok(Math.abs(node.translation[2]*.73-F11_GUTTER_MARK.z)<1e-7);
+ assert.deepEqual([f11PaperBeats(46).gutterRoot,f11PaperBeats(55).roots,f11PaperBeats(61).roots],[0,0,0]);
+ assert.ok(f11PaperBeats(55).gutterRoot>.45);assert.equal(f11PaperBeats(61).gutterRoot,1);
+ assert.equal(f11WitnessClip(59),1);
+ assert.ok(f11WitnessClip(70)>=73&&f11WitnessClip(70)<86);
+ const craft=createF11StoryPaper(()=>0);
+ const pilot=craft.root.getObjectByName('F11 one pilot root enters the gutter');
+ const foot=craft.root.getObjectByName('F11 witness foot bonded at gutter');
+ craft.update(47,false);assert.ok(!pilot.visible&&!foot.visible);
+ craft.update(55,false);assert.ok(pilot.visible&&!foot.visible);assert.ok(pilot.children[0].geometry.drawRange.count<216);
+ craft.update(61,false);assert.ok(pilot.visible&&foot.visible);assert.equal(pilot.children[0].geometry.drawRange.count,216);
+ const first=foot.position.clone();
+ craft.update(109,false);assert.ok(pilot.visible&&foot.visible);
+ assert.ok(foot.position.equals(first));
+ craft.update(175,true);assert.ok(pilot.visible&&foot.visible&&foot.position.equals(first));craft.dispose();
+});

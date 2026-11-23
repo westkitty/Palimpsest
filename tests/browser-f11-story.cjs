@@ -5,8 +5,9 @@ const origin=process.env.PALIMPSEST_PREVIEW_URL||'http://127.0.0.1:8789';
 const proof=process.env.PALIMPSEST_PROOF_DIR;
 const requiredDevices=process.env.PALIMPSEST_F11_DEVICES?.split(',');
 const beats=[
-  ['ash',7],['single-patch',28],['gravity-redirect',49],['fine-roots',61],['gutter-cut',71],
-  ['unfold-wave',82],['canopy-full',95],['canopy-parts',101],['held-opening',109],['tiger-late',124],['codec-withdraws',168]
+  ['ash',7],['single-patch',28],['gravity-redirect',46],['gutter-root',55],['gutter-root',61],
+  ['gutter-cut',71],['unfold-wave',82],['canopy-full',94],['canopy-parts',101],['held-opening',109],
+  ['tiger-late',124],['codec-withdraws',155],['codec-withdraws',173]
 ];
 (async()=>{
 const browser=await chromium.launch({headless:true,executablePath:process.env.PALIMPSEST_CHROME_PATH,
@@ -54,17 +55,26 @@ try {
       assert.ok(s.frame>=target&&s.frame<=target+2,[label,name,target,s.frame]);
       if(i===0)assert.deepEqual([s.patch,s.fibers,s.roots,s.split,s.canopy],Array(5).fill(0));
       if(i===1)assert.deepEqual([s.patch,s.roots,s.split],[1,0,0]);
-      if(i===2)assert.ok(s.redirected>.70&&s.fibers===1&&s.roots===0);
-      if(i===3)assert.ok(s.roots>.7&&s.split===0&&s.canopy===0);
-      if(i===4)assert.ok(s.split>.85&&s.canopy===0);
-      if(i===5)assert.ok(s.canopy>.60,JSON.stringify(s));
-      if(i===6)assert.ok(s.close>.95&&s.tiger===false);
-      if(i===7)assert.ok(s.parted>.40&&s.tiger===false);
-      if(i===8)assert.ok(s.parted===1&&s.close===0&&s.tiger===false);
-      if(i===9)assert.equal(s.tiger,true);
-      if(i===10)assert.deepEqual([s.tiger,s.withdraw,s.codecIdle],[true,1,0]);
+      if(i===2)assert.ok(s.redirected>.5&&s.fibers===1&&s.roots===0);
+      if(i===3)assert.ok(s.gutterRoot>.45&&s.gutterRoot<1&&s.roots===0&&s.rootedCanopy===0&&s.witness===null);
+      if(i===4)assert.ok(s.gutterRoot===1&&s.split<.2&&s.rootedCanopy===1&&s.witness.id==='PLANT_22');
+      if(i===5)assert.ok(s.split>.85&&s.witness.stem>.40);
+      if(i===6)assert.ok(s.canopy>.60&&s.rootedCanopy>20,JSON.stringify(s));
+      if(i===7)assert.ok(s.close>.95&&s.tiger===false);
+      if(i===8)assert.ok(s.parted>.40&&s.tiger===false);
+      if(i===9)assert.ok(s.parted===1&&s.close===0&&s.tiger===false);
+      if(i===10)assert.equal(s.tiger,true);
+      if(i>=11)assert.deepEqual([s.tiger,s.withdraw,s.codecIdle],[true,1,0]);
+      if(i>=4){
+        const fixed=await p.evaluate(()=>window.__f11Proof.samples[4].witness);
+        assert.deepEqual([s.witness.id,s.witness.x,s.witness.z],[fixed.id,fixed.x,fixed.z],'same physical native plant remains fixed');
+      }
+      if(i===12){
+        const anchor=await p.evaluate(()=>window.__f11Proof.samples[9].codecHeadPitch);
+        assert.ok(Math.abs(anchor-s.codecHeadPitch)>17,'actual Codec head pitch changes');
+      }
       const out=proof&&path.join(proof,`${label}-${String(i).padStart(2,'0')}-${name}.png`);
-      if(out&&!require('node:fs').existsSync(out)&&(label==='desktop'||[0,2,4,6,8,10].includes(i))){
+      if(out&&!require('node:fs').existsSync(out)&&([0,3,4,6,7,9,10,12].includes(i))){
         const {data}=await cdp.send('Page.captureScreenshot',{format:'png',fromSurface:true});
         require('node:fs').writeFileSync(out,Buffer.from(data,'base64'));
       }

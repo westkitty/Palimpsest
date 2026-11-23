@@ -2,11 +2,11 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import assetUrl from './assets/palimpsest-f11-challenger.glb.gz?url';
 import motion from './assets/palimpsest-f11-motion.json';
-import { createF11StoryPaper, f11Ease } from './f11StoryPaper.ts';
+import { createF11StoryPaper, f11Ease, f11WitnessClip, F11_GUTTER_PLANT } from './f11StoryPaper.ts';
 
 const cues: [number,number][]=[
-  [0,1],[1.32,11],[2.65,34],[3.35,42],[4.15,55],[4.80,63],[5.58,72],
-  [7.25,92],[8.35,104],[9.90,112],[10.94,129],[12.70,180]
+  [0,1],[1.32,11],[2.65,34],[3.35,42],[4.05,49],[4.77,58],[5.34,62],[6.10,72],
+  [7.78,92],[8.98,104],[10.39,112],[11.48,129],[12.42,143],[13.40,155],[15.38,180]
 ];
 export function f11BlenderFrame(t:number):number {
   for(let i=1;i<cues.length;i++){
@@ -47,6 +47,7 @@ export function createF11Challenger(pageY:(x:number)=>number){
   const idles: Array<{node:THREE.Object3D;motion:typeof motion.idles[keyof typeof motion.idles]}>=[];
   const eyes:THREE.Mesh[]=[];
   const anchors:THREE.Object3D[]=[];
+  let witnessStem:THREE.Object3D|undefined, codecHead:THREE.Object3D|undefined;
   const trees: Array<{ holder:THREE.Object3D;x:number;z:number;s:number;delay:number;edge:number }>=[];
   let elapsed=0,idleTime=0, reduced=false,lastRender=0;
   function sample(){
@@ -57,7 +58,11 @@ export function createF11Challenger(pageY:(x:number)=>number){
       // Keep authored under-vellum roots at exact timing. Only the rooted
       // plant clips are sequenced into a left-to-right fold after the slit.
       const name=a.getClip().name,match=/^(?:PLANT|STEM|FROND)_(\d+)/.exec(name);
-      if(match){const tree=trees[Number(match[1])];if(tree)local=Math.max(1,frame-tree.delay*(1-.62*f11Ease(81,96,frame)));}
+      if(match){
+        const i=Number(match[1]),tree=trees[i];
+        if(i===F11_GUTTER_PLANT)local=f11WitnessClip(frame);
+        else if(tree)local=Math.max(1,frame-tree.delay*(1-.62*f11Ease(81,96,frame)));
+      }
       a.time=Math.min((local-1)/motion.fps,a.getClip().duration);
     }
     mixer.update(0);
@@ -78,12 +83,24 @@ export function createF11Challenger(pageY:(x:number)=>number){
       node.visible=i===0?frame>=11:i===1?frame>=34:i===2?frame>=112:frame>=33&&frame<85;
     // Fixed base positions: tilt only about the actual root/stem hinge,
     // never translate a leaf cluster or separate it from the source stalk.
-    for(const t of trees){
-      t.holder.visible=frame>=55+t.delay;
+    for(const [i,t] of trees.entries()){
+      if(i===F11_GUTTER_PLANT){
+        t.holder.visible=frame>=60;
+        // Same exact root in frame through the parting and actor hold. Slightly
+        // stronger silhouette, with no sideways migration or second stand-in.
+        t.holder.scale.set(t.s*.96,t.s*(1+.11*beats.close+.24*beats.parted),t.s*.96);
+        t.holder.rotation.set(0,0,-.035);
+        continue;
+      }
+      t.holder.visible=frame>=62+t.delay;
       const near=t.z>-.43, kernel=1-Math.min(1,Math.abs(t.x-.07)/2.65);
       const peak=beats.close*(near?.52:1)*kernel;
-      const lean=t.edge*(.23*peak-.18*beats.parted);
-      const stretch=1+(near?.92:1.72)*peak+(near?.04:.28)*beats.parted;
+      // Plant 21 sits immediately in front of Codec in this staging; bend its
+      // live stem toward the gutter and lower its crown, not its planted foot.
+      // This leaves an unfenced window around the original actor’s face/body.
+      const clear=(i===21?beats.parted:0);
+      const lean=t.edge*(.23*peak-.18*beats.parted)-.64*clear;
+      const stretch=1+(near?.92:1.72)*peak+(near?.04:.28)*beats.parted-.49*clear;
       t.holder.scale.set(t.s*(1+.20*peak),t.s*stretch,t.s*(1+.09*peak));
       t.holder.rotation.set(near?.14*peak: .47*peak,0,lean);
     }
@@ -91,11 +108,17 @@ export function createF11Challenger(pageY:(x:number)=>number){
     anchors[0].rotation.y=-.66*beats.withdraw;
     anchors[1].rotation.y=.14*f11Ease(133,147,frame);
     anchors[2].rotation.y=.11*f11Ease(133,150,frame);
-    const storyBeat=frame<11?'ash':frame<34?'single-patch':frame<55?'gravity-redirect':frame<63?'fine-roots':
+    const storyBeat=frame<11?'ash':frame<34?'single-patch':frame<49?'gravity-redirect':frame<62?'gutter-root':frame<66?'fine-roots':
       frame<72?'gutter-cut':frame<88?'unfold-wave':frame<98?'canopy-full':frame<106?'canopy-parts':
       frame<112?'held-opening':frame<129?'tiger-late':'codec-withdraws';
     root.userData.story={beat:storyBeat,...Object.fromEntries(Object.entries(beats).map(([k,v])=>[k,Math.round(v*100)/100])),
-      codecIdle:Math.round((1-beats.withdraw)*100)/100,tiger:anchors[2].visible};
+      codecIdle:Math.round((1-beats.withdraw)*100)/100,tiger:anchors[2].visible,
+      codecHeadPitch:Math.round(180/Math.PI*(codecHead?.rotation.x??0)),
+      rootedCanopy:trees.filter(t=>t.holder.visible).length,
+      witness:trees[F11_GUTTER_PLANT].holder.visible?{
+        id:'PLANT_22',x:trees[F11_GUTTER_PLANT].x,z:trees[F11_GUTTER_PLANT].z,
+        stem:Number((witnessStem?.scale.y??0).toFixed(3)),
+      }:null};
     root.userData.phase=f11StoryPhase(frame);
     root.userData.frame=Math.round(frame);
     root.userData.codecSad=frame>=141;
@@ -136,6 +159,7 @@ export function createF11Challenger(pageY:(x:number)=>number){
         trees.push({holder:outer,x,z,s:scale,delay:9+(x+2.6)*1.42+(.26*Math.sin(i*4)),edge:x<.07?-1:1});
       }
       move(get('ROOT_REGISTER'),-1.85,pageY(-1.85)+.014,1.05,.78);
+      witnessStem=get('STEM_22');codecHead=get('CODEC_HEAD_STORY');
       for(const [name,source] of Object.entries(motion.idles))idles.push({node:get(name),motion:source});
       for(const name of eyeNames){
         const node=get(name);

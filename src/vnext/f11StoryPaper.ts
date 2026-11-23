@@ -2,15 +2,27 @@ import * as THREE from 'three';
 
 type Point = [number, number];
 type Stock = (x:number)=>number;
+export const F11_GUTTER_PLANT=22;
+export const F11_GUTTER_MARK={x:.05*.70,z:.59*.73} as const;
 export const f11Ease=(from:number,to:number,at:number)=>THREE.MathUtils.smoothstep(at,from,to);
 const mix=THREE.MathUtils.lerp;
+
+export function f11WitnessClip(frame:number):number {
+  // The same rooted native stem starts unfolding from its known floor after the
+  // pilot hits the gutter, early enough to read before the rest of the forest.
+  if(frame<60)return 1;
+  if(frame<70)return THREE.MathUtils.lerp(57,73,(frame-60)/10);
+  if(frame<86)return THREE.MathUtils.lerp(73,86,(frame-70)/16);
+  return frame;
+}
 
 export function f11PaperBeats(frame:number) {
   return {
     patch:f11Ease(17,25,frame),
     fibers:f11Ease(34,39,frame)*(1-f11Ease(64,74,frame)),
     redirected:f11Ease(39,53,frame),
-    roots:f11Ease(55,63,frame),
+    gutterRoot:f11Ease(49,60,frame),
+    roots:f11Ease(62,68,frame),
     split:f11Ease(63,72,frame),
     canopy:f11Ease(72,88,frame),
     close:f11Ease(76,94,frame)*(1-f11Ease(95,106,frame)),
@@ -94,6 +106,38 @@ export function createF11StoryPaper(pageY:Stock) {
 
   const gravity=group('F11 Marcel redirects paper fibers before roots');
   const strands=Array.from({length:5},(_,i)=>ribbon(gravity,'Redirectable scored paper fiber',24,.010+i%2*.003,fibers[i%2]));
+  // One identifiable thick cut-paper root descends from Codec’s actual soil.
+  // The elbow follows the binding before terminating at the native PLANT_22 foot.
+  // Keep this exact root and the same three small branches through the final hold.
+  const witness=group('F11 one pilot root enters the gutter');
+  const markedFiber=stock(0xb49352),markedEdge=stock(0xe7bc68),markedSide=stock(0x584530);
+  const route: Point[]=[
+    [cx+.050,cz+.016],[-.26,-.060],[-.305,.027],[-.212,.128],[-.147,.156],[-.062,.225],[-.018,.239],
+    [F11_GUTTER_MARK.x,.259],[F11_GUTTER_MARK.x-.013,.343],[F11_GUTTER_MARK.x,F11_GUTTER_MARK.z],
+  ];
+  const pilot=(t:number,layer=0)=>{
+    const i=Math.min(route.length-2,Math.floor(t*(route.length-1)));
+    const z=t*(route.length-1)-i, x=mix(route[i][0],route[i+1][0],z);
+    const depth=mix(route[i][1],route[i+1][1],z);
+    return vec(x,pageY(x)+.045+layer+Math.sin(Math.PI*t)*.013,depth);
+  };
+  const leaderRibbons=[
+    {draw:ribbon(witness,'Pilot root dark cut edge',37,.043,markedSide),layer:-.003},
+    {draw:ribbon(witness,'Pilot root scored gold paper',37,.034,markedFiber),layer:.001},
+    {draw:ribbon(witness,'Pilot root bright folded ridge',37,.011,markedEdge),layer:.009},
+  ];
+  const pilotForks=[
+    [.22,-.15,.046],[.58,.127,.102],[.83,-.096,.068],
+  ].map(([at,dx,dz])=>({at,dx,dz,draw:ribbon(witness,'Identifying pilot root fork',10,.012,markedFiber)}));
+  const rootedFoot=group('F11 witness foot bonded at gutter');
+  rootedFoot.position.set(F11_GUTTER_MARK.x,pageY(F11_GUTTER_MARK.x)+.041,F11_GUTTER_MARK.z);
+  for(const sign of [-1,1]){
+    const l=facets(rootedFoot,'Unprinted folded soil lip pointing to the live stalk',[
+      vec(0,.003,-.095),vec(.082*sign,.005,-.042),vec(.079*sign,.008,.045),
+      vec(.030*sign,.038,.070),vec(0,.028,.038),
+    ],[0,1,4,1,2,4,2,3,4],sign<0?soil:polish);
+    l.receiveShadow=true;
+  }
   const inlays=group('F11 fine under-stock roots from single loam patch');
   const end: Point[]=[[-1.94,-.66],[-1.20,-1.1],[.36,-1.23],[1.68,-.96],[2.04,-.26],[-1.72,.76],[-2.10,.56],[1.75,.74],[-.60,.76]];
   const traces=end.map((_,i)=>ribbon(inlays,'Subsurface rooted filament',25,i<5?.014:.010,vein[i%3]));
@@ -143,12 +187,23 @@ export function createF11StoryPaper(pageY:Stock) {
         return vec(x,pageY(x)+elevation,z);
       },Math.min(1,b.fibers*(1.27-i*.065)));
     });
+    witness.visible=b.gutterRoot>.001;
+    rootedFoot.visible=b.gutterRoot>=.996;
+    if(witness.visible){
+      const reached=b.gutterRoot;
+      // Trim the score at its precise moving tip instead of revealing the next pre-drawn segment.
+      leaderRibbons.forEach(({draw,layer})=>draw((_,t)=>pilot(Math.min(reached,t),layer),reached));
+      pilotForks.forEach(({at,dx,dz,draw})=>draw((_,t)=>{
+        const from=pilot(at,.004);
+        return vec(from.x+dx*t,from.y+.004*Math.sin(t*Math.PI),from.z+dz*t);
+      },f11Ease(49+at*8,53+at*8,frame)));
+    }
     inlays.visible=b.roots>.001;
     if(inlays.visible&&!rootsComplete){
-      traces.forEach((draw,i)=>draw((_,t)=>line(i,t),f11Ease(55+(i%3)*.70,65+i*.24,frame)));
+      traces.forEach((draw,i)=>draw((_,t)=>line(i,t),f11Ease(62+(i%3)*.38,68+i*.14,frame)));
       twigs.forEach((draw,k)=>{
         const i=Math.floor(k/2),side=k%2?1:-1;
-        draw((_,t)=>line(i,.32+.28*(k%2)+.23*t,side*.24*t),f11Ease(58+(k%4)*.72,68+(i%4)*.8,frame));
+        draw((_,t)=>line(i,.32+.28*(k%2)+.23*t,side*.24*t),f11Ease(63+(k%4)*.39,69+(i%4)*.59,frame));
       });
       rootsComplete=frame>=71;
     }

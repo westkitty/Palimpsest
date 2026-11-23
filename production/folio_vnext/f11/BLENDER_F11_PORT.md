@@ -18,3 +18,7 @@ npm run lint
 npm run build
 ```
 Browser test: `tests/browser-f11-challenger.cjs` against the built preview or standalone file, desktop normal motion and narrow touch with reduced motion. It requires the actual imported asset, exact distinct phases, and independent working A/B/C controls. Software Chromium is smoke evidence, not a physical-device performance benchmark.
+
+### One rooted witness through the change
+
+The first new cut-paper root starts in Codec’s lone loam patch, follows the gutter, and reaches the exact native `PLANT_22` floor position before the broad root network or the canopy rise. A narrow ochre center fold and three short forks distinguish the same path after the split opens; no new plant replaces the Blender specimen. `PLANT_22` uses its original stem/frond tracks, resampled as the first sprout. The remaining rooted stems keep their existing growth wave, bloom, and later parting. The foreground neighbor rooted in front of Codec bends aside without translating, and `PLANT_22` remains fixed and legible in the opened silhouette. Tiger still enters only after the canopy parts and holds. The final hold is paced to show Codec’s original head/body motion with the same specimen rooted in view, not by changing the actors or their order. Reduced motion uses the same sequence and omits idle oscillation.
