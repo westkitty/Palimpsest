@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {F08_ACT_DURATION,f08CueClock,f08Cue,f08LeafTravel} from '../src/vnext/f08Motion.ts';
+import {F08_ACT_DURATION,f08CueClock,f08Cue,f08LeafTravel,f08ThresholdCue} from '../src/vnext/f08Motion.ts';
 test('F08 leads one real shutter, reveals a dark open aperture, then collar, rim, plasma',()=>{
   const lead=f08Cue(.22,true),second=f08Cue(.55,true),dark=f08Cue(.835,true), collar=f08Cue(1.10,true),rim=f08Cue(1.35,true);
   assert.ok(lead.left>.30&&lead.right===0);assert.ok(second.right>0&&second.right<1);
@@ -25,4 +25,21 @@ test('F08 unfolds four exact attached hinges as one traveling release',()=>{
   const parts=f08LeafTravel(.5);
   assert.ok(parts[0]>parts[1]&&parts[1]>parts[2]&&parts[2]>parts[3]);
   assert.deepEqual(f08LeafTravel(1),[1,1,1,1]);
+});
+
+test('F08 threshold leans source-side first and crawls in order before reaching Marcel',()=>{
+  const first=f08ThresholdCue(1.74,true), middle=f08ThresholdCue(2.13,true), actor=f08ThresholdCue(2.99,true);
+  assert.equal(first.head,0);assert.ok(first.lean[0]>.6&&first.lean[6]===0);
+  assert.ok(first.edges[0]>.6&&first.edges.slice(1).every(x=>x===0));
+  assert.equal(middle.head,3);assert.ok(middle.edges[2]>.5&&middle.edges.slice(4).every(x=>x===0));
+  assert.equal(middle.actorLight,0);assert.equal(actor.head,7);
+  assert.ok(actor.contact>0&&actor.climb>.5&&actor.actorLight>1.7);
+});
+test('F08 snap applies quiet contact and A off cuts every emissive reflection',()=>{
+  const on=f08ThresholdCue(F08_ACT_DURATION,true,true);
+  assert.equal(on.head,7);assert.equal(on.climb,1);assert.equal(on.actorLight,.60);
+  assert.ok(on.edges.every(e=>e===.22));
+  const off=f08ThresholdCue(F08_ACT_DURATION,false);
+  assert.ok(off.edges.every(e=>e===0)&&off.floor.every(e=>e===0));assert.equal(off.actorLight,0);
+  assert.ok(off.lean.some(x=>x>.5),'physical stock still returns under authored closure, not a snap');
 });

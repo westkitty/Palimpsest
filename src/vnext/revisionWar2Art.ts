@@ -1,6 +1,7 @@
 import { makeF09RuptureBed, newF09CollapsingPaperGround } from './f09EnvironmentalTheatre.ts';
 import * as THREE from 'three';
 import { f08CueClock, f08Cue } from './f08Motion.ts';
+import { newF08ThresholdResponse } from './f08ThresholdResponse.ts';
 import type { FolioRuntimeState } from '../types/atlas';
 import type { BaseFolioWorld } from '../engine/folios/BaseFolioWorld';
 import { getOpenPageY as pageY } from '../engine/BookAndDeskRig';
@@ -174,6 +175,7 @@ export function mountF08FunctionalTheatre(root:THREE.Group):void{
   // Shoulder-height aperture fits the original left theatrical cut; collar still leads into it.
   collar.position.set(-.47,.285,-.27);collar.rotation.y=.31;
   for(const n of [marcel,shoes])n.position.z=1.46;
+  root.userData.f08NativeThreshold=true;
 }
 
 function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
@@ -268,6 +270,7 @@ function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
   const shoes=new THREE.Group();shoes.name='F08 · Marcel paper foot anchors';
   shoes.position.set(1.59,pageY(1.59)+.012,.38);root.add(shoes);
   for(const dz of [-.075,.075])slab(shoes,.40,.018,.06,ink,0,0,dz);
+  const threshold=newF08ThresholdResponse(pageY,shoes);root.add(threshold.root);
   let t=0,cueTime=0,wasOn=false,initialized=false;
   return (state,dt,reduced) => {
     const on = state.interactions.A.active;
@@ -281,7 +284,11 @@ function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
     root.userData.collarPower=cue.collar;
     root.userData.rimPower=cue.rim;
     root.userData.foldLight=cue.plasma*3.3+cue.rim*.28+cue.impulse*2.5;
-    root.userData.marcelLight=cue.plasma*.84+cue.impulse*.68;
+    const liveThreshold=root.userData.f08NativeThreshold===true;
+    threshold.root.visible=liveThreshold;
+    const witness=threshold.update(liveThreshold?cueTime:0,liveThreshold&&on,reduced);
+    root.userData.thresholdResponse=liveThreshold?witness:undefined;
+    root.userData.marcelLight=liveThreshold?witness.actorLight:cue.plasma*.84+cue.impulse*.68;
     plasma.visible=cue.plasma>.005;
     plasmaMaterial.uniforms.uEnergy.value=cue.plasma*.96;
     plasmaMaterial.uniforms.uImpulse.value=cue.impulse;
@@ -291,7 +298,10 @@ function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
     rimEnergy.forEach((rim,i)=>{rim.visible=on&&cue.rim>(i+.55)/12;});
     foldSpill.intensity=root.userData.foldLight;
     marcelSpill.intensity=root.userData.marcelLight;
-    marcelSpill.position.set(actor.position.x-.38,actor.position.y+.46,actor.position.z+.20);
+    // Light travels onto Marcel from his anchored boots to the existing vest.
+    // This is reflected Hookshot light, not emissive anatomy or a new power.
+    marcelSpill.distance=liveThreshold?.84:1.65;
+    marcelSpill.position.set(actor.position.x-(liveThreshold?.20:.38),actor.position.y+(liveThreshold?.10+.48*witness.climb:.46),actor.position.z+.22);
     actor.rotation.y=-.52-cue.plasma*.22+(reduced?0:Math.sin(t*.8)*.035);
     actor.rotation.z=-cue.plasma*.048-cue.impulse*.059+(reduced?0:Math.sin(t*.9)*.020);
     actor.position.y=pageY(1.59)+.025; // anchored paper weight shift, not levitation
