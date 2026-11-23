@@ -385,15 +385,16 @@ function f12Art(world: BaseFolioWorld): MechanismArt {
   const muted:[string,string,string]=['#e9dec1','#292720','#a27849'];
   const dusk:[string,string,string]=['#2a313b','#f5ead4','#b49b61'];
   const vermilion:[string,string,string]=['#6b302d','#ffecd5','#d5b286'];
-  const roof=plate(root,1.80,0.29,'The Administration Calls','POSTWAR RECRUITMENT EXHIBIT',dusk);
+  const recruitment=new THREE.Group();recruitment.name='living-f12-recruitment-mechanism';root.add(recruitment);
+  const roof=plate(recruitment,1.80,0.29,'The Administration Calls','POSTWAR RECRUITMENT EXHIBIT',dusk);
   roof.position.set(0,1.13,-1.13);
-  const rollers=new THREE.Group();rollers.position.set(0,0.65,-1.10);root.add(rollers);
+  const rollers=new THREE.Group();rollers.position.set(0,0.65,-1.10);recruitment.add(rollers);
   const axle=box(1.84,0.044,0.052,0x78613d,rollers,0,-0.19,-0.015);
   axle.rotation.z=0.003;
   for(const s of [-1,1]){
-    const support=box(0.046,0.68,0.11,0x74674e,root,s*0.89,0.34,-1.20);
+    const support=box(0.046,0.68,0.11,0x74674e,recruitment,s*0.89,0.34,-1.20);
     support.rotation.x=-0.17;
-    box(0.24,0.026,0.29,0x9f8558,root,s*0.89,getOpenPageY(s*0.89)+0.019,-1.20);
+    box(0.24,0.026,0.29,0x9f8558,recruitment,s*0.89,getOpenPageY(s*0.89)+0.019,-1.20);
   }
   const roles = [
     ['Rebuilders','REPAIR & CIVIC WORKS'],

@@ -379,6 +379,34 @@ export class F11FolioWorld extends BaseFolioWorld {
 }
 
 export class F12FolioWorld extends BaseFolioWorld {
+  private livingEdition = false;
+  private symbolicStudy!: THREE.Group;
+
+  public useLivingEdition(): void {
+    this.livingEdition = true;
+  }
+
+  /** Keep the existing B mechanism on the left-hand Blender teaching card. */
+  public mountLivingBlender(stage: THREE.Group): void {
+    for (const node of this.root.children) node.visible = false;
+    stage.add(this.symbolicStudy);
+    this.symbolicStudy.visible = true;
+    this.symbolicStudy.position.set(-3.378, .342, 1.548);
+    this.symbolicStudy.scale.setScalar(.45);
+  }
+
+  public unmountLivingBlender(): void {
+    this.root.add(this.symbolicStudy);
+    this.symbolicStudy.position.set(0, this.pageY(0) + .04, .14);
+    this.symbolicStudy.scale.setScalar(1);
+    for (const node of this.root.children) node.visible = true;
+    this.memorialLeaf.visible = !this.livingEdition;
+  }
+
+  public symbolicStudyState(): {inert: boolean; plunger: number; emission: number} {
+    return {inert:this.switchActivated,plunger:this.deadSwitchPlunger.position.y,emission:this.silkMat.emissiveIntensity};
+  }
+
   private plaqueLeft!: THREE.Group;
   private plaqueRight!: THREE.Group;
   private splitRatio = 0;
@@ -425,6 +453,7 @@ export class F12FolioWorld extends BaseFolioWorld {
 
     // 2. [B] Symbolic Syrin-Blood Helical Starsilk Dead-Switch Diagram on stepped obsidian plinth
     const silkCoilGroup = new THREE.Group();
+    this.symbolicStudy = silkCoilGroup;
     silkCoilGroup.position.set(0, centerY + 0.04, 0.14);
 
     const switchPad = this.buildLayeredTerrace([1.15, 0.92], [1.15, 0.92], 0.024, [0x22262d, 0x303640], 0xc2a25d);
@@ -466,22 +495,24 @@ export class F12FolioWorld extends BaseFolioWorld {
     // 3. [C] Closing Archival Leaf: Kail (blue hair, black suit, red scarf over mouth) & Syrin 4 Record
     this.memorialLeaf = new THREE.Group();
     this.memorialLeaf.position.set(0, centerY + 0.04, 0.94);
-    const kail = buildKailFigure(this.paperBump, 0.96);
-    kail.position.set(-1.14, 0.04, -0.05);
-    this.addGroundShadow(kail, 0.34, 0.36);
+    if (!this.livingEdition) {
+      const kail = buildKailFigure(this.paperBump, 0.96);
+      kail.position.set(-1.14, 0.04, -0.05);
+      this.addGroundShadow(kail, 0.34, 0.36);
 
-    const card = this.makeCardLabel(
-      'SYRIN 4 GENOCIDE RECORD',
-      'Kail · Surviving Syrin Initiate',
-      2.18,
-      0.3,
-      '#FAF4E6',
-      '#181C22',
-      0.22,
-    );
-    card.position.set(0.32, 0.045, 0);
-    this.bindMechanismTarget(card, 'C');
-    this.memorialLeaf.add(kail, card);
+      const card = this.makeCardLabel(
+        'SYRIN 4 GENOCIDE RECORD',
+        'Kail · Surviving Syrin Initiate',
+        2.18,
+        0.3,
+        '#FAF4E6',
+        '#181C22',
+        0.22,
+      );
+      card.position.set(0.32, 0.045, 0);
+      this.bindMechanismTarget(card, 'C');
+      this.memorialLeaf.add(kail, card);
+    }
     this.root.add(this.memorialLeaf);
 
     this.syncState(state);

@@ -5,6 +5,8 @@ import { F09_MODEL_CENTER, makeF09CandidateStage } from './proof/f09CandidateSta
 import { makeF04CandidateStage } from './proof/f04CandidateStage';
 import { makeF05CandidateStage } from './proof/f05CandidateStage';
 import { makeF06CandidateStage } from './proof/f06CandidateStage';
+import { makeF12CandidateStage } from './proof/f12CandidateStage';
+import { F12FolioWorld } from '../engine/folios/FoliosAftermath';
 import { cssStock, folioStock, isDarkStock } from './livingPaperStock.ts';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -413,6 +415,14 @@ function onPaperPointerUp(e:PointerEvent):void {
   if((currentFolio===3&&canvas.dataset.blenderFolio==='04')||(currentFolio===4&&canvas.dataset.blenderFolio==='05')||(currentFolio===5&&canvas.dataset.blenderFolio==='06')||(currentFolio===6&&canvas.dataset.blenderFolio==='07')){
     const slots:THREE.Mesh[]=laterRevision?.root.userData.interactables??[];
     for(const hit of mechanismRaycaster.intersectObjects(slots,false)){
+      const slot=hit.object.userData.slot;
+      if(slot==='A'||slot==='B'||slot==='C'){handleAction(slot);return;}
+    }
+    return;
+  }
+  if(currentFolio===11&&canvas.dataset.blenderFolio==='12'){
+    const targets:THREE.Mesh[]=laterRevision?.root.userData.interactables??[];
+    for(const hit of mechanismRaycaster.intersectObjects(targets,false)){
       const slot=hit.object.userData.slot;
       if(slot==='A'||slot==='B'||slot==='C'){handleAction(slot);return;}
     }
@@ -1141,7 +1151,10 @@ function revisionCopy(index:LaterFolioIndex):ReturnType<typeof getLaterCopy>{
     description:'Year zero. Follow the planet lights as expansion advances. The pulse stops at the final lit state.'};
   if(index===7)return {...existing,description:'The Aureal Gate is a circular Hookshot portal. Operate its mechanisms to see the test of the gate and its consequences.',visuals:['A circular, plasma-filled Hookshot portal; plasma activates with the event.','Marcel stands by the gate. The fold-out records the twenty worlds.']};
   if(index===10)return {...existing,description:'Thirty-one days after the war. Codec, Marcel and Tiger arrive in that order. The theatrical paper jungle depicts what the loam could make possible, not the restoration of Nacreous VI.',visuals:['Codec works on the barren remnant.','Marcel arrives with gravity and Wordstreaming. Roots run through the paper, then a jungle erupts.','Tiger arrives last. Codec’s posture drops while Marcel and Tiger are still celebratory.']};
-  if(index===11)return {...existing,description:'The Administration turns from containment and harm to a call to serve. The closing imprint has its own page.',visuals:['The containment and harm cards are separate.','The Administration cycles through celebratory service roles, then stamps its endorsement.','The closing imprint is on the following leaf.']};
+  if(index===11)return {...existing,description:'The Administration turns from containment and harm to a call to serve. The closing imprint has its own page.',
+    mechanicalDescriptions:[existing.mechanicalDescriptions[0],existing.mechanicalDescriptions[1],
+      'Open the public Syrin 4 archival leaf. The destruction is recorded; exact dates and casualty counts remain unknown.'],
+    visuals:['The containment and harm cards are separate.','The Administration cycles through celebratory service roles, then stamps its endorsement.','The closing imprint is on the following leaf.']};
   return existing;
 }
 function updateNav():void {
@@ -1213,6 +1226,7 @@ function goFolio(index:number, deferCameraReset=false):void {
   delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;
   delete canvas.dataset.f02Challenger;delete canvas.dataset.f02Frame;delete canvas.dataset.f02Detent;delete canvas.dataset.f02Clip;
   delete canvas.dataset.f06CandidateState;
+  delete canvas.dataset.f12CandidateState;
   if(index===CODA_INDEX){
     if(renderer)buildCoda();
   } else if(index<FIRST_LATER_FOLIO){
@@ -1473,6 +1487,34 @@ function goFolio(index:number, deferCameraReset=false):void {
           });
         }
       },dispose(){staged.dispose();staged.root.removeFromParent();art.dispose();}};
+    }
+    if(index===11&&laterWorld instanceof F12FolioWorld){
+      const stageOwner=rig,world=laterWorld,scenic=livingStagecraft;
+      let mounted=false;
+      const recruitment=art.root.getObjectByName('living-f12-recruitment-mechanism');
+      const stamp=art.root.getObjectByName('living-f12-administration-endorsement-stamp');
+      const fallbackLeaf=art.root.getObjectByName('living-f12-final-archive-leaf');
+      const staged=makeF12CandidateStage(()=>{
+        if(rig!==stageOwner||currentFolio!==11)return;
+        staged.update(laterStates[8],0,reducedMotion);
+        if(!recruitment||!stamp||!fallbackLeaf)throw Error('F12 recruitment/stamp mounting incomplete');
+        world.mountLivingBlender(stageOwner);
+        stageOwner.add(art.root);art.root.visible=true;
+        recruitment.position.set(-1.61,.265,-.41);
+        stamp.position.set(4.015,.285,1.84);stamp.scale.setScalar(.64);
+        fallbackLeaf.visible=false;scenic.root.visible=false;
+        canvas.dataset.blenderFolio='12';mounted=true;
+      },()=>{if(rig===stageOwner)canvas.dataset.blenderFolio='unavailable';});
+      staged.root.userData.interactables=staged.controls;
+      stageOwner.add(staged.root);
+      laterRevision={root:staged.root,update(actual,dt,reduce){
+        art.update(actual,dt,reduce);staged.update(actual,dt,reduce);
+        if(mounted&&rig===stageOwner){
+          const {claimFrame,archiveFrame,splitDistance,archiveAngle,horizonPieces,creaseFixed}=staged.root.userData;
+          canvas.dataset.f12CandidateState=JSON.stringify({claimFrame,archiveFrame,splitDistance,archiveAngle,horizonPieces,creaseFixed,
+            study:world.symbolicStudyState(),role:art.root.userData.role,stampPresent:art.root.visible&&stamp?.visible===true,recruitmentPresent:art.root.visible&&recruitment?.visible===true});
+        }
+      },dispose(){staged.dispose();if(mounted)world.unmountLivingBlender();art.root.removeFromParent();art.dispose();}};
     }
   }
   ambientLight.intensity=index===2?0.46:0.78;

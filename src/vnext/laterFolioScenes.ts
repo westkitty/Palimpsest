@@ -27,6 +27,7 @@ export function createLaterFolio(
 ): BaseFolioWorld {
   const Class = classes[index - 3];
   const folio: BaseFolioWorld = new Class(index, paper, shadow);
+  if (folio instanceof F12FolioWorld) folio.useLivingEdition();
   folio.build(state);
   folio.syncState(state, activeSpecimen(state), 0);
   return folio;
