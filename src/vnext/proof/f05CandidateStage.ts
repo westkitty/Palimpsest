@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { makeFactoryFloor } from './f05FactoryFloor.ts';
 import type { FolioRuntimeState } from '../../types/atlas';
 
 const fps=24;
@@ -21,6 +22,8 @@ export function makeF05CandidateStage(ready:()=>void,failed:()=>void) {
   const draxis:{node:THREE.Object3D;base:THREE.Quaternion}[]=[];
   const ringSurface:{mat:THREE.MeshStandardMaterial;base:number}[]=[];
   let frames=[20,42,132];
+  let line:ReturnType<typeof makeFactoryFloor>|undefined;
+  const paperFilingLabels:THREE.Object3D[]=[];
   root.userData.assetState='loading';
 
   function disposeTree(scene:THREE.Object3D):void {
@@ -61,6 +64,11 @@ export function makeF05CandidateStage(ready:()=>void,failed:()=>void) {
       if(id.startsWith('afallenstarprimeafterconquest'))scarred=n;
       if(id.startsWith('gorevault044source')||id.startsWith('ringthroat029source'))
         draxis.push({node:n,base:n.quaternion.clone()});
+      if(/^creamtypedbaylabel|^bayheading|^baydescriptor/.test(id))paperFilingLabels.push(n);
+      // Reuse the actual authored records as part of the station, not as a
+      // separate form strip. C still controls the original folding pivots.
+      if(id.startsWith('ccattributedquotationpaperfold'))n.position.set(-.70,n.position.y,-1.78);
+      if(id.startsWith('ccarchiverecordpaperfold'))n.position.set(2.23,n.position.y,.66);
       const mark=/^b(?:documentedmaterialpassagemarker|mechanismstagednumber)([1-4])$/.exec(id);
       if(mark)markers.push({node:n,step:Number(mark[1])});
       if(id.startsWith('aaphysicalopaquecrimsonglassironbloodring')){
@@ -85,6 +93,7 @@ export function makeF05CandidateStage(ready:()=>void,failed:()=>void) {
       console.error('Incomplete F05 challenger',JSON.stringify({orbit:!!orbit,green:!!green,scarred:!!scarred,draxis:draxis.length,markers:markers.length,controls:controls.length,A:channels.A.length,B:channels.B.length,C:channels.C.length,ringSurface:ringSurface.length}));
       fail();return;
     }
+    line=makeFactoryFloor(asset);
     root.add(asset);
     root.userData.assetState='ready';
     ready();
@@ -112,7 +121,9 @@ export function makeF05CandidateStage(ready:()=>void,failed:()=>void) {
       node.quaternion.copy(base);
       if(!reduced){node.rotation.x+=.021*Math.sin(clock*1.61+i*1.8);node.rotation.z+=.016*Math.sin(clock*1.24+i*.8);}
     });
-    Object.assign(root.userData,{ring:orbit.visible,step:markers.filter(m=>m.node.visible).length/2,record:frames[2]>=154,
+    const factory=line?.(B.step,delta,reduced);
+    for(const item of paperFilingLabels)item.visible=B.step===0;
+    Object.assign(root.userData,{factory,ring:orbit.visible,step:markers.filter(m=>m.node.visible).length/2,record:frames[2]>=154,
       planetPhase:green.rotation.y,orbitalPhase:reduced?0:clock*.81});
   }
   function dispose():void {

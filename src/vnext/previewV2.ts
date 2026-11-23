@@ -1390,8 +1390,8 @@ function goFolio(index:number, deferCameraReset=false):void {
       laterRevision={root:staged.root,update:(actual,dt,reduce)=>{
         if(staged.root.userData.assetState==='ready'){
           staged.update(actual,dt,reduce);
-          const {ring,step,record,planetPhase,orbitalPhase}=staged.root.userData;
-          canvas.dataset.f05CandidateState=JSON.stringify({ring,step,record,planetPhase,orbitalPhase});
+          const {ring,step,record,planetPhase,orbitalPhase,factory}=staged.root.userData;
+          canvas.dataset.f05CandidateState=JSON.stringify({ring,step,record,planetPhase,orbitalPhase,factory});
         }else art.update(actual,dt,reduce);
       },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
     }
