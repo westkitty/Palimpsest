@@ -13,6 +13,7 @@ import { LivingStagecraft } from './livingStagecraft.ts';
 import { LivingBookBinding } from './livingBookBinding.ts';
 import { createRevisionEarlyArt, REVISION_VAULT_TEMPLATES } from './revisionEarlyArt.ts';
 import { createF01Challenger } from './challengerF01.ts';
+import { createF02Challenger } from './challengerF02.ts';
 import { createRevisionWar1Art } from './revisionWar1Art.ts';
 import { createRevisionWar2Art } from './revisionWar2Art.ts';
 import { createRevisionAftermathArt } from './revisionAftermathArt.ts';
@@ -878,18 +879,19 @@ function buildAllPaperLoom(root: THREE.Object3D): THREE.Group {
   return loom;
 }
 
-function buildF02():void {
+function buildF02():THREE.Group {
   const root=book();
-  const frame=cutArch(root,0,-2.66,7.85,2.0,shared.navy);
+  const fallback=new THREE.Group();fallback.name='F02 procedural fallback paper scenery';root.add(fallback);
+  const frame=cutArch(fallback,0,-2.66,7.85,2.0,shared.navy);
   for(let j=0;j<9;j++){
     const x=-3.48+j*0.87;
     slab(frame,0.055,0.34+Math.abs(4-j)*0.052,0.032,shared.gold,x,0.31,-0.065);
   }
-  const back=paperHinge(root,0,-2.41,8.35,3.15,shared.blue);
+  const back=paperHinge(fallback,0,-2.41,8.35,3.15,shared.blue);
   back.rotation.x=-0.02;paperHinges.push(back);
   // Distinct cardstock layers: they unfold only when A, B, C are activated.
   for(const [stage,number,radius,depth] of [[1,110,1.7,0.26],[2,230,2.55,0.43],[3,430,3.72,0.63]] as const){
-    const leaf=paperHinge(root,0,-2.20-stage*0.02,8.05-stage*0.20,3.03,stage===3?shared.ink:shared.blue);
+    const leaf=paperHinge(fallback,0,-2.20-stage*0.02,8.05-stage*0.20,3.03,stage===3?shared.ink:shared.blue);
     leaf.rotation.x=0;
     leaf.visible=false;
     const galaxy=new THREE.Group();leaf.add(galaxy);
@@ -911,11 +913,11 @@ function buildF02():void {
     }
     galaxyLayers.push({group:leaf,stage});
   }
-  galaxyPaperLoom=buildAllPaperLoom(root);
+  galaxyPaperLoom=buildAllPaperLoom(fallback);
   // An architectural landmark, intentionally not placed at the literal center of all space.
-  platform(root,-2.30,0.55,1.79);
-  for(const r of [0.29,0.48,0.63]){const g=ring(root,r,0.018,shared.brass,-2.30,0.83,0.27);g.rotation.z=r*0.65;}
-  plaque(root,'ZENTRUM',-2.30,0.41,1.07,1.52);
+  platform(fallback,-2.30,0.55,1.79);
+  for(const r of [0.29,0.48,0.63]){const g=ring(fallback,r,0.018,shared.brass,-2.30,0.83,0.27);g.rotation.z=r*0.65;}
+  plaque(fallback,'ZENTRUM',-2.30,0.41,1.07,1.52);
   platform(root,2.27,0.55,1.86);
   const geode=new THREE.Group();geode.position.set(2.27,0.54,0.24);root.add(geode);
   // The source-authored NiAlBu-in-Geode sculpture is preserved, including its open
@@ -934,11 +936,12 @@ function buildF02():void {
     const ang=j*Math.PI/3.5;
     const ix=-2.30+Math.cos(ang)*0.65;
     const iz=0.27+Math.sin(ang)*0.54;
-    slab(root,0.032,0.025,0.14,shared.bone,ix,0.39,iz).rotation.y=ang;
+    slab(fallback,0.032,0.025,0.14,shared.bone,ix,0.39,iz).rotation.y=ang;
   }
   // Interior backplate, never shown by exterior/proximity alone.
   focusText=inscription(geode,['NiAlBu still watches her die.','Again and again.'],0,0.44,-0.17,1.13);
   secretTarget=new THREE.Vector3(2.27,0.98,0.07);
+  return fallback;
 }
 function buildF03():void {
   const root=book();
@@ -1184,6 +1187,7 @@ function goFolio(index:number, deferCameraReset=false):void {
   canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
   delete canvas.dataset.revisionPhase;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;
   delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;
+  delete canvas.dataset.f02Challenger;delete canvas.dataset.f02Frame;delete canvas.dataset.f02Detent;delete canvas.dataset.f02Clip;
   if(index===CODA_INDEX){
     if(renderer)buildCoda();
   } else if(index<FIRST_LATER_FOLIO){
@@ -1225,7 +1229,8 @@ function goFolio(index:number, deferCameraReset=false):void {
           dispose(){challenger.dispose();disposeSubtree(register.root);stage.clear();},
         };
       }else{
-        if(index===1)buildF02();else buildF03();
+        const f02Fallback=index===1?buildF02():null;
+        if(index===2)buildF03();
         if(index===1){
           for(const layer of galaxyLayers)layer.group.visible=false;
           if(paperHinges[0])paperHinges[0].visible=false;
@@ -1235,7 +1240,35 @@ function goFolio(index:number, deferCameraReset=false):void {
         earlyRevision=procedural;
         rig.add(procedural.root);
         procedural.update(state,0,reducedMotion);
-        if(index===1)tintVellumEdges(Number(procedural.root.userData.inkAdvance));
+        if(index===1&&f02Fallback){
+          const stageOwner=rig;
+          const challenger=createF02Challenger(state.f02.reveal,reducedMotion,phase=>{
+            // Only the redundant scenic understudy leaves the stage. Original Geode,
+            // witness, vellum ink, book and source-authored A/B/C keep their own lifetimes.
+            if(phase==='ready')f02Fallback.visible=false;
+            if(rig===stageOwner&&currentFolio===1)canvas.dataset.f02Challenger=phase;
+          });
+          const stage=new THREE.Group();
+          stage.add(procedural.root,challenger.root);
+          rig.add(stage);
+          canvas.dataset.f02Challenger='loading';
+          earlyRevision={
+            root:stage,
+            update(s,dt,r){
+              procedural.update(s,dt,r);
+              challenger.update(s.f02.reveal,dt,r);
+              stage.userData.inkAdvance=procedural.root.userData.inkAdvance;
+              if(challenger.root.userData.status==='ready'&&rig===stageOwner){
+                canvas.dataset.f02Frame=String(challenger.root.userData.frame);
+                canvas.dataset.f02Detent=String(challenger.root.userData.detent);
+                canvas.dataset.f02Clip=String(challenger.root.userData.clip);
+              }
+            },
+            dispose(){challenger.dispose();disposeSubtree(procedural.root);stage.clear();},
+          };
+          earlyRevision.update(state,0,reducedMotion);
+          tintVellumEdges(Number(stage.userData.inkAdvance));
+        }
         if(index===2){
           const folioRig=rig;
           const oldNodes=[...rig.children];
