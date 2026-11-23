@@ -4,6 +4,7 @@ import { buildDraxisModel, type DraxisRig } from '../../engine/drakken/DraxisMod
 import { F06_CAMPAIGN_DRAXIS_IDS, DRAXIS_BY_ID } from '../../story/draxisCatalog';
 import { authoredSlotMixer, createPortedPaperAsset } from './portedPaperAsset';
 import { attachF06AttritionTerrain,cutF06UnknownLossCells } from './f06AttritionLayers';
+import { bindDraxisFigurePerformance } from '../draxisFigurePerformance.ts';
 
 export const F06_ERAS = ['7–30','31–60','61–90','91–120'] as const;
 const fps=18;
@@ -128,7 +129,8 @@ export function makeF06CandidateStage(bump:THREE.Texture, ready:()=>void, failed
       const printEra=slip(ledgerInk,1.13,.17,false);
       const printSpecimen=slip(specimenInk,1.73,.21,false);
       const initialSlip=indexSlip.position.x;
-      let specimen:DraxisRig|undefined, currentId:DraxisId|undefined, elapsed=0;
+      let specimen:DraxisRig|undefined, currentId:DraxisId|undefined;
+      let performanceLayer:ReturnType<typeof bindDraxisFigurePerformance>|undefined;
       let era=-1, target=0, wheelTravel=0, cFrame=69, bFrame=45, jog=0;
       let targetYaw=0,specimenYaw=0,clock=0;
       return {
@@ -147,6 +149,7 @@ export function makeF06CandidateStage(bump:THREE.Texture, ready:()=>void, failed
             if(specimen)disposeSpecimen(specimen);
             currentId=s.specimenId;
             specimen=buildDraxisModel(currentId,bump);
+            performanceLayer=bindDraxisFigurePerformance(specimen);
             specimen.group.name='F06 authored catalog '+currentId;
             specimen.group.scale.setScalar(1.05);
             specimenRotator.add(specimen.group);
@@ -166,8 +169,9 @@ export function makeF06CandidateStage(bump:THREE.Texture, ready:()=>void, failed
           printIndex('YEARS '+eraText);
           printEra('YEARS '+eraText);
           printSpecimen(currentId+'  '+DRAXIS_BY_ID[currentId].name.toUpperCase());
-          elapsed+=reduced?0:time;
-          specimen?.animate(elapsed,!reduced);
+          let exposed=true;
+          for(let node:THREE.Object3D|null=seat;node&&exposed;node=node.parent)exposed=node.visible;
+          const specimenPerformance=performanceLayer?.update(time,exposed,reduced);
           specimenYaw=reduced?targetYaw:approach(specimenYaw,targetYaw,time*1.9);
           specimenRotator.rotation.y=specimenYaw%(Math.PI*2);
           const marks=terrain.update(s.era,time,reduced);
@@ -175,7 +179,7 @@ export function makeF06CandidateStage(bump:THREE.Texture, ready:()=>void, failed
             era:eraText,ledgerEra:eraText,specimenId:currentId,cFrame,ledgerOpen:s.open,
             wheelDetent:target%4,ledgerJiggle:ripple,nativeLedgerLeaves:leaves.length,
             authoredBlankCasualtyCell:blankCell.visible,authoredCradleYaw:cradle.rotation.y,
-            physicalBlankApertures:apertures,specimenYaw,...marks,
+            physicalBlankApertures:apertures,specimenYaw,specimenPerformance,...marks,
           });
         },
         dispose(){if(specimen)disposeSpecimen(specimen);channels.dispose();controls.length=0;},

@@ -11,6 +11,7 @@ import { buildMarcelFigure } from '../engine/drakken/CharacterFigures';
 import { buildDraxisModel } from '../engine/drakken/DraxisModels';
 import { createF10Challenger } from './challengerF10.ts';
 import { createF10StoryPaper } from './f10StoryPaper.ts';
+import { bindDraxisFigurePerformance } from './draxisFigurePerformance.ts';
 import { F10FolioWorld } from '../engine/folios/FoliosAftermath';
 
 type RevisionArt = {
@@ -502,7 +503,7 @@ function siege(root: THREE.Group, world: BaseFolioWorld, bump: THREE.Texture | u
     const bounds=new THREE.Box3().setFromObject(rig.group);
     const corners=[bounds.min.x,bounds.max.x].flatMap(x=>[bounds.min.y,bounds.max.y].flatMap(y=>
       [bounds.min.z,bounds.max.z].map(z=>new THREE.Vector3(x,y,z))));
-    return {rig,hold,theta,radius,corners};
+    return {performance:bindDraxisFigurePerformance(rig),hold,theta,radius,corners};
   });
   let clock=0,fallback=0,initialized=false,hadOpened=false;
   return (state,dt,reduced)=>{
@@ -529,10 +530,13 @@ function siege(root: THREE.Group, world: BaseFolioWorld, bump: THREE.Texture | u
     const lift=ready?authored.lift:reduced?Number(on):!hadOpened?0:outerWall?clamp((outerWall.scale.y-.16)/.84):fallback;
     let belowReceiver=0;
     const storyActors:string[]=[];
+    const paperPerformance:ReturnType<ReturnType<typeof bindDraxisFigurePerformance>['update']>[]=[];
+    let stageVisible=true;
+    for(let node:THREE.Object3D|null=root;node&&stageVisible;node=node.parent)stageVisible=node.visible;
     const lip=authored.lip,receiverLip=center.y+lip.top;
     const worldCorner=new THREE.Vector3();
     for(let i=0;i<actors.length;i++){
-      const { rig, hold, theta, radius, corners }=actors[i];
+      const { performance, hold, theta, radius, corners }=actors[i];
       const local=ready?authored.localLift(theta):lift;
       const brace=ease(.025,.24,local)*(1-ease(.30,.57,local));
       const slip=ease(.30,.83,local);
@@ -555,9 +559,9 @@ function siege(root: THREE.Group, world: BaseFolioWorld, bump: THREE.Texture | u
       hold.visible=radial>lip.radius*.74||top>=receiverLip;
       if(!hold.visible)belowReceiver++;
       storyActors.push(!hold.visible?'below-lip':drop>.15?'descending':slip>.08?'slipping':brace>.1?'braced':'ready');
-      rig.animate(clock+i*.47,!reduced&&brace<.06&&slip<.015);
+      paperPerformance.push(performance.update(dt,stageVisible&&hold.visible&&slip<.08,reduced,1-ease(.02,.17,brace+slip)));
     }
-    root.userData.f10Story={...story?.update(state.interactions.C.active,state.interactions.B.active,lift,dt,reduced,ready?authored.localLift:()=>lift),actors:storyActors};
+    root.userData.f10Story={...story?.update(state.interactions.C.active,state.interactions.B.active,lift,dt,reduced,ready?authored.localLift:()=>lift),actors:storyActors,paperPerformance};
     root.userData.f10Captured=belowReceiver;
   };
 }
