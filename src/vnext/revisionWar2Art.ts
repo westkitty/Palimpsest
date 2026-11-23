@@ -1,3 +1,4 @@
+import { newF09CollapsingPaperGround } from './f09EnvironmentalTheatre.ts';
 import * as THREE from 'three';
 import { f08CueClock, f08Cue } from './f08Motion.ts';
 import type { FolioRuntimeState } from '../types/atlas';
@@ -345,20 +346,21 @@ function heliocide(root: THREE.Group, bump: THREE.Texture | undefined): UpdateAr
     else t=0;
     was=on;
     const authoredFrame = root.userData.f09AuthoredFrame as number|undefined;
-    const progress = on ? reduced ? 1 : authoredFrame===undefined ? ease(.17,.75,t)
-      : ease(13,48,authoredFrame) : 0;
+    const foldingPaper=root.userData.f09PaperGround as ReturnType<typeof newF09CollapsingPaperGround>|undefined;
+    root.userData.f09WholePaperWaves=foldingPaper?.update(authoredFrame??1,reduced)??[0,0,0];
     const drawn=on?(reduced?1:ease(0,.27,t)):0;
     extraction.position.x=star.x+.33+drawn*.11;
     slip.scale.x=1+drawn*.21;
     grip.position.x=.39+drawn*.078;
     blades.forEach(({tab,elbow},i)=>{
+      const progress=on?reduced?1:authoredFrame===undefined?ease(.17,.75,t):ease(18+i*3,44+i*2,authoredFrame):0;
       tab.rotation.z=progress*(.93-i*.19);
       tab.rotation.x=-progress*(.48-i*.06);
       elbow.rotation.z=progress*(.56-i*.105);
     });
     fibers.forEach(({fragment,start},i)=>{
       const flight=authoredFrame===undefined ? clamp((t-.16-i%5*.036)/.72)
-        : clamp((authoredFrame-13-i%5*.57)/31);
+        : clamp((authoredFrame-19-i%5*.57)/27);
       fragment.visible=on&&!reduced&&flight>0&&flight<1;
       if(!fragment.visible)return;
       const inward=Math.pow(flight,1.28);
@@ -382,6 +384,7 @@ export function mountF09FunctionalTheatre(root:THREE.Group, center:THREE.Vector3
   const slip=root.getObjectByName('F09 · Starsilk slip pulled from the model');
   if(slip)slip.visible=false;
   root.userData.f09ModelCenter=center;
+  root.userData.f09PaperGround=newF09CollapsingPaperGround(root,center);
 }
 
 function siege(root: THREE.Group, world: BaseFolioWorld, bump: THREE.Texture | undefined): UpdateArt {

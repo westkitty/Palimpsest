@@ -1496,9 +1496,10 @@ function goFolio(index:number, deferCameraReset=false):void {
         }
         art.update(actual,dt,reduce);
         if(canvas.dataset.blenderFolio==='09'&&rig===stageOwner){
-          const {authorFrame,modelState,foldDegrees,filamentTravel,activeFilamentMorphs}=staged.root.userData;
+          const {authorFrame,modelState,foldDegrees,filamentTravel,activeFilamentMorphs,environmentalBeat,petalDegrees,gimbal}=staged.root.userData;
           canvas.dataset.f09CandidateState=JSON.stringify({
-            authorFrame,modelState,foldDegrees,filamentTravel,activeFilamentMorphs,
+            authorFrame,modelState,foldDegrees,filamentTravel,activeFilamentMorphs,environmentalBeat,petalDegrees,gimbal,
+            waves:art.root.userData.f09WholePaperWaves,
             witness:art.root.userData.f09Witness,slivers:art.root.userData.f09InwardSlivers,
             latched:actual.interactions.A.locked,historicalStep:actual.interactions.B.step,survey:actual.interactions.C.active,
           });

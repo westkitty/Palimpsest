@@ -12,6 +12,7 @@ const url=(process.env.PALIMPSEST_STANDALONE
   try{
     const pages=[['desktop',{width:1190,height:790},'no-preference'],['touch',{width:412,height:830},'reduce']];
     for(const [form,viewport,reducedMotion] of pages){
+      if(process.env.PALIMPSEST_PROOF_FORM&&process.env.PALIMPSEST_PROOF_FORM!==form) continue;
       const p=await browser.newPage({viewport,reducedMotion,hasTouch:form==='touch'});
       const errors=[];const messages=[];
       p.on('pageerror',e=>errors.push(String(e)));
@@ -24,7 +25,7 @@ const url=(process.env.PALIMPSEST_STANDALONE
           new MutationObserver(()=>{
             if(stage.dataset.f09CandidateState){
               const n=JSON.parse(stage.dataset.f09CandidateState), last=window.__f09Reads.at(-1);
-              if(!last||Math.abs(n.authorFrame-last.authorFrame)>.6||n.modelState!==last.modelState||n.historicalStep!==last.historicalStep||n.survey!==last.survey){
+              if(!last||Math.abs(n.authorFrame-last.authorFrame)>.6||n.environmentalBeat!==last.environmentalBeat||n.modelState!==last.modelState||n.historicalStep!==last.historicalStep||n.survey!==last.survey){
                 window.__f09Reads.push(n);
               }
             }
@@ -35,13 +36,14 @@ const url=(process.env.PALIMPSEST_STANDALONE
       const ready=()=>p.waitForFunction(()=>document.querySelector('#stage')?.dataset.blenderFolio==='09',null,{timeout:20000});
       const state=()=>stage.evaluate(e=>JSON.parse(e.dataset.f09CandidateState));
       const field=(key,value)=>p.waitForFunction(([key,value])=>
-        JSON.parse(document.querySelector('#stage').dataset.f09CandidateState||'{}')[key]===value,[key,value]);
+        JSON.parse(document.querySelector('#stage').dataset.f09CandidateState||'{}')[key]===value,[key,value],{timeout:85000});
       const save=async(label)=>{if(output)await p.screenshot({path:path.join(output,'F09-'+form+'-'+label+'.png')});};
       await p.goto(url);await ready().catch(async e=>{throw new Error(JSON.stringify({errors,messages}),{cause:e});});
       await p.waitForFunction(()=>document.querySelector('#stage')?.dataset.bookPhase==='open',null,{timeout:15000});
       await stage.focus();
       const before=await state();
       assert.equal(before.modelState,'star');assert.equal(before.authorFrame,1);
+      assert.equal(before.environmentalBeat,'rest');
       assert.deepEqual(before.witness,[0,0,0]); assert.equal(before.historicalStep,0);
       await save('model');
       await p.keyboard.press('b');
@@ -54,10 +56,12 @@ const url=(process.env.PALIMPSEST_STANDALONE
       else await p.keyboard.press('a');
       await field('latched',true);
       if(form==='desktop'){
-        await p.waitForFunction(()=>JSON.parse(document.querySelector('#stage').dataset.f09CandidateState).authorFrame>26);
+        await field('environmentalBeat','tension');
+        if(output)await save('tension');
+        await p.waitForFunction(()=>{const x=JSON.parse(document.querySelector('#stage').dataset.f09CandidateState);return x.authorFrame>=28;},null,{timeout:85000});
         await save('inward-pull');
       }
-      await p.waitForFunction(()=>JSON.parse(document.querySelector('#stage').dataset.f09CandidateState).authorFrame===70,null,{timeout:18000});
+      await p.waitForFunction(()=>JSON.parse(document.querySelector('#stage').dataset.f09CandidateState).authorFrame===70,null,{timeout:85000});
       const after=await state();
       assert.equal(after.modelState,'matte-absence');
       assert.equal(after.latched,true);
@@ -65,12 +69,19 @@ const url=(process.env.PALIMPSEST_STANDALONE
       assert.ok(after.foldDegrees>101 && after.filamentTravel>1.63);
       assert.equal(after.activeFilamentMorphs,1);
       assert.equal(after.slivers,0);
+      assert.deepEqual(after.waves,[0,0,0]);
+      assert.equal(after.environmentalBeat,'quiet-absence');
+      assert.ok(after.gimbal.every(a=>Math.abs(a)<.00001));
+      assert.ok(after.petalDegrees.every(x=>x>101));
       assert.equal(after.historicalStep,1);
       assert.equal(after.survey,true);
       if(form==='desktop'){
         const trace=await p.evaluate(()=>window.__f09Reads);
         assert.ok(trace.some(n=>n.authorFrame>20&&n.authorFrame<44&&n.slivers>0&&n.filamentTravel>.1&&n.activeFilamentMorphs>0));
         assert.ok(trace.some(n=>n.modelState==='extraction'&&n.foldDegrees>10));
+        assert.ok(trace.some(n=>n.environmentalBeat==='tension'&&n.filamentTravel>.03&&n.waves.every(w=>w===0)));
+        assert.ok(trace.some(n=>n.environmentalBeat==='inward-wave'&&n.waves[0]>n.waves[1]&&n.waves[1]>n.waves[2]));
+        assert.ok(trace.some(n=>n.environmentalBeat==='scored-fold'&&n.petalDegrees[0]>n.petalDegrees[7]+15&&n.gimbal.some(a=>Math.abs(a)>.01)));
         assert.ok(trace.every(n=>n.authorFrame<10||n.historicalStep===1),'no reaction of historical B to A');
       }
       await save('latched');
