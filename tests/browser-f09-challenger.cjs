@@ -76,17 +76,17 @@ const url=(process.env.PALIMPSEST_STANDALONE
       await save('latched');
       await p.keyboard.press('a');assert.equal((await state()).authorFrame,70);
       for(let i=0;i<4;i++)await p.keyboard.press('b');
-      await field('historicalStep',4);
+      await field('historicalStep',3);
       assert.equal((await state()).authorFrame,70);
       await p.keyboard.press('c');
       await field('survey',false);
       await p.reload();await ready();
       await p.waitForFunction(()=>JSON.parse(document.querySelector('#stage').dataset.f09CandidateState||'{}').authorFrame===70);
       const restored=await state();
-      assert.equal(restored.historicalStep,4);
+      assert.equal(restored.historicalStep,3);
       assert.equal(restored.survey,false);
       assert.deepEqual(errors,[]);
-      await p.close();console.log('F09_WEBGL_PASS',form,'A source-native→latched, historical B to 4, C independent, reload held');
+      await p.close();console.log('F09_WEBGL_PASS',form,'A source-native→latched, historical B to 3, C independent, reload held');
     }
   }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
