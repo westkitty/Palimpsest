@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { FolioRuntimeState } from '../../types/atlas';
+import { createF07Scorch } from './f07ScorchedVellum';
 import { createF07Environment } from './f07Environment';
 import { authoredSlotMixer, createPortedPaperAsset, paperKey } from './portedPaperAsset';
 
@@ -52,6 +53,7 @@ export function makeF07CandidateStage(phase:(value:'loading'|'ready'|'fallback')
         /^(aclippedstockedgerail|afrontpulledge|afoldedfingerpulltab)/.test(paperKey(n.name)));
       if(opaqueRails.length!==4)throw Error('F07 opaque casting frame incomplete');
       const field=createF07Environment(scene,opaqueRails);
+      const char=createF07Scorch(scene,vellum);
       const frames:Record<Slot,number>={A:1,B:1,C:1};
       let initialized=false;
       const angle=(object:THREE.Object3D,axis:'x'|'y')=>2*Math.atan2(object.quaternion[axis],object.quaternion.w);
@@ -65,13 +67,14 @@ export function makeF07CandidateStage(phase:(value:'loading'|'ready'|'fallback')
           initialized=true;player.sample(slots.map(slot=>[slot,frames[slot]]));
           const planAngle=angle(hinge,'x'),outcomeLift=(outcome.position.y-.105)*scale;
           const environment=field.update(planAngle,outcomeLift);
-          Object.assign(audit,{
+          const scorched=char.update(environment.open,state.interactions.A.active,dt,reduced);
+          Object.assign(audit,{vellumScorch:scorched.flame,vellumCut:Number(scorched.cut),
             planAngle,outcomeLift,fieldOpen:environment.open,rubyShadow:environment.shadow,costReading:environment.cost,
             armAngle:angle(arm,'y'),gearAngle:angle(gear,'y'),
             frameA:frames.A,frameB:frames.B,frameC:frames.C,
           });
         },
-        dispose:()=>{player.dispose();field.dispose();},
+        dispose:()=>{player.dispose();field.dispose();char.dispose();},
       };
     },
     phase,
