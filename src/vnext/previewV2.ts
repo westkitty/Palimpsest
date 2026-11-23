@@ -1766,7 +1766,8 @@ function animate(dt:number):void {
     const advance=Number(earlyRevision.root.userData.inkAdvance);
     tintVellumEdges(advance);
     canvas.dataset.inkAdvance=String(advance);
-    updateF02Captive?.(dt,rig.visible&&!physicalTurn&&!cameraFlight&&!document.hidden&&state.f02.reveal===3);
+    const geodeShown=state.f02.reveal===3&&advance>=.999&&(canvas.dataset.f02Detent==='3'||canvas.dataset.f02Challenger==='fallback');
+    updateF02Captive?.(dt,rig.visible&&!physicalTurn&&!cameraFlight&&!document.hidden&&geodeShown);
   }
   if(currentFolio<FIRST_LATER_FOLIO)animateEarlyPaperTabs(dt);
   if(currentFolio>=FIRST_LATER_FOLIO){

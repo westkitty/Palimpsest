@@ -39,5 +39,6 @@ test('the exposed original captive has only a tiny body and unadorned head idle'
   assert.match(motion,/torso\.scale\.y/);
   assert.match(motion,/head\.rotation/);
   assert.doesNotMatch(motion,/\bring\b|\beye\b|inscription|geode\.rotation/);
-  assert.match(preview,/updateF02Captive\?\.\(dt,rig\.visible&&!physicalTurn&&!cameraFlight&&!document\.hidden&&state\.f02\.reveal===3\)/);
+  assert.match(preview,/updateF02Captive\?\.\(dt,rig\.visible&&!physicalTurn&&!cameraFlight&&!document\.hidden&&geodeShown\)/);
+  assert.match(preview,/geodeShown=state\.f02\.reveal===3&&advance>=\.999/);
 });
