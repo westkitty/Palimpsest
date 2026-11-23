@@ -429,7 +429,9 @@ function onPaperPointerUp(e:PointerEvent):void {
       }
     }
   }
-  const targets=laterWorld.getInteractables().filter(n=>canvas.dataset.blenderFolio!=='08'||!n.userData.f08Understudy);
+  const targets=laterWorld.getInteractables().filter(n=>
+    (canvas.dataset.blenderFolio!=='08'||!n.userData.f08Understudy)&&
+    (canvas.dataset.blenderFolio!=='10'||!n.userData.f10Understudy));
   const hits=mechanismRaycaster.intersectObjects(targets,true);
   for(const hit of hits){
     let obj:THREE.Object3D|null=hit.object;
@@ -1206,7 +1208,7 @@ function goFolio(index:number, deferCameraReset=false):void {
   if(!playableIndex(index))return;
   clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
   canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
-  delete canvas.dataset.revisionPhase;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;delete canvas.dataset.f11AuthoredFrame;delete canvas.dataset.f07CandidateState;delete canvas.dataset.f08CandidateState;
+  delete canvas.dataset.revisionPhase;delete canvas.dataset.f10CandidateState;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;delete canvas.dataset.f11AuthoredFrame;delete canvas.dataset.f07CandidateState;delete canvas.dataset.f08CandidateState;
   delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;
   delete canvas.dataset.f02Challenger;delete canvas.dataset.f02Frame;delete canvas.dataset.f02Detent;delete canvas.dataset.f02Clip;
   delete canvas.dataset.f06CandidateState;
@@ -1482,6 +1484,11 @@ function animate(dt:number):void {
       livingStagecraft?.update(dt,reducedMotion);
     }
     laterRevision?.update(laterStates[currentFolio-FIRST_LATER_FOLIO],dt,reducedMotion);
+    if(currentFolio===9&&laterRevision?.root.userData.f10AssetState==='ready'){
+      const f10=laterRevision.root.userData;
+      canvas.dataset.blenderFolio='10';
+      canvas.dataset.f10CandidateState=JSON.stringify({hinges:f10.f10Hinges,lift:f10.f10Lift,captured:f10.f10Captured});
+    }
     if(currentFolio===10&&laterRevision){
       const evidence=laterRevision.root.userData;
       canvas.dataset.revisionPhase=String(evidence.phase);

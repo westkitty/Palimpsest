@@ -4,6 +4,7 @@ import type { BaseFolioWorld } from '../engine/folios/BaseFolioWorld';
 import { getOpenPageY as pageY } from '../engine/BookAndDeskRig';
 import { buildMarcelFigure } from '../engine/drakken/CharacterFigures';
 import { buildDraxisModel } from '../engine/drakken/DraxisModels';
+import { createF10Challenger } from './challengerF10.ts';
 
 type RevisionArt = {
   root: THREE.Group;
@@ -318,6 +319,17 @@ function siege(root: THREE.Group, world: BaseFolioWorld, bump: THREE.Texture | u
   const outerWall=world.root.children.find(o=>o instanceof THREE.Group && o.children.some(child=>
     child instanceof THREE.Mesh && child.geometry instanceof THREE.TorusGeometry &&
     Math.abs(child.geometry.parameters.radius-.84)<.001));
+  const authored=createF10Challenger(center,bump);
+  root.add(authored.root);
+  const positionMatches=(o:THREE.Object3D)=>Math.abs(o.position.x-center.x)<.001&&Math.abs(o.position.z-center.z)<.001;
+  const originalCore=world.root.children.find(o=>positionMatches(o)&&o instanceof THREE.Mesh&&
+    o.geometry instanceof THREE.CylinderGeometry&&Math.abs(o.geometry.parameters.radiusTop-.62)<.001);
+  const originalTerrace=world.root.children.find(o=>positionMatches(o)&&Math.abs(o.position.y-(center.y-.03))<.001);
+  let staged=false;
+  root.userData.f10Dispose=()=>{
+    for(const n of authored.hits){const i=world.interactables.indexOf(n);if(i>=0)world.interactables.splice(i,1);}
+    authored.dispose();
+  };
   const bumpSource=bump??new THREE.Texture();
   if(!bump) receiver.userData.revisionOwnedBump=bumpSource;
   const actors=(['037','055','044'] as const).map((id,i)=>{
@@ -333,6 +345,17 @@ function siege(root: THREE.Group, world: BaseFolioWorld, bump: THREE.Texture | u
   let clock=0,fallback=0,initialized=false,hadOpened=false;
   return (state,dt,reduced)=>{
     const on=state.interactions.A.active;
+    authored.update(on,dt,reduced);
+    const ready=authored.root.userData.assetState==='ready';
+    if(ready&&!staged){
+      staged=true;
+      for(const o of [receiver,outerWall,originalCore,originalTerrace])if(o)o.visible=false;
+      outerWall?.traverse(n=>{n.userData.f10Understudy=true;});
+      world.interactables.push(...authored.hits);
+    }
+    root.userData.f10AssetState=authored.root.userData.assetState;
+    root.userData.f10Lift=authored.lift;
+    root.userData.f10Hinges=authored.root.userData.hingeCount;
     if(!initialized||reduced) fallback=Number(on);
     else fallback=toward(fallback,Number(on),dt,5);
     initialized=true;
@@ -340,12 +363,14 @@ function siege(root: THREE.Group, world: BaseFolioWorld, bump: THREE.Texture | u
     clock+=reduced?0:dt;
     // The archive collar starts at unit scale on construction, then eases to
     // its stored closed value. Do not play a false capture on a fresh page.
-    const lift=reduced?Number(on):!hadOpened?0:outerWall?clamp((outerWall.scale.y-.16)/.84):fallback;
+    const lift=ready?authored.lift:reduced?Number(on):!hadOpened?0:outerWall?clamp((outerWall.scale.y-.16)/.84):fallback;
+    let belowReceiver=0;
     for(let i=0;i<actors.length;i++){
       const { rig, hold, theta, radius, initial }=actors[i];
       const capture=ease(.09+i*.08,.91+i*.02,lift);
       const angle=theta+(i-1)*.17*capture;
-      const radial=radius*(1-capture*.79);
+      const recoil=ready&&!reduced?Math.sin(Math.PI*clamp((lift-.035-i*.035)/.29))*.09:0;
+      const radial=radius*(1-capture*.79)+recoil;
       hold.position.set(center.x+Math.cos(angle)*radial,
         center.y+.048+Math.sin(Math.PI*capture)*.12-ease(.61,.99,capture)*.49,
         center.z+Math.sin(angle)*radial);
@@ -355,8 +380,10 @@ function siege(root: THREE.Group, world: BaseFolioWorld, bump: THREE.Texture | u
       rig.group.scale.setScalar(initial*(1-.23*capture));
       // Vanish only after going below the receiver surface, never by alpha.
       hold.visible=capture<.93;
+      if(!hold.visible)belowReceiver++;
       rig.animate(clock+i*.47,!reduced&&capture<.12);
     }
+    root.userData.f10Captured=belowReceiver;
   };
 }
 
@@ -367,6 +394,7 @@ export function createRevisionWar2Art(index:6|7|8|9,world:BaseFolioWorld):Revisi
   const update=index===6?relief(root,bump):index===7?aureal(root,bump):
     index===8?heliocide(root,bump):siege(root,world,bump);
   return {root,update,dispose:()=>{
+    root.userData.f10Dispose?.();
     root.traverse(e=>e.userData.revisionOwnedBump?.dispose());
     disposeArt(root);
   }};
