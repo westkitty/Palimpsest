@@ -7,6 +7,8 @@ import { getOpenPageY as pageY } from '../engine/BookAndDeskRig';
 import { buildMarcelFigure } from '../engine/drakken/CharacterFigures';
 import { buildDraxisModel } from '../engine/drakken/DraxisModels';
 import { createF10Challenger } from './challengerF10.ts';
+import { createF10StoryPaper } from './f10StoryPaper.ts';
+import { F10FolioWorld } from '../engine/folios/FoliosAftermath';
 
 type RevisionArt = {
   root: THREE.Group;
@@ -405,6 +407,8 @@ function siege(root: THREE.Group, world: BaseFolioWorld, bump: THREE.Texture | u
     Math.abs(child.geometry.parameters.radius-.84)<.001));
   const authored=createF10Challenger(center,bump);
   root.add(authored.root);
+  const story=world instanceof F10FolioWorld?createF10StoryPaper(world,pageY):null;
+  if(story)root.add(story.root);
   const positionMatches=(o:THREE.Object3D)=>Math.abs(o.position.x-center.x)<.001&&Math.abs(o.position.z-center.z)<.001;
   const originalCore=world.root.children.find(o=>positionMatches(o)&&o instanceof THREE.Mesh&&
     o.geometry instanceof THREE.CylinderGeometry&&Math.abs(o.geometry.parameters.radiusTop-.62)<.001);
@@ -412,7 +416,7 @@ function siege(root: THREE.Group, world: BaseFolioWorld, bump: THREE.Texture | u
   let staged=false;
   root.userData.f10Dispose=()=>{
     for(const n of authored.hits){const i=world.interactables.indexOf(n);if(i>=0)world.interactables.splice(i,1);}
-    authored.dispose();
+    authored.dispose();story?.dispose();
   };
   const bumpSource=bump??new THREE.Texture();
   if(!bump) receiver.userData.revisionOwnedBump=bumpSource;
@@ -420,11 +424,14 @@ function siege(root: THREE.Group, world: BaseFolioWorld, bump: THREE.Texture | u
     const rig=buildDraxisModel(id,bumpSource);
     const hold=new THREE.Group();hold.name='F10 · Drakken containment figure '+id;
     root.add(hold);hold.add(rig.group);
-    const initial = [.25,.28,.25][i];
+    const initial = [.31,.342,.317][i];
     rig.group.scale.setScalar(initial);
     const theta=[2.89,1.51,.06][i]+.18;
     const radius=[.74,.67,.71][i];
-    return {rig,hold,theta,radius,initial};
+    const bounds=new THREE.Box3().setFromObject(rig.group);
+    const corners=[bounds.min.x,bounds.max.x].flatMap(x=>[bounds.min.y,bounds.max.y].flatMap(y=>
+      [bounds.min.z,bounds.max.z].map(z=>new THREE.Vector3(x,y,z))));
+    return {rig,hold,theta,radius,corners};
   });
   let clock=0,fallback=0,initialized=false,hadOpened=false;
   return (state,dt,reduced)=>{
@@ -440,6 +447,7 @@ function siege(root: THREE.Group, world: BaseFolioWorld, bump: THREE.Texture | u
     root.userData.f10AssetState=authored.root.userData.assetState;
     root.userData.f10Lift=authored.lift;
     root.userData.f10Hinges=authored.root.userData.hingeCount;
+    root.userData.f10Wave=authored.root.userData.wave;
     if(!initialized||reduced) fallback=Number(on);
     else fallback=toward(fallback,Number(on),dt,5);
     initialized=true;
@@ -449,24 +457,36 @@ function siege(root: THREE.Group, world: BaseFolioWorld, bump: THREE.Texture | u
     // its stored closed value. Do not play a false capture on a fresh page.
     const lift=ready?authored.lift:reduced?Number(on):!hadOpened?0:outerWall?clamp((outerWall.scale.y-.16)/.84):fallback;
     let belowReceiver=0;
+    const storyActors:string[]=[];
+    const lip=authored.lip,receiverLip=center.y+lip.top;
+    const worldCorner=new THREE.Vector3();
     for(let i=0;i<actors.length;i++){
-      const { rig, hold, theta, radius, initial }=actors[i];
-      const capture=ease(.09+i*.08,.91+i*.02,lift);
-      const angle=theta+(i-1)*.17*capture;
-      const recoil=ready&&!reduced?Math.sin(Math.PI*clamp((lift-.035-i*.035)/.29))*.09:0;
-      const radial=radius*(1-capture*.79)+recoil;
+      const { rig, hold, theta, radius, corners }=actors[i];
+      const local=ready?authored.localLift(theta):lift;
+      const brace=ease(.025,.24,local)*(1-ease(.30,.57,local));
+      const slip=ease(.30,.83,local);
+      const drop=ease(.59,.99,local);
+      const angle=theta+(i%2?-.36:.29)*slip;
+      // Brace outward against the fin, then lose footing around the hinge.
+      // Folded-paper actor sizes stay genuine during the plunge.
+      const radial=radius+.11*brace-(radius-.21)*slip;
       hold.position.set(center.x+Math.cos(angle)*radial,
-        center.y+.048+Math.sin(Math.PI*capture)*.12-ease(.61,.99,capture)*.49,
+        center.y+.048+Math.sin(Math.PI*slip)*.071-.94*drop,
         center.z+Math.sin(angle)*radial);
-      hold.rotation.y=theta+Math.PI*.5+capture*.74;
-      hold.rotation.x=-capture*.68;
-      hold.rotation.z=capture*.37+(reduced?0:Math.sin(clock*1.2+i*2.1)*(1-capture)*.026);
-      rig.group.scale.setScalar(initial*(1-.23*capture));
-      // Vanish only after going below the receiver surface, never by alpha.
-      hold.visible=capture<.93;
+      hold.rotation.y=theta+Math.PI*.52+slip*.89;
+      hold.rotation.x=-.23*brace-.72*drop+.10*Math.sin(Math.PI*slip);
+      hold.rotation.z=(i%2?-1:1)*(.19*brace+.40*slip)+(reduced?0:Math.sin(clock*1.2+i*2.1)*(1-slip)*.026);
+      hold.updateMatrix();
+      // Gate invisibility against the original receiver lip, not a timed
+      // crossfade. Bounds are in actor-local space before the current lean.
+      let top=-Infinity;
+      for(const corner of corners)top=Math.max(top,worldCorner.copy(corner).applyMatrix4(hold.matrix).y);
+      hold.visible=radial>lip.radius*.74||top>=receiverLip;
       if(!hold.visible)belowReceiver++;
-      rig.animate(clock+i*.47,!reduced&&capture<.12);
+      storyActors.push(!hold.visible?'below-lip':drop>.15?'descending':slip>.08?'slipping':brace>.1?'braced':'ready');
+      rig.animate(clock+i*.47,!reduced&&brace<.06&&slip<.015);
     }
+    root.userData.f10Story={...story?.update(state.interactions.C.active,state.interactions.B.active,lift,dt,reduced),actors:storyActors};
     root.userData.f10Captured=belowReceiver;
   };
 }

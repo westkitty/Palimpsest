@@ -172,6 +172,11 @@ export class F10FolioWorld extends BaseFolioWorld {
     this.syncState(state);
   }
 
+  /** Source geometry handles for the optional Living stage only; Archive leaves them untouched. */
+  public livingWitnessHandles(){
+    return {horizon:this.horizonView,protocol:this.protocolFlap};
+  }
+
   public syncState(state: FolioRuntimeState): void {
     this.syncLevers(state);
     this.collarTargetScaleY = state.interactions.A.active ? 1.0 : 0.16;

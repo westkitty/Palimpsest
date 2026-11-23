@@ -10,6 +10,12 @@ function release(g:THREE.Group){
   g.removeFromParent();
 }
 const clamp=(x:number)=>THREE.MathUtils.clamp(x,0,1);
+// Start on the leftmost pin, pass across the visible face, then close
+// around the back. Exact native clip shape and endpoints are preserved.
+export function f10WaveDetent(p:number,i:number):number{
+  const rank=(i+6)%12;
+  return clamp((p-.39*rank/11)/.61);
+}
 const ids=Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0'));
 
 export function createF10Challenger(center:THREE.Vector3,bump?:THREE.Texture){
@@ -21,17 +27,23 @@ export function createF10Challenger(center:THREE.Vector3,bump?:THREE.Texture){
   let hinges:THREE.Object3D[]=[],acts:THREE.AnimationAction[]=[];
   const closed=new THREE.Quaternion();
   let lift=0,p=0,initialized=false,disposed=false;
+  let waves:number[]=[], receiverTop=.049,receiverRadius=.62;
   const hits:THREE.Mesh[]=[];
   function sample(){
     if(!mixer)return;
     // Fold and refold are an exact scrub of the authored f07–35 keyframe
     // interval, not a rescaling wall or a second animation approximation.
-    for(const a of acts)a.time=p===1?a.getClip().duration:THREE.MathUtils.lerp(6/15,a.getClip().duration,p);
+    for(const [i,a] of acts.entries()){
+      const local=f10WaveDetent(p,i);
+      a.time=local===1?a.getClip().duration:THREE.MathUtils.lerp(6/15,a.getClip().duration,local);
+    }
     mixer.update(0);
     // Three.js transforms the Blender X-axis consistently under glTF Y-up.
     // Reading evaluated hinge angle (not the control target) ties the cast to
     // real material motion. The authored stand-up arc ends at pi/2.
-    lift=hinges.reduce((sum,n)=>sum+clamp(closed.angleTo(n.quaternion)/(Math.PI/2)),0)/hinges.length;
+    waves=hinges.map(n=>clamp(closed.angleTo(n.quaternion)/(Math.PI/2)));
+    lift=waves.reduce((sum,n)=>sum+n,0)/hinges.length;
+    root.userData.wave=waves.map(v=>Math.round(v*100)/100);
     root.userData.lift=lift;
     root.userData.hingeCount=hinges.length;
     root.userData.detent=Math.round(p*1000)/1000;
@@ -76,7 +88,13 @@ export function createF10Challenger(center:THREE.Vector3,bump?:THREE.Texture){
       for(const n of hits){
         n.userData={interactionType:'folioMechanism',worldId:9,slot:'A',label:'[A] Raise or fold the boundary collar'};
       }
-      root.add(model);sample();
+      root.add(model);
+      core.geometry.computeBoundingBox();
+      const bounds=core.geometry.boundingBox;
+      if(!bounds||bounds.isEmpty())throw new Error('F10 receiver geometry has no lip');
+      receiverTop=root.worldToLocal(core.localToWorld(new THREE.Vector3(0,bounds.max.y,0))).y;
+      receiverRadius=Math.min(bounds.max.x,-bounds.min.x,bounds.max.z,-bounds.min.z);
+      sample();
       root.userData.assetState='ready';
     }catch(error){
       root.userData.assetState='fallback';root.userData.failure=String(error);
@@ -87,10 +105,16 @@ export function createF10Challenger(center:THREE.Vector3,bump?:THREE.Texture){
   return {
     root,hits,
     get lift(){return lift;},
+    get lip(){return {top:receiverTop,radius:receiverRadius};},
+    localLift(azimuth:number){
+      if(!waves.length)return 0;
+      const at=THREE.MathUtils.euclideanModulo(-azimuth/(Math.PI/6),12), low=Math.floor(at);
+      return THREE.MathUtils.lerp(waves[low],waves[(low+1)%12],at-low);
+    },
     update(open:boolean,dt:number,reduced:boolean){
       if(!initialized||reduced)p=Number(open);
       else {
-        const step=Math.max(0,dt)/1.26;
+        const step=Math.max(0,dt)/2.12;
         p=open?Math.min(1,p+step):Math.max(0,p-step);
       }
       initialized=true;sample();

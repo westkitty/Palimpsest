@@ -1578,7 +1578,7 @@ function animate(dt:number):void {
     if(currentFolio===9&&laterRevision?.root.userData.f10AssetState==='ready'){
       const f10=laterRevision.root.userData;
       canvas.dataset.blenderFolio='10';
-      canvas.dataset.f10CandidateState=JSON.stringify({hinges:f10.f10Hinges,lift:f10.f10Lift,captured:f10.f10Captured});
+      canvas.dataset.f10CandidateState=JSON.stringify({hinges:f10.f10Hinges,lift:f10.f10Lift,captured:f10.f10Captured,wave:f10.f10Wave,story:f10.f10Story});
     }
     if(currentFolio===10&&laterRevision){
       const evidence=laterRevision.root.userData;
@@ -1731,6 +1731,10 @@ function fitBookCamera(openProgress:number):void {
     // foreground / middle stage, against the raised spiral in the rear.
     camera.position.set(3.05*scale,7.34*scale,9.92*scale);
     controls?.target.set(0,.40,.08);
+  }else if(currentFolio===9&&openProgress>.99){
+    const witnessScale=scale*THREE.MathUtils.lerp(.68,.98,THREE.MathUtils.smoothstep(aspect,.52,1.28));
+    camera.position.set(.20*witnessScale,6.18*witnessScale,9.05*witnessScale);
+    controls?.target.set(.38,.42,.05);
   }else if(currentFolio===2&&openProgress>.99){
     camera.position.set(4.0*scale,7.4*scale,9.8*scale);
     controls?.target.set(0,.56,.08);
