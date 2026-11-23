@@ -5,7 +5,7 @@ The shipped paper theatre is exported from the reviewed `Palimpsest_F08_The_Aure
 | Slot | Native Blender motion | Runtime constraint |
 |---|---|---|
 | A | Two actual shutter hinges rotate 11.5° to 87.1° in opposite directions, through authored frames 16–40. | The registration clip and active plasma appear only on A. Arrival and both other slots alone keep plasma off. |
-| B | Slider advances, the original full gold ring changes to three asymmetrically displaced red arcs and the low broken profile. Frames 65–88. | No change to shutters, portal, or right wing. |
+| B | Slider advances, the original full gold ring changes to three asymmetrically displaced red arcs and the low broken profile at Tiger, distinct from the working portal. Frames 65–88. | No change to shutters, portal, or right wing. |
 | C | The four linked paper creases open across frames 103–153, carrying five physical red-ringed medallions on each real card. | Twenty marks, not a map. C does not power the gate. |
 
 The distinct native clip tracks are evaluated separately; reader-controlled motions can open, reverse, or run concurrently without colliding in the mixer. Reduced motion settles to the same authored end states. The real A/B/C UI and paper controls remain visible and clickable. An unavailable or malformed asset keeps the prior reader scene. `canvas.dataset.blenderFolio` is `08` only on successful mount; `f08CandidateState` records native frames, ring count and actual plasma power.

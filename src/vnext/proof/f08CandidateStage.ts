@@ -18,6 +18,12 @@ export function makeF08CandidateStage(onReady:()=>void,onFail:()=>void){
       model.traverse(n=>{
         if(/^C_world_\d\d.*opaque_crimson_Blood_Ring$/.test(n.name))rings.push(n);
         if(n instanceof THREE.Mesh){n.castShadow=true;n.receiveShadow=true;}
+        // The source fracture profile was centered on the flat Tiger emblem.
+        // Seat the exact fragments at the original 3D Tiger's Living-only plinth,
+        // not over the separate functional Hookshot aperture.
+        if(n.name.startsWith('B_low_crimson_fracture_band_fragment')&&n.parent?.name.startsWith('F08_B_VIS_')){
+          n.parent.position.add(new THREE.Vector3(-1.51,-.40,1.52));
+        }
         const slot = /^(Opaque_lower_shield_plate|Shield_crossrail_bridge)/.test(n.name)?'A'
           : /^(F08_B_SLIDER|Assumption_comparator_backing_card)/.test(n.name)?'B'
           : /^(Black_laminated_accordion_card|Side-on_scored_anchor_root)/.test(n.name)?'C':undefined;
