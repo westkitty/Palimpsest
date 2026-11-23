@@ -501,7 +501,7 @@ let witnessCamera: {position: THREE.Vector3; target: THREE.Vector3} | null = nul
 let witnessCollapse=0;
 let updateF02Captive:((dt:number,visible:boolean)=>void)|null=null;
 let applyWitnessScene:((collapse:number,glint:number)=>void)|null=null;
-type CameraFlight = {from: THREE.Vector3; to: THREE.Vector3; lookFrom: THREE.Vector3; lookTo: THREE.Vector3; elapsed: number; seconds: number; destination: 'witness' | 'overhead' | 'f10'; collapseFrom:number;wallTick:number};
+type CameraFlight = {from: THREE.Vector3; to: THREE.Vector3; lookFrom: THREE.Vector3; lookTo: THREE.Vector3; elapsed: number; seconds: number; destination: 'witness' | 'overhead' | 'f10'; collapseFrom:number;wallTick:number;realStart?:number};
 let cameraFlight: CameraFlight | null = null;
 let vaultLeaf: THREE.Group | null = null;
 let sourceWheel: THREE.Group | null = null;
@@ -1906,7 +1906,7 @@ function beginFlight(to: THREE.Vector3, lookTo: THREE.Vector3, destination: 'wit
   if(!controls)return;
   const from=camera.position.clone();
   const lookFrom=controls.target.clone();
-  cameraFlight={from,to,lookFrom,lookTo,elapsed:0,seconds:reducedMotion?0:destination==='overhead'?F02_RETURN_SECONDS:seconds,destination,collapseFrom:witnessCollapse,wallTick:performance.now()};
+  cameraFlight={from,to,lookFrom,lookTo,elapsed:0,seconds:reducedMotion?0:destination==='overhead'?F02_RETURN_SECONDS:seconds,destination,collapseFrom:witnessCollapse,wallTick:performance.now(),realStart:destination==='f10'?performance.now():undefined};
   controls.enabled=false;
   if(reducedMotion)advanceFlight(1);
 }
@@ -1918,7 +1918,7 @@ function advanceFlight(dt:number):void {
   // unrelated 60ms simulation cap or skipping a cue on a slow GPU.
   const step=document.hidden?0:Math.max(dt,Math.min(.12,(now-f.wallTick)/1000));
   f.wallTick=now;
-  f.elapsed=Math.min(f.seconds,f.elapsed+step);
+  f.elapsed=Math.min(f.seconds,f.realStart===undefined?f.elapsed+step:(now-f.realStart)/1000);
   const t=f.seconds===0?1:THREE.MathUtils.clamp(f.elapsed/f.seconds,0,1);
   const eased=t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
   controls.maxDistance=Math.max(19,f.to.distanceTo(f.lookTo)+3);
