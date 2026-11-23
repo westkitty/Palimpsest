@@ -13,12 +13,14 @@ const out=process.env.PALIMPSEST_PROOF_DIR;
    const errors=[];p.on('pageerror',x=>errors.push(String(x)));
    await p.addInitScript(()=>{
     window.__f01Trace=[];
+    window.__f01Performances=[];
     const attach=()=>{
      const stage=document.querySelector('#stage');if(!stage){requestAnimationFrame(attach);return;}
      new MutationObserver(()=>{
       if(!stage.dataset.f01Stage)return;
       const s=JSON.parse(stage.dataset.f01Stage),last=window.__f01Trace.at(-1);
       const beat=s.stations.filter(n=>n===1).length;
+      window.__f01Performances.push({stations:s.stations,attention:s.attention});
       const next={beat,stations:s.stations,arch:s.archJoin>0,territories:s.territories};
       if(!last||[last.beat,last.arch].join()!==[next.beat,next.arch].join())window.__f01Trace.push(next);
      }).observe(stage,{attributes:true,attributeFilter:['data-f01-stage']});
@@ -57,9 +59,15 @@ const out=process.env.PALIMPSEST_PROOF_DIR;
      assert.ok(trace.every(t=>!t.arch||t.beat===3));
      assert.ok(trace.some(t=>t.beat===1&&t.territories[0]>t.territories[2]));
      assert.equal(new Set(s.idleTimes.map(v=>v.toFixed(2))).size,3);
+     await p.waitForFunction(()=>[0,1,2].every(i=>window.__f01Performances.some(
+       f=>Math.abs(f.attention?.[i]?.yaw??0)>.07)),null,{timeout:90000});
+     const performance=await p.evaluate(()=>window.__f01Performances);
+     assert.ok(performance.every(f=>f.stations.every((v,i)=>v===1||f.attention[i].visibleAge===0)));
+     await snap('notice');
    }else{
      assert.deepEqual([...new Set(trace.map(t=>t.beat))],[0,3]);
      assert.deepEqual(s.idleTimes,[0,0,0]);
+     assert.ok(s.attention.every(a=>a.visibleAge===0&&a.yaw===0));
    }
    for(const [key,detent] of [['b',3],['c',7]]){
      await press(key);await verify({detent,join:1,moving:false});

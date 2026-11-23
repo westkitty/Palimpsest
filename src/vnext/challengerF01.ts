@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import type { FolioActions } from './folioLogic.ts';
 import { bindF01EnvironmentalStage,f01CreaseProgress } from './f01EnvironmentalStage.ts';
+import { bindF01FigurePerformance } from './f01FigurePerformance.ts';
 
 const prefix = 'F01_ABS_';
 const bits = [1, 2, 4] as const;
@@ -40,7 +41,6 @@ export type F01Challenger = {
 export function bindF01Mechanisms(model: THREE.Group, clips: THREE.AnimationClip[]) {
   const byName=new Map(clips.map(clip=>[clip.name,clip]));
   const mixer=new THREE.AnimationMixer(model);
-  const idleMixer=new THREE.AnimationMixer(model);
   const layer=bindF01EnvironmentalStage(model);
   const cache=new Map<string,THREE.AnimationClip[]>();
   const station=(track:THREE.KeyframeTrack)=>Number(/^F01_(?:HINGE|GUSSET|DETAIL)_([123])(?:[_.]|$)/.exec(track.name)?.[1]??0)-1;
@@ -53,17 +53,8 @@ export function bindF01Mechanisms(model: THREE.Group, clips: THREE.AnimationClip
     cache.set(name,split.map((tracks,s)=>new THREE.AnimationClip(name+'_station_'+s,clip.duration,tracks)));
   }
 
-  const idle=byName.get('F01_ACTOR_IDLE');
-  // Preserve original source movements: pupil-free crystal edges, Wordstreamer's
-  // small bowed profile, and NiAlBu's paper brow/observation plate.
-  const idlePatterns=[/Tiger/i,/Wordstreamer|^Mesh199\./i,/NiAlBu/i];
-  const actions=idle?idlePatterns.map((rule,s)=>{
-    const clip=new THREE.AnimationClip('F01 authored actor '+s,idle.duration,idle.tracks.filter(t=>rule.test(t.name)));
-    if(!clip.tracks.length)throw new Error('F01 actor idle absent: '+s);
-    const action=idleMixer.clipAction(clip).play();
-    action.paused=true;return action;
-  }):[];
-  let active:Flight|null=null,flight:Flight|null=null,shown=0,hasInitialPose=false,idleClock=0;
+  const performance=bindF01FigurePerformance(model,byName.get('F01_ACTOR_IDLE'));
+  let active:Flight|null=null,flight:Flight|null=null,shown=0,hasInitialPose=false;
   const isA=(f:Flight)=>Boolean((f.from^f.to)&1);
   const normalize=(f:Flight)=>f.from<f.to?f.progress:1-f.progress;
   const aDuration=(to:number)=>to&1?3.65:1.55;
@@ -87,8 +78,8 @@ export function bindF01Mechanisms(model: THREE.Group, clips: THREE.AnimationClip
     flight=null;sample(start(value^1,value,1));shown=value;
   };
   return {
-    get idle(){return actions.length===3;},
-    update(target:number,dt:number,reduced:boolean){
+    get idle(){return true;},
+    update(target:number,dt:number,reduced:boolean,stageVisible=true){
       const step=Math.min(Math.max(dt,0),.09);
       if(reduced||!hasInitialPose){
         if(!hasInitialPose||target!==shown||flight)detent(target);
@@ -107,18 +98,10 @@ export function bindF01Mechanisms(model: THREE.Group, clips: THREE.AnimationClip
         }
       }
       const stage=layer.update(flight&&isA(flight)?normalize(flight):Number(Boolean(shown&1)));
-      if(!reduced)idleClock=(idleClock+step)%300;
-      const idleTimes=actions.map((a,i)=>{
-        const period=a.getClip().duration;
-        const t=reduced?0:(idleClock*[.77,1.05,.62][i]+[0,1.32,2.51][i])%period;
-        // Separate authored child bindings: no underfoot sliding, no blink while stored folded.
-        a.setEffectiveWeight(reduced?0:Math.max(0,(stage.stations[i]-.82)/.18));
-        a.time=t;return t;
-      });
-      idleMixer.update(0);
-      return {settled:shown,clip:flight?.name??active?.name??'',moving:Boolean(flight),stage:{...stage,idleTimes}};
+      const figure=performance.update(stage.stations,step,reduced,stageVisible);
+      return {settled:shown,clip:flight?.name??active?.name??'',moving:Boolean(flight),stage:{...stage,...figure}};
     },
-    dispose(){mixer.stopAllAction();mixer.uncacheRoot(model);idleMixer.stopAllAction();idleMixer.uncacheRoot(model);},
+    dispose(){mixer.stopAllAction();mixer.uncacheRoot(model);performance.dispose();},
   };
 }
 
@@ -177,7 +160,11 @@ export function createF01Challenger(
     root,
     update(next, dt, motion) {
       state=next;reduced=motion;
-      if (animator) Object.assign(root.userData,animator.update(f01Mask(state.f01),dt,reduced));
+      if (animator) {
+        let visible=true;
+        for(let node:THREE.Object3D|null=root;node&&visible;node=node.parent)visible=node.visible;
+        Object.assign(root.userData,animator.update(f01Mask(state.f01),dt,reduced,visible));
+      }
     },
     dispose() {
       if (disposed) return;
