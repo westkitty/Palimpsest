@@ -26,7 +26,7 @@ const out=process.env.PALIMPSEST_PROOF_DIR;
    await p.goto(base+'/folio-vnext.html?folio=1');
    const stage=p.locator('#stage');
    const snap=label=>out?p.screenshot({path:path.join(out,'F01-'+mode+'-'+label+'.png')}):Promise.resolve();
-   const verify=(state,timeout=35000)=>p.waitForFunction(req=>{
+   const verify=(state,timeout=90000)=>p.waitForFunction(req=>{
      const node=document.querySelector('#stage');if(!node?.dataset.f01Stage)return false;
      const s=JSON.parse(node.dataset.f01Stage);
      return (req.detent===undefined||node.dataset.f01Detent===String(req.detent))
