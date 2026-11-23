@@ -1,3 +1,4 @@
+import { makeF09MechanicalSound } from './f09MechanicalSound.ts';
 import { invitationFrame, makePrimaryPaperGrip, primaryPaperSlot } from './primaryPaperControl.ts';
 import {F02_RETURN_CREASE,F02_RETURN_NEAR,F02_RETURN_SECONDS,f02WitnessReturn} from './f02WitnessReturn.ts';
 import {f10ReadingView,type F10ReadingView} from './f10ReadingViews.ts';
@@ -140,6 +141,7 @@ type PhysicalTurn = {
 };
 let physicalTurn: PhysicalTurn | null = null;
 let queuedBridgeFolio:number|null=null;
+const f09Sound=makeF09MechanicalSound();
 let f09Run:number|null=null;
 let f09LastBeat:ReturnType<typeof f09ForcedBeat>|null=null;
 let f09FallbackDeadline:number|undefined;
@@ -1363,7 +1365,7 @@ function updateNav():void {
 }
 function goFolio(index:number, deferCameraReset=false):void {
   if(!playableIndex(index))return;
-  cancelF09Run();clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
+  f09Sound.stop();cancelF09Run();clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
   canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
   f10View='book';
   delete canvas.dataset.f10View;delete canvas.dataset.f10ViewMotion;
@@ -1733,6 +1735,8 @@ function animate(dt:number):void {
     if(!physicalTurn.incomingClockStarted){physicalTurn.incomingClockStarted=true;dt=0;}
   }
   updatePrimaryPaperControl(dt);
+  if(currentFolio===F09_INDEX)f09Sound.update(dt,f09Run??-1,
+    laterStates[F09_INDEX-FIRST_LATER_FOLIO].interactions.B.locked,reducedMotion);
   if(currentFolio===CODA_INDEX){
     updateClosingBeat(dt);
     return;
@@ -1809,6 +1813,7 @@ function handleAction(slot:Slot):void {
     const prior=laterStates[idx];
     const next=operateLater(prior,slot);
     const catastrophe=armsF09(currentFolio,slot,prior.interactions.B.locked,next.interactions.B.locked);
+    if(currentFolio===F09_INDEX&&slot==='B'&&!reducedMotion&&!prior.interactions.B.locked)f09Sound.arm();
     if(catastrophe){f09Run=0;f09LastBeat=null;}
     laterStates[idx]=next;saveLaterStudy();
     laterWorld?.syncState(next,activeSpecimen(next),activeTime);
@@ -2260,7 +2265,7 @@ function fallbackPage(index:number):void {
   }
 }
 function destroy():void {
-  cancelF09Run();cancelAnimationFrame(frame);
+  f09Sound.dispose();cancelF09Run();cancelAnimationFrame(frame);
   window.removeEventListener('keydown',handleKeys);
   window.removeEventListener('keyup',releaseKey);
   window.removeEventListener('resize',resize);
