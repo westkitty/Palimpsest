@@ -1464,10 +1464,14 @@ function goFolio(index:number, deferCameraReset=false):void {
       },()=>{if(rig===stageOwner)canvas.dataset.blenderFolio='unavailable';});
       stageOwner.add(staged.root);
       laterRevision={root:staged.root,update(actual,dt,reduce){
-        art.update(actual,dt,reduce);staged.update(actual,dt,reduce);
+        staged.update(actual,dt,reduce);
+        if(staged.root.userData.assetState==='ready')art.root.userData.authoredCue=staged.root.userData.cueTime;
+        art.update(actual,dt,reduce);
         if(rig===stageOwner&&staged.root.userData.assetState==='ready'){
-          const {authoredFrames,rings}=staged.root.userData;
-          canvas.dataset.f08CandidateState=JSON.stringify({authoredFrames,rings,plasma:art.root.userData.portalPower});
+          const {authoredFrames,rings,shutterFrames,leafFrames,comparison}=staged.root.userData;
+          const {portalPower:plasma,portalCue,collarPower,rimPower,foldLight,marcelLight}=art.root.userData;
+          canvas.dataset.f08CandidateState=JSON.stringify({authoredFrames,rings,shutterFrames,leafFrames,comparison,
+            plasma,portalCue,collarPower,rimPower,foldLight,marcelLight});
         }
       },dispose(){staged.dispose();art.dispose();}};
     }

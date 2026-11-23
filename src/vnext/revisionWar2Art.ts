@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { f08CueClock, f08Cue } from './f08Motion.ts';
 import type { FolioRuntimeState } from '../types/atlas';
 import type { BaseFolioWorld } from '../engine/folios/BaseFolioWorld';
 import { getOpenPageY as pageY } from '../engine/BookAndDeskRig';
@@ -193,7 +194,7 @@ function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
   }
 
   const plasmaMaterial=new THREE.ShaderMaterial({
-    uniforms:{uTime:{value:0},uEnergy:{value:0}},
+    uniforms:{uTime:{value:0},uEnergy:{value:0},uImpulse:{value:0}},
     vertexShader:`
       varying vec2 p;
       void main(){
@@ -205,6 +206,7 @@ function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
       varying vec2 p;
       uniform float uTime;
       uniform float uEnergy;
+      uniform float uImpulse;
       void main(){
         float r=length(p), a=atan(p.y,p.x);
         float swirl=sin(a*3.0-r*14.0+uTime*1.75);
@@ -214,7 +216,8 @@ function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
         float corona=smoothstep(.15,.90,r);
         vec3 base=mix(vec3(.01,.05,.11),vec3(.13,.70,.79),clamp(seam*.75+corona*.35,0.,1.));
         vec3 surge=vec3(.37,.88,1.)*min(1.0,sheath*(.48+.36*swirl)+seam*.37);
-        gl_FragColor=vec4(base+surge,uEnergy*(1.0-smoothstep(.974,1.0,r)));
+        vec3 body=base*.87+surge*(.63+uImpulse*.38);
+        gl_FragColor=vec4(body,uEnergy*(1.0-smoothstep(.974,1.0,r)));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }
@@ -224,6 +227,19 @@ function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
   const plasma=arc(gate,new THREE.CircleGeometry(.449,50),plasmaMaterial,0,.029);
   plasma.castShadow=plasma.receiveShadow=false;
   plasma.visible=false;
+
+  const rimEnergy:THREE.Mesh[]=[];
+  const rimMat=new THREE.MeshBasicMaterial({color:0x70dbee});
+  for(let i=0;i<12;i++){
+    // A small directional surge traces the already-built circle; it never
+    // turns the aperture itself into another shape or affects B/C.
+    const rim=arc(gate,new THREE.TorusGeometry(.459,.009,4,9,Math.PI/5.85),rimMat,0,.055);
+    rim.rotation.z=-.55+i*Math.PI/6;rim.castShadow=false;rim.visible=false;rimEnergy.push(rim);
+  }
+  const foldSpill=new THREE.PointLight(0x72d7ff,0,3.28,2);
+  foldSpill.name='F08 reflected Hookshot light on shutters and folds';foldSpill.position.set(0,.08,.39);gate.add(foldSpill);
+  const marcelSpill=new THREE.PointLight(0x97cfff,0,1.65,2);
+  marcelSpill.name='F08 reflected Hookshot light on Marcel';root.add(marcelSpill);
 
   const collar=new THREE.Group();
   collar.name='F08 · Hookshot registration collar';collar.position.set(.41,pageY(.41)+.061,-.36);root.add(collar);
@@ -249,23 +265,33 @@ function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
   const shoes=new THREE.Group();shoes.name='F08 · Marcel paper foot anchors';
   shoes.position.set(1.59,pageY(1.59)+.012,.38);root.add(shoes);
   for(const dz of [-.075,.075])slab(shoes,.40,.018,.06,ink,0,0,dz);
-  let t=0,p=0,initialized=false;
+  let t=0,cueTime=0,wasOn=false,initialized=false;
   return (state,dt,reduced) => {
     const on = state.interactions.A.active;
-    if (reduced || !initialized) p=Number(on);
-    else p=toward(p,Number(on),dt,on?2.8:7);
-    initialized=true;
-    t+=reduced?0:dt;
-    const power=on?ease(.45,.87,p):0;
-    root.userData.portalPower=power;
-    plasma.visible=power>.008;
-    plasmaMaterial.uniforms.uEnergy.value=power*.92;
+    cueTime=typeof root.userData.authoredCue==='number'?root.userData.authoredCue:
+      f08CueClock(cueTime,wasOn,on,dt,reduced||!initialized);
+    initialized=true;wasOn=on;
+    const cue=f08Cue(cueTime,on);
+    t+=reduced?0:Math.min(.07,Math.max(0,dt))*(cue.impulse>.001?1.66:.32);
+    root.userData.portalPower=cue.plasma;
+    root.userData.portalCue=cue.phase;
+    root.userData.collarPower=cue.collar;
+    root.userData.rimPower=cue.rim;
+    root.userData.foldLight=cue.plasma*3.3+cue.rim*.28+cue.impulse*2.5;
+    root.userData.marcelLight=cue.plasma*.84+cue.impulse*.68;
+    plasma.visible=cue.plasma>.005;
+    plasmaMaterial.uniforms.uEnergy.value=cue.plasma*.96;
+    plasmaMaterial.uniforms.uImpulse.value=cue.impulse;
     plasmaMaterial.uniforms.uTime.value=reduced?0:t;
-    clip.rotation.z=-.24+p*.27;
-    leads.forEach((light,i)=>{light.visible=on&&p>.055+i*.058;});
-    actor.rotation.y=-.52-p*.22+(reduced?0:Math.sin(t*.8)*.035);
-    actor.rotation.z=-p*.055+(reduced?0:Math.sin(t*.9)*.026);
-    actor.position.y=pageY(1.59)+.025; // weight shift, not levitation
+    clip.rotation.z=-.24+cue.collar*.27;
+    leads.forEach((light,i)=>{light.visible=on&&cue.collar>.055+i*.128;});
+    rimEnergy.forEach((rim,i)=>{rim.visible=on&&cue.rim>(i+.55)/12;});
+    foldSpill.intensity=root.userData.foldLight;
+    marcelSpill.intensity=root.userData.marcelLight;
+    marcelSpill.position.set(actor.position.x-.38,actor.position.y+.46,actor.position.z+.20);
+    actor.rotation.y=-.52-cue.plasma*.22+(reduced?0:Math.sin(t*.8)*.035);
+    actor.rotation.z=-cue.plasma*.048-cue.impulse*.059+(reduced?0:Math.sin(t*.9)*.020);
+    actor.position.y=pageY(1.59)+.025; // anchored paper weight shift, not levitation
   };
 }
 
