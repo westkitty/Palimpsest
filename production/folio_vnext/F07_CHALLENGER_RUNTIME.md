@@ -15,3 +15,7 @@ Reproduce from the reviewed source file: `blender -b -t 2 Palimpsest_F07_Fold_Ca
 ## Environmental reading pass
 
 The hinge still samples the original Blender track. Its two drawn vectors now register onto a single shallow cardstock field below the membrane. An independent cost state interrupts the same route lines rather than replacing them with another map. The ruby-tinted cast shadow follows the real hinge motion and lands by the two relief workers. Their physical parcel pass follows its own clock and continues after the map folds or the cost card moves. Reduced motion shows a steady handoff pose rather than rapid movement; a portrait-only camera preset leaves the controls in frame and spends more of the screen width on the map and workers. All positions are editorial registrations to the model diagram, not a reconstruction of Pharos or a count of losses.
+
+### Structural shadow reading
+
+A lifts a frame, not a sheet of darkness. Its opaque native edge rails and pull tab now project distinct burgundy silhouettes across the same receiving relief and onto the page margin. The translucent field and open space between the rails remain clear; the localized shade reaches toward the relief bench but does not change the independently keyed cost and relief actions. The shape is derived from the evaluated hinges and baked source meshes, not a separate timed sweep. It folds away with A. The same matte treatment renders with standard GPU shadow-map support disabled; no second camera or interaction was introduced.

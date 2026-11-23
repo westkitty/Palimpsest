@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
+import {getOpenPageY} from '../engine/BookAndDeskRig';
+import {createPaperCastSilhouette} from './paperCastSilhouette';
 import url from './assets/palimpsest-f10-challenger.glb?url';
 
 function release(g:THREE.Group){
@@ -29,6 +31,7 @@ export function createF10Challenger(center:THREE.Vector3,bump?:THREE.Texture){
   let lift=0,p=0,initialized=false,disposed=false;
   let waves:number[]=[], receiverTop=.049,receiverRadius=.62;
   const hits:THREE.Mesh[]=[];
+  let cast:ReturnType<typeof createPaperCastSilhouette>|undefined;
   function sample(){
     if(!mixer)return;
     // Fold and refold are an exact scrub of the authored f07–35 keyframe
@@ -47,6 +50,7 @@ export function createF10Challenger(center:THREE.Vector3,bump?:THREE.Texture){
     root.userData.lift=lift;
     root.userData.hingeCount=hinges.length;
     root.userData.detent=Math.round(p*1000)/1000;
+    cast?.update(p);
   }
   const load=(g:GLTF)=>{
     if(disposed){release(g.scene);return;}
@@ -89,6 +93,14 @@ export function createF10Challenger(center:THREE.Vector3,bump?:THREE.Texture){
         n.userData={interactionType:'folioMechanism',worldId:9,slot:'A',label:'[A] Raise or fold the boundary collar'};
       }
       root.add(model);
+      // The raised fins reach across the adjacent receiving stock in their
+      // actual sequence. The untouched black core naturally occludes the
+      // print in its recess; the inhabited ground is outside this receiver.
+      cast=createPaperCastSilhouette(root,leaves as THREE.Mesh[],{
+        direction:[-1.48,.94],datum:.008,bounds:[-2.78,.91,-1.50,1.71],
+        receiver:x=>getOpenPageY(x+center.x)-center.y+.046,
+        color:0x0b111a,opacity:.63,
+      });
       core.geometry.computeBoundingBox();
       const bounds=core.geometry.boundingBox;
       if(!bounds||bounds.isEmpty())throw new Error('F10 receiver geometry has no lip');
@@ -97,6 +109,7 @@ export function createF10Challenger(center:THREE.Vector3,bump?:THREE.Texture){
       sample();
       root.userData.assetState='ready';
     }catch(error){
+      cast?.dispose();cast=undefined;
       root.userData.assetState='fallback';root.userData.failure=String(error);
       mixer?.stopAllAction();mixer?.uncacheRoot(model);release(model);model=null;mixer=null;hits.length=0;
     }
@@ -120,7 +133,7 @@ export function createF10Challenger(center:THREE.Vector3,bump?:THREE.Texture){
       initialized=true;sample();
     },
     dispose(){
-      disposed=true;mixer?.stopAllAction();
+      disposed=true;cast?.dispose();cast=undefined;mixer?.stopAllAction();
       if(model){mixer?.uncacheRoot(model);release(model);}
       model=null;mixer=null;hits.length=0;root.removeFromParent();
     },

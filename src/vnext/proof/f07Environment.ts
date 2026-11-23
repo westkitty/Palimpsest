@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {createPaperCastSilhouette} from '../paperCastSilhouette.ts';
 
 /** Registered to the reviewed vellum diagram, not a reconstruction of Pharos. */
 export const f07Route = [
@@ -15,7 +16,7 @@ export function f07EnvironmentalRead(planAngle:number,costLift:number){
   const cost=THREE.MathUtils.clamp(costLift/.28,0,1);
   return {open,cost,shadow:THREE.MathUtils.smoothstep(open,.13,.93)};
 }
-export function createF07Environment(parent:THREE.Object3D){
+export function createF07Environment(parent:THREE.Object3D,casters:readonly THREE.Mesh[] = []){
   const root=new THREE.Group();root.name='F07 • same schematic terrain seen as plan and attrition';parent.add(root);
   const meshes:THREE.Mesh[]=[];
   const materials=new Set<THREE.Material>();
@@ -69,48 +70,22 @@ export function createF07Environment(parent:THREE.Object3D){
     }
     place('Interrupted cost impression on same line '+(index+1),v,i,wear);
   }
-  // Paper-toned, feather-layered ruby sweep anchored at the actual embossed
-  // ruby marker. The last edge lands between the support bench and board.
-  const shadowMats=[.21,.26,.37].map(opacity=>new THREE.MeshBasicMaterial({
-    color:0x9a283b,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide,
-    polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2,
-  }));
-  const shadowGroup=new THREE.Group();shadowGroup.name='Printed ruby cast shadow runs toward the relief';root.add(shadowGroup);
-  const left=-2.63,right=-.64;
-  shadowMats.forEach((mat,k)=>{
-    const w=.52-k*.106;
-    const geometry=new THREE.PlaneGeometry(1,1,18,1);
-    geometry.rotateX(-Math.PI/2);
-    const m=new THREE.Mesh(geometry,mat);m.name='Overlaid feathered ruby ink '+(k+1);
-    shadowGroup.add(m);meshes.push(m);materials.add(mat);
-    m.userData.halfWidth=w;
+  const shadow=createPaperCastSilhouette(root,casters,{
+    direction:[-1.12,.53],datum:.247,bounds:[-2.77,1.31,-1.10,1.05],
+    receiver:(x,z)=>x>=-1.33&&x<=1.33&&z>=-1.11&&z<=.63?f07FieldHeight(x,z)+.014:.093,
+    color:0x351219,opacity:.68,
   });
-  let lastShadow=-1;
   const update=(planAngle:number,costLift:number)=>{
     const s=f07EnvironmentalRead(planAngle,costLift);
     plan.opacity=.07+.79*s.open*(1-s.cost*.49);
     wear.opacity=.22*s.open+.69*s.cost*(.30+s.open*.70);
-    shadowGroup.visible=s.shadow>.015;
-    if(Math.abs(lastShadow-s.shadow)>.004){
-      lastShadow=s.shadow;
-      const end=THREE.MathUtils.lerp(right,left,s.shadow);
-      for(const m of shadowGroup.children as THREE.Mesh[]){
-        const a=m.geometry.getAttribute('position');
-        const w=Number(m.userData.halfWidth);
-        for(let i=0;i<a.count;i++){
-          const t=(i%19)/18,l=Math.sign(i<19?1:-1);
-          const x=THREE.MathUtils.lerp(right,end,t);
-          const z=THREE.MathUtils.lerp(-.27,.67,t*s.shadow)+l*w*(.09+.92*t);
-          const y=Math.abs(x)<1.4?f07FieldHeight(x,z)+.012: .077+Math.max(0,1-(Math.abs(x)-1.4)*4.2)*.168;
-          a.setXYZ(i,x,y,z);
-        }
-        a.needsUpdate=true;m.geometry.computeBoundingSphere();
-      }
-    }
+    // The original opaque plan rails interrupt the vellum's transmission.
+    // Light goes through the membrane and escapes through the real openings.
+    shadow.update(s.open);
     return s;
   };
   return {update,dispose(){
-    root.removeFromParent();
+    shadow.dispose();root.removeFromParent();
     meshes.forEach(m=>m.geometry.dispose());materials.forEach(m=>m.dispose());
   }};
 }

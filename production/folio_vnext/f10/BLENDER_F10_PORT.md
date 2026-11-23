@@ -13,3 +13,7 @@ node --test tests/challenger-f10.test.mjs
 npm run lint && npm run build
 ```
 `tests/browser-f10-challenger.cjs` requires the actual loaded WebGL donor, shows mid-travel in normal motion, checks settled capture, holds A steady during B/C operations, and then restores the closed collar and three visible figures. It also checks the reduced-motion portrait variant, not physical-device FPS.
+
+### Structural shadow reading
+
+The twelve existing opaque fin meshes cast individually resolved matte silhouettes onto the adjacent paper as their pinned hinges rise in sequence. The cutout shows the reach of the boundary on land outside the well while the original recess, inhabited horizon, and independent Postwar Protocols reading remain unchanged. The cast follows evaluated Blender geometry, disappears as the collar folds back down, and is drawn on receiving stock even without renderer shadow maps. No new light effect, camera, or control is required.

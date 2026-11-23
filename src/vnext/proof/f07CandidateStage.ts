@@ -48,7 +48,10 @@ export function makeF07CandidateStage(phase:(value:'loading'|'ready'|'fallback')
         const slot=clip.name[0] as Slot;
         return slots.includes(slot)&&clip.name.startsWith(slot+'__')?slot:undefined;
       },fps);
-      const field=createF07Environment(scene);
+      const opaqueRails=hinge.children.filter((n):n is THREE.Mesh=>n instanceof THREE.Mesh&&
+        /^(aclippedstockedgerail|afrontpulledge|afoldedfingerpulltab)/.test(paperKey(n.name)));
+      if(opaqueRails.length!==4)throw Error('F07 opaque casting frame incomplete');
+      const field=createF07Environment(scene,opaqueRails);
       const frames:Record<Slot,number>={A:1,B:1,C:1};
       let initialized=false;
       const angle=(object:THREE.Object3D,axis:'x'|'y')=>2*Math.atan2(object.quaternion[axis],object.quaternion.w);
