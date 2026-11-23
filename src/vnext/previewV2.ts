@@ -493,7 +493,7 @@ let witnessActive = false;
 let witnessCamera: {position: THREE.Vector3; target: THREE.Vector3} | null = null;
 let witnessCollapse=0;
 let applyWitnessScene:((collapse:number,glint:number)=>void)|null=null;
-type CameraFlight = {from: THREE.Vector3; to: THREE.Vector3; lookFrom: THREE.Vector3; lookTo: THREE.Vector3; elapsed: number; seconds: number; destination: 'witness' | 'overhead'; collapseFrom:number};
+type CameraFlight = {from: THREE.Vector3; to: THREE.Vector3; lookFrom: THREE.Vector3; lookTo: THREE.Vector3; elapsed: number; seconds: number; destination: 'witness' | 'overhead'; collapseFrom:number;wallTick:number};
 let cameraFlight: CameraFlight | null = null;
 let vaultLeaf: THREE.Group | null = null;
 let sourceWheel: THREE.Group | null = null;
@@ -1853,14 +1853,19 @@ function beginFlight(to: THREE.Vector3, lookTo: THREE.Vector3, destination: 'wit
   if(!controls)return;
   const from=camera.position.clone();
   const lookFrom=controls.target.clone();
-  cameraFlight={from,to,lookFrom,lookTo,elapsed:0,seconds:reducedMotion?0:destination==='overhead'?F02_RETURN_SECONDS:2.25,destination,collapseFrom:witnessCollapse};
+  cameraFlight={from,to,lookFrom,lookTo,elapsed:0,seconds:reducedMotion?0:destination==='overhead'?F02_RETURN_SECONDS:2.25,destination,collapseFrom:witnessCollapse,wallTick:performance.now()};
   controls.enabled=false;
   if(reducedMotion)advanceFlight(1);
 }
 function advanceFlight(dt:number):void {
   if(!cameraFlight || !controls)return;
   const f=cameraFlight;
-  f.elapsed=Math.min(f.seconds, f.elapsed+dt);
+  const now=performance.now();
+  // Hold remains readable even at coarse frame rates, without inheriting the
+  // unrelated 60ms simulation cap or skipping a cue on a slow GPU.
+  const step=document.hidden?0:Math.max(dt,Math.min(.12,(now-f.wallTick)/1000));
+  f.wallTick=now;
+  f.elapsed=Math.min(f.seconds,f.elapsed+step);
   const t=f.seconds===0?1:THREE.MathUtils.clamp(f.elapsed/f.seconds,0,1);
   const eased=t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
   controls.maxDistance=Math.max(19,f.to.distanceTo(f.lookTo)+3);
