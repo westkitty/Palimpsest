@@ -421,6 +421,22 @@ export class F09FolioWorld extends BaseFolioWorld {
   private seqStars: { star: THREE.Mesh; hole: THREE.Mesh }[] = [];
   private seqStep = 0;
 
+  /** Living edition only. Archive retains its original discrete diagram. */
+  public get livingHistoricalHoles():number { return this.seqStars.filter(o=>o.hole.visible).length; }
+  public setLivingHistoryClock(seconds:number|null,reduced:boolean):void {
+    this.seqStars.forEach(({star,hole},index)=>{
+      const cutoff=index===3?2.72:2.19;
+      const eligible=seconds!==null&&(index>=2);
+      const tension=eligible&&!reduced?THREE.MathUtils.smoothstep(seconds,cutoff-.7,cutoff):0;
+      const gone=eligible?(reduced||seconds>=cutoff):index<this.seqStep;
+      star.visible=!gone;
+      star.scale.setScalar(Math.max(.055,1-tension*.9));
+      if(eligible&&!reduced)star.rotation.z=tension*(index===3?-2.8:2.4);
+      hole.visible=gone;
+      hole.scale.setScalar(eligible?1.05:1);
+    });
+  }
+
   // Wide containment boundary calipers [C]
   private boundaryRings!: THREE.Group;
   private boundaryScaleTarget = 0.42;

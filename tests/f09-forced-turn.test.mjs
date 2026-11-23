@@ -4,17 +4,17 @@ import {F09_INDEX,armsF09,f09ForcedBeat,F09_AUTO_TURN_SECONDS} from '../src/vnex
 import {makeF09RuptureBed} from '../src/vnext/f09EnvironmentalTheatre.ts';
 import {Group,Vector3} from 'three';
 
-test('only the first deliberate pull on F09 arms the forced page turn',()=>{
+test('only the final deliberate historical detent on F09 arms the forced page turn',()=>{
   for(let folio=0;folio<13;folio++){
     for(const slot of ['A','B','C']){
-      assert.equal(armsF09(folio,slot,false,true),folio===F09_INDEX&&slot==='A');
+      assert.equal(armsF09(folio,slot,false,true),folio===F09_INDEX&&slot==='B');
       assert.equal(armsF09(folio,slot,true,true),false);
       assert.equal(armsF09(folio,slot,false,false),false);
     }
   }
 });
 test('destruction and ruined hold precede the turn; reduced skips motion but not the hold',()=>{
-  assert.equal(f09ForcedBeat(1,false),'pull');
+  assert.equal(f09ForcedBeat(1,false),'cascade');
   assert.equal(f09ForcedBeat(3,false),'rupture');
   assert.equal(f09ForcedBeat(4,false),'aftermath');
   assert.equal(f09ForcedBeat(F09_AUTO_TURN_SECONDS,false),'turn');

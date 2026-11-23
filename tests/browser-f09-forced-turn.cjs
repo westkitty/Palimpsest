@@ -18,7 +18,7 @@ const mode=process.argv[2]||'desktop';
       new MutationObserver(()=>{
         const d=stage.dataset;
         const q=JSON.parse(d.f09CandidateState||'{}');
-        const t={folio:d.revisionFolio,turn:d.pageTurn,cat:d.f09Catastrophe,frame:q.authorFrame,rings:q.survivingRings,chips:q.ruptureFragments,hist:q.historicalStep};
+        const t={folio:d.revisionFolio,turn:d.pageTurn,cat:d.f09Catastrophe,frame:q.authorFrame,rings:q.survivingRings,chips:q.historicalFractures,holes:q.historicalHoles,hist:q.historicalStep};
         const prior=window.catastropheTrace.at(-1);
         if(JSON.stringify(prior)!==JSON.stringify(t))window.catastropheTrace.push(t);
       }).observe(stage,{attributes:true});
@@ -35,22 +35,25 @@ const mode=process.argv[2]||'desktop';
   await action('B');
   await wait('revisionFolio','9');
   assert.equal((await p.evaluate(()=>window.catastropheTrace)).some(t=>t.cat),false);
-  await action('A');
+  await action('B');
+  assert.equal((await p.evaluate(()=>window.catastropheTrace)).some(t=>t.cat),false);
+  await action('B');
   if(!reduced){await wait('f09Catastrophe','rupture');await save('fracture');}
   await wait('f09Catastrophe','aftermath');
-  if(fallback)assert.match(await p.locator('#later-plate-scene').textContent(),/DESTROYED MODEL AND MOUNT/);
+  if(fallback)assert.match(await p.locator('#later-plate-scene').textContent(),/FINAL COLLAPSE/);
   await save('ruin');
   await wait('revisionFolio','10');await wait('pageTurn','idle');await save('forced-destination');
   const t=await p.evaluate(()=>window.catastropheTrace);
   assert.ok(t.some(x=>x.cat==='aftermath'&&x.folio==='9'));
   if(!fallback){
-    assert.ok(t.some(x=>x.cat==='aftermath'&&x.rings===0&&x.chips===4&&x.hist===1));
+    assert.ok(t.some(x=>x.cat==='aftermath'&&x.rings===3&&x.holes===4&&x.chips===12&&x.hist===3));
     assert.ok(t.some(x=>x.turn==='settling'));
-    if(!reduced) assert.ok(t.some(x=>x.cat==='rupture'&&x.chips>4));
+    if(!reduced) assert.ok(t.some(x=>x.cat==='rupture'&&x.chips>12));
   }
   await p.locator('#prev').click();await wait('revisionFolio','9');await wait('pageTurn','idle');
   if(!fallback)await wait('blenderFolio','09');
-  assert.equal(await p.locator('[data-mechanism="A"]').isDisabled(),true);
+  assert.equal(await p.locator('[data-mechanism="B"]').isDisabled(),true);
+  assert.equal(await p.locator('[data-mechanism="A"]').isEnabled(),true);
   await p.waitForTimeout(reduced?1350:4600);
   await wait('revisionFolio','9');await wait('pageTurn','idle');
   assert.equal(await p.locator('#next').isEnabled(),true);

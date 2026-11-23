@@ -340,6 +340,9 @@ function heliocide(root: THREE.Group, bump: THREE.Texture | undefined): UpdateAr
   grip.rotation.x=-.46;
   const dir=new THREE.Vector3(), pos=new THREE.Vector3(), unitX=new THREE.Vector3(1,0,0);
   const fallbackRupture=makeF09RuptureBed(root,star.clone().setY(pageY(star.x)+.47));
+  const historicalBed=makeF09RuptureBed(root,new THREE.Vector3(1.22,pageY(1.22)+.48,-.53));
+  const nextBed=makeF09RuptureBed(root,new THREE.Vector3(1.78,pageY(1.78)+.48,-.53));
+  const leftFold=makeF09RuptureBed(root,new THREE.Vector3(.62,pageY(.62)+.48,-.53));
   let was=false, initialized=false, t=0;
   return (state,dt,reduced)=>{
     const on=state.interactions.A.active||state.interactions.A.locked;
@@ -355,6 +358,10 @@ function heliocide(root: THREE.Group, bump: THREE.Texture | undefined): UpdateAr
     if(rupture)fallbackRupture.update(-1,reduced);
     root.userData.f09RuptureBedFractures=(rupture??fallbackRupture).update(destruction,reduced);
     comb.visible=destructionClock<55;
+    const historical=root.userData.f09HistoricalFinale??-1;
+    const bedAt=(start:number,duration:number)=>historical<start?-1:(historical-start)/duration;
+    root.userData.f09HistoricalFractures=historicalBed.update(bedAt(2.31,.94),reduced)+
+      nextBed.update(bedAt(2.53,1.02),reduced)+leftFold.update(bedAt(2.14,.91),reduced);
     const foldingPaper=root.userData.f09PaperGround as ReturnType<typeof newF09CollapsingPaperGround>|undefined;
     root.userData.f09WholePaperWaves=foldingPaper?.update(authoredFrame??1,reduced)??[0,0,0];
     const drawn=on?(reduced?1:ease(0,.27,t)):0;

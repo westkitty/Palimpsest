@@ -1,4 +1,4 @@
-import { armsF09, f09ForcedBeat, F09_INDEX } from './f09ForcedTurn.ts';
+import { F09_AFTERMATH_SECONDS, armsF09, f09ForcedBeat, F09_INDEX } from './f09ForcedTurn.ts';
 import {closingReadingPose,createEnvironmentalClosing} from './environmentClosing.ts';
 import { makeF07CandidateStage } from './proof/f07CandidateStage';
 import { F08FolioWorld, F09FolioWorld } from '../engine/folios/FoliosWar2';
@@ -148,7 +148,7 @@ function advanceF09Run(dt:number):void{
   f09LastBeat=beat;
   if(beat==='aftermath'){
     if(!renderer)fallbackPage(F09_INDEX);
-    announce('The model star and its mounting bed are gone. The leaf will turn.');
+    announce('The depicted Hal’Ven cascade is complete. The leaf will turn.');
   }
   if(beat==='turn'){
     cancelF09Run();
@@ -1511,6 +1511,7 @@ function goFolio(index:number, deferCameraReset=false):void {
     }
     if(index===8&&laterWorld instanceof F09FolioWorld){
       const stageOwner=rig,world=laterWorld;
+      world.setLivingHistoryClock(null,reducedMotion);
       const staged=makeF09CandidateStage((pull,star,absence)=>{
         if(rig!==stageOwner||currentFolio!==8)return;
         const state=laterStates[8-FIRST_LATER_FOLIO];
@@ -1524,6 +1525,9 @@ function goFolio(index:number, deferCameraReset=false):void {
       },()=>{if(rig===stageOwner&&currentFolio===8)canvas.dataset.blenderFolio='unavailable';});
       world.root.add(staged.root);
       laterRevision={root:staged.root,update(actual,dt,reduce){
+        const historical=actual.interactions.B.locked;
+        world.setLivingHistoryClock(historical?(f09Run??F09_AFTERMATH_SECONDS):null,reduce);
+        art.root.userData.f09HistoricalFinale=historical?(reduce?F09_AFTERMATH_SECONDS:f09Run??F09_AFTERMATH_SECONDS):-1;
         staged.update(actual,dt,reduce);
         if(canvas.dataset.blenderFolio==='09'&&rig===stageOwner){
           art.root.userData.f09AuthoredFrame=staged.root.userData.authorFrame;
@@ -1536,6 +1540,8 @@ function goFolio(index:number, deferCameraReset=false):void {
             waves:art.root.userData.f09WholePaperWaves,
             witness:art.root.userData.f09Witness,slivers:art.root.userData.f09InwardSlivers,
             ruptureFragments:art.root.userData.f09RuptureBedFractures,
+            historicalHoles:world.livingHistoricalHoles,
+            historicalFractures:art.root.userData.f09HistoricalFractures,
             latched:actual.interactions.A.locked,historicalStep:actual.interactions.B.step,survey:actual.interactions.C.active,
           });
         }
@@ -1670,7 +1676,7 @@ function handleAction(slot:Slot):void {
     const idx=currentFolio-FIRST_LATER_FOLIO;
     const prior=laterStates[idx];
     const next=operateLater(prior,slot);
-    const catastrophe=armsF09(currentFolio,slot,prior.interactions.A.locked,next.interactions.A.locked);
+    const catastrophe=armsF09(currentFolio,slot,prior.interactions.B.locked,next.interactions.B.locked);
     if(catastrophe){f09Run=0;f09LastBeat=null;}
     laterStates[idx]=next;saveLaterStudy();
     laterWorld?.syncState(next,activeSpecimen(next),activeTime);
@@ -1678,7 +1684,7 @@ function handleAction(slot:Slot):void {
     updateNav();
     if(!renderer)fallbackPage(currentFolio);
     if(catastrophe){
-      announce('Starsilk withdrawn. The model is failing.');
+      announce('The final Hal’Ven wave has begun.');
       advanceF09Run(0);
     }else announce(`${revisionCopy(currentFolio as LaterFolioIndex).actions[slot==='A'?0:slot==='B'?1:2]}. ${indicator.textContent}`);
     return;
@@ -2020,9 +2026,10 @@ function fallbackPage(index:number):void {
     if(isLater){
       const scene=laterArt.querySelector<SVGGElement>('#later-plate-scene');
       if(scene){
-        const active=laterStates[index-FIRST_LATER_FOLIO].interactions.A.active;
-        const showRuin=index===F09_INDEX&&f09Run!==null? f09ForcedBeat(f09Run,reducedMotion)==='aftermath':active;
-        scene.innerHTML=revisionDiagram(index,showRuin)??getLaterDiagram(index);
+        const actions=laterStates[index-FIRST_LATER_FOLIO].interactions;
+        const clusterRuin=index===F09_INDEX&&actions.B.locked&&
+          (f09Run===null||f09ForcedBeat(f09Run,reducedMotion)==='aftermath');
+        scene.innerHTML=revisionDiagram(index,actions.A.active,clusterRuin)??getLaterDiagram(index);
         scene.firstElementChild?.setAttribute('fill',cssStock(folioStock(index).face));
       }
     }

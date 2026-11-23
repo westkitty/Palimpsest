@@ -41,11 +41,7 @@ const failures=[];
       assert.notEqual(await status.textContent(),before,'folio '+n+' '+key.toUpperCase()+' changes study state');
       assert.deepEqual(failures,[]);
       console.log('Native Blender runtime: F'+String(n).padStart(2,'0'));
-      if(n===9){
-        await wait({revisionFolio:'10',pageTurn:'idle'});
-        // Return for the independent F10 check; a spent plate never auto-turns again.
-        await press('ArrowLeft');await wait({revisionFolio:'9',pageTurn:'idle'});
-      }
+
     }
     await press('ArrowRight');await wait({revisionFolio:'coda',pageTurn:'idle'});
     assert.equal(await page.locator('#folio-description').textContent(),'Your fate is in our hands.');
