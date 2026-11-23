@@ -58,7 +58,7 @@ try{
       assert.ok(wave.wave[6]>wave.wave[0]&&wave.wave[0]>wave.wave[5]);
       await shot('native-wave');await p.evaluate(()=>window.__f10Proof.release());
     }
-    const secured=await wait([.99,1],3);
+    const secured=await wait([.9998,1],3);
     assert.ok(secured.wave.every(v=>v>=.99));
     assert.ok(secured.story.actors.every(v=>v==='below-lip'));
     if(motion==='no-preference'){
@@ -66,8 +66,8 @@ try{
       assert.ok(['braced','slipping','descending'].every(p=>seen.includes(p)),seen.join(','));
     }
     await shot('below-lip');
-    await key('b');await wait([.99,1],3,{horizon:true,litWindows:8,streaks:1,record:false});await shot('inhabited-horizon');
-    await key('c');await wait([.99,1],3,{door:1,record:true,streaks:1,horizon:true});await shot('threshold-open');
+    await key('b');await wait([.9998,1],3,{horizon:true,litWindows:8,streaks:1,record:false});await shot('inhabited-horizon');
+    await key('c');await wait([.9998,1],3,{door:1,record:true,streaks:1,horizon:true});await shot('threshold-open');
     await key('a');await wait([0,.005],0,{door:1,record:true,streaks:1,horizon:true});
     await key('c');await wait([0,.005],0,{door:0,record:false,streaks:1,horizon:true});
     await p.close();console.log('F10_STORY_WEBGL_PASS',label);
