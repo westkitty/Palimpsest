@@ -28,6 +28,7 @@ const mode=process.argv[2]||'desktop';
   const wait=(k,v)=>p.waitForFunction(([k,v])=>document.querySelector('#stage')?.dataset[k]===v,[k,v],{timeout:35000});
   const save=async phase=>{if(out)await p.screenshot({path:path.join(out,`F09-${mode}-${String(++tick)}-${phase}.png`),timeout:30000});};
   await p.goto(base+'?folio=9');await p.evaluate(()=>window.watchCatastrophe());
+  await p.locator('#toggle-panels').click();
   const action=slot=>p.locator(`[data-mechanism="${slot}"]`).click();
   if(!fallback)await wait('blenderFolio','09');
   await save('star');
