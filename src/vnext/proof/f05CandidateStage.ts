@@ -10,6 +10,14 @@ type Slot=(typeof slots)[number];
 const clean=(name:string)=>name.replace(/[^a-zA-Z0-9]/g,'').toLowerCase();
 const up=new THREE.Vector3(0,1,0);
 
+// Standing archive rigs keep a small individual paper-body motion even when
+// their machine line is held. The grounded pivot and source details stay put.
+export function draxisIdlePose(bay:number,clock:number,reduced:boolean){
+  if(reduced)return {pitch:0,roll:0};
+  if(bay===1)return {pitch:.024*Math.sin(clock*1.12),roll:-.011*Math.sin(clock*.79+.4)};
+  return {pitch:-.018*Math.sin(clock*.87+1.7),roll:.022*Math.sin(clock*1.36+.9)};
+}
+
 export function makeF05CandidateStage(ready:()=>void,failed:()=>void) {
   const root=new THREE.Group();
   root.name='F05 · Blender-authored crimson ring and inspection works';
@@ -135,9 +143,10 @@ export function makeF05CandidateStage(ready:()=>void,failed:()=>void) {
     });
     draxis.forEach(({node,base,bay})=>{
       const a=stroke(bay);
+      const idle=draxisIdlePose(bay,clock,reduced);
       node.quaternion.copy(base);
-      node.rotateX(.095*a);
-      node.rotateZ((bay===1?-1:1)*.047*a);
+      node.rotateX(idle.pitch+.095*a);
+      node.rotateZ(idle.roll+(bay===1?-1:1)*.047*a);
     });
     if(nativeFeedCursor)nativeFeedCursor.position.y+=.026*stroke(1.55);
     for(const item of paperFilingLabels)item.visible=B.step===0;
