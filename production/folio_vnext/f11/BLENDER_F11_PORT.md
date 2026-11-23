@@ -30,3 +30,5 @@ Only after the already rooted canopy has spread, a hand-cut six-legged moth land
 ### Capillary water mark
 
 The small condensate bead appears in the side paper lip only after Marcel’s redirection and the identifiable pilot reaches the gutter. It shrinks in place as an irregular two-tone capillary margin follows the dyed paper. The actual front edge cockles and sags while the back crease and side paste points stay fixed. The darkened stain and slight deformed silhouette stay there under the canopy and through the final acting. This is a secondary material observation only: it does not drive the roots, wildlife, actor timings, or growth. The wet patch avoids the hero plant and stays smaller than the paper cutaway.
+
+The small ground bird’s existing two printed eyes close briefly before the late entrance and occasionally in the indefinite settled idle. Its torso and neck make a tiny local resting movement without shifting the feet. From Tiger’s entry through Codec’s final authored reaction, the bird is still. The moth re-seats its folded wings once before the late entrance; neither cue loops or runs in reduced motion.

@@ -117,7 +117,7 @@ export function createF11Challenger(pageY:(x:number)=>number){
       frame<112?'held-opening':frame<129?'tiger-late':'codec-withdraws';
     root.userData.story={beat:storyBeat,...Object.fromEntries(Object.entries(beats).map(([k,v])=>[k,Math.round(v*100)/100])),
       codecIdle:Math.round((1-beats.withdraw)*100)/100,tiger:anchors[2].visible,
-      wildlife:wildlife?.update(frame,reduced),wetStock:water.update(frame),
+      wildlife:wildlife?.update(frame,reduced,idleTime),wetStock:water.update(frame),
       codecHeadPitch:Math.round(180/Math.PI*(codecHead?.rotation.x??0)),
       rootedCanopy:trees.filter(t=>t.holder.visible).length,
       witness:trees[F11_GUTTER_PLANT].holder.visible?{

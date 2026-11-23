@@ -33,6 +33,16 @@ test('six-legged moth lands on actual paper geometry and tracks that frond when 
  const p=moth.position.clone();
  frond.position.x+=.250;wild.update(108,false);
  assert.ok(moth.position.distanceTo(p)>.150,'moth does not float independently of the plant');
+ assert.ok(wild.update(110.39,false).birdBlink>.95);
+ assert.deepEqual([wild.update(125,false).birdBlink,wild.update(125,false).birdIdle],[0,0],'Tiger’s beat is left still');
+ let restingHasBlink=false,restingHasIdle=false;
+ for(let t=0;t<8;t+=.03){
+   const state=wild.update(180,false,t);
+   restingHasBlink ||= state.birdBlink>.6;
+   restingHasIdle ||= Math.abs(state.birdIdle)>.05;
+ }
+ assert.ok(restingHasBlink&&restingHasIdle);
+ assert.deepEqual([wild.update(180,true,8).birdBlink,wild.update(180,true,9).birdIdle],[0,0]);
  wild.update(170,true);assert.ok(moth.visible&&bird.visible);
  wild.dispose();assert.ok(!field.getObjectByName(moth.name));
 });

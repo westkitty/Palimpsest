@@ -87,10 +87,10 @@ export function createF11PaperWildlife(owner:THREE.Group,frond:THREE.Object3D) {
   neck.position.set(-.104,.178,0);
   mesh(neck,new THREE.IcosahedronGeometry(.065,1),chalk,-.040,.079,0).scale.set(1,.96,.85);
   const beak=mesh(neck,new THREE.ConeGeometry(.021,.080,5),side,-.113,.065,0);beak.rotation.z=Math.PI/2;
-  for(const sign of [-1,1]){
+  const eyes=[-1,1].map(sign=>{
     const eye=mesh(neck,new THREE.IcosahedronGeometry(.011,0),graphite,-.067,.091,sign*.045);
-    eye.name='Bird printed small eye';
-  }
+    eye.name='Bird printed small eye';return eye;
+  });
   const feet=[-1,1].map((s,i)=>{
     const leg=group(bird,'Bird actual stepping leg '+i);leg.position.set(i?-.054:.036,0,s*.034);
     limb(leg,v(.022,0,0),v(-.007,.13,0),.013,side);
@@ -99,7 +99,16 @@ export function createF11PaperWildlife(owner:THREE.Group,frond:THREE.Object3D) {
     return leg;
   });
   const contact=v(),offset=v(),normal=v(),projected=v(),up=v(0,1,0);
-  const update=(frame:number,reduced:boolean)=>{
+  let quietTime=0,lastClock=0;
+  const update=(frame:number,reduced:boolean,clockSeconds=0)=>{
+    const delta=Math.min(.10,Math.max(0,clockSeconds-lastClock));
+    lastClock=clockSeconds;
+    quietTime=frame>=179.95&&!reduced?quietTime+delta:0;
+    const idleGate=reduced?0:f11Ease(.70,1.55,quietTime);
+    const resting=idleGate*Math.sin(quietTime*1.65);
+    const quietBlink=(quietTime+1.9)%5.9;
+    const preTiger=reduced?0:f11Ease(109.9,110.35,frame)*(1-f11Ease(110.45,111.25,frame));
+    const blink=Math.max(preTiger,idleGate*f11Ease(5.32,5.39,quietBlink)*(1-f11Ease(5.43,5.53,quietBlink)));
     const b=f11WildlifeBeats(frame);
     moth.visible=b.moth!=='absent';bird.visible=b.bird!=='absent';
     if(moth.visible){
@@ -117,7 +126,8 @@ export function createF11PaperWildlife(owner:THREE.Group,frond:THREE.Object3D) {
       moth.position.copy(now).addScaledVector(normal,.012);
       moth.quaternion.setFromUnitVectors(up,arrive>.99?normal:up);
       const flutter=reduced?0:Math.sin((frame-89)*1.82)*.63*(1-b.wingFold);
-      wings.forEach((a,i)=>a.rotation.z=(i===0?1:-1)*(.16+.85*b.wingFold+flutter));
+      const reseat=reduced?0:Math.sin(Math.PI*f11Ease(104,106.3,frame))*.09;
+      wings.forEach((a,i)=>a.rotation.z=(i===0?1:-1)*(.16+.85*b.wingFold+flutter+reseat*(i===0?1:.64)));
     }
     if(bird.visible){
       const walk=reduced?1:b.approach;
@@ -129,12 +139,13 @@ export function createF11PaperWildlife(owner:THREE.Group,frond:THREE.Object3D) {
         foot.position.y=Math.max(0,stride)*.030;foot.rotation.z=-stride*.21;
       });
       trunk.position.y=reduced?0:Math.abs(Math.sin(tread))*(walk===1?.0:.019);
-      trunk.rotation.z=.21*b.bow;
-      neck.rotation.z=.66*b.bow;
+      trunk.rotation.z=.21*b.bow+.014*resting;
+      neck.rotation.z=.66*b.bow+.026*resting;
+      for(const eye of eyes)eye.scale.y=1-.88*blink;
       neck.rotation.y=-.34*f11Ease(99,106,frame)+.25*f11Ease(106,109,frame);
     }
     return {moth:reduced&&moth.visible?'perched':b.moth,bird:b.bird,perch:b.moth==='perched'||reduced&&moth.visible?F11_MOTH_FROND:null,
-      birdBow:Number(b.bow.toFixed(3)),boundToFrond:moth.visible&&(b.moth==='perched'||reduced)};
+      birdBow:Number(b.bow.toFixed(3)),birdBlink:Number(blink.toFixed(3)),birdIdle:Number(resting.toFixed(3)),boundToFrond:moth.visible&&(b.moth==='perched'||reduced)};
   };
   const dispose=()=>{
     const geos=new Set<THREE.BufferGeometry>(),mats=new Set<THREE.Material>();
