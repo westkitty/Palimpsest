@@ -1,3 +1,4 @@
+import {closingReadingPose,createEnvironmentalClosing} from './environmentClosing.ts';
 import { makeF07CandidateStage } from './proof/f07CandidateStage';
 import { F08FolioWorld, F09FolioWorld } from '../engine/folios/FoliosWar2';
 import { makeF08CandidateStage } from './proof/f08CandidateStage.ts';
@@ -337,7 +338,7 @@ let livingStagecraft: LivingStagecraft | null = null;
 type RevisionLayer<S>={root:THREE.Group;update(state:S,dt:number,reduced:boolean):void;dispose?():void};
 let earlyRevision:RevisionLayer<FolioActions>|null=null;
 let laterRevision:RevisionLayer<FolioRuntimeState>|null=null;
-let codaPanel:THREE.Group|null=null;
+let closingWall:ReturnType<typeof createEnvironmentalClosing>|null=null;
 function disposeRevision(l:RevisionLayer<never>|null):void{
   if(!l)return;
   l.root.removeFromParent();
@@ -725,23 +726,9 @@ function book():THREE.Group {
 }
 function buildCoda():void {
   const page=book();
-  const panel=new THREE.Group();
-  panel.name='Character-free blind-embossed closing pop-out';
-  panel.position.set(0,0.28,1.42);
-  panel.rotation.x=reducedMotion?0.83:0.04;
-  page.add(panel);codaPanel=panel;
-  slab(panel,6.18,0.135,2.75,shared.paper,0,0.04,-1.37);
-  for(const x of [-2.92,2.92]){
-    slab(panel,0.1,0.06,2.45,shared.bone,x,0.14,-1.38);
-    slab(panel,0.032,0.045,2.24,shared.backing,x*0.95,0.145,-1.38);
-  }
-  for(const z of [-0.19,-2.55])slab(panel,5.89,0.06,0.08,shared.bone,0,0.14,z);
-  const printed=plaque(panel,ADMINISTRATION_SLOGAN,0,0.132,-1.37,5.5);
-  printed.name='Only printed line on the closing pop-out';
-  for(const side of [-1,1]){
-    const brace=slab(page,0.16,0.035,0.70,shared.bone,side*2.7,0.248,1.05);
-    brace.rotation.y=side*0.2;
-  }
+  closingWall=createEnvironmentalClosing(textTextures);
+  page.add(closingWall.root);
+  canvas.dataset.closingBeat=closingWall.update(0,reducedMotion);
 }
 function platform(parent:THREE.Object3D,x:number,z:number,w=1.55):void {
   slab(parent,w,0.11,1.18,shared.backing,x,0.24,z);
@@ -1103,7 +1090,7 @@ function disposeSubtree(root:THREE.Object3D):void {
   });
 }
 function clear():void {
-  disposeRevision(earlyRevision);disposeRevision(laterRevision);earlyRevision=null;laterRevision=null;codaPanel=null;
+  disposeRevision(earlyRevision);disposeRevision(laterRevision);earlyRevision=null;laterRevision=null;closingWall=null;delete canvas.dataset.closingBeat;
   if(inspection!=='overview')leaveMini();
   if (livingStagecraft) {
     rig.remove(livingStagecraft.root);
@@ -1540,7 +1527,7 @@ function smooth(value:number,target:number,dt:number):number {
 }
 function animate(dt:number):void {
   if(currentFolio===CODA_INDEX){
-    if(codaPanel)codaPanel.rotation.x=smooth(codaPanel.rotation.x,0.83,dt);
+    if(closingWall)canvas.dataset.closingBeat=closingWall.update(dt,reducedMotion);
     return;
   }
   earlyRevision?.update(state,dt,reducedMotion);
@@ -1703,7 +1690,11 @@ function fitBookCamera(openProgress:number):void {
   const openScale=Math.max(1,1.28/aspect);
   const scale=THREE.MathUtils.lerp(closedScale,openScale,
     THREE.MathUtils.clamp(openProgress,0,1));
-  if(currentFolio===2&&openProgress>.99){
+  if(currentFolio===CODA_INDEX&&openProgress>.99){
+    const {distance,focusY,focusZ}=closingReadingPose(aspect);
+    camera.position.set(.028*distance,focusY+.38*distance,focusZ+.924*distance);
+    controls?.target.set(0,focusY,focusZ);
+  }else if(currentFolio===2&&openProgress>.99){
     camera.position.set(4.0*scale,7.4*scale,9.8*scale);
     controls?.target.set(0,.56,.08);
   }else if(currentFolio===4&&openProgress>.99){
@@ -1880,7 +1871,7 @@ function resize():void {
   if(!renderer)return;
   const w=Math.max(1,canvas.clientWidth),h=Math.max(1,canvas.clientHeight);
   camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);
-  if(bookPhase!=='open' && inspection==='overview')fitBookCamera(coverAnimation);
+  if((bookPhase!=='open'||currentFolio===CODA_INDEX) && inspection==='overview')fitBookCamera(coverAnimation);
 }
 function wireButtons():void {
   prevButton.addEventListener('click',()=>nextFolio(-1));
