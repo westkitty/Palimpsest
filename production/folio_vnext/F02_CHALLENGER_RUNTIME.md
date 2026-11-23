@@ -9,3 +9,11 @@ The book and cut edges still arrive white. The original liquid ink spread, first
 - GLB SHA-256: `11ad86354ec352b0d4b3246306128285936a25bda7d45c4726d7bf0ac79f0bfb`; 1,600,352 bytes.
 - Reproduce with Blender 4.3.2: `blender -b Palimpsest_F02_The_All_Unfolds.blend -t 2 -P production/folio_vnext/sources/export_f02_challenger.py` (reviewed scrubbed source input, output `f02.glb` beside the export script). See the public F02 source-stage map in `production/dot_archive/folios/F02/F02_SLOT_MAP.md`.
 - Verify the asset and source geometry in runtime with `node --test tests/challenger-f02.test.mjs`. The test checks the GLTFLoader animation and world extent at exact detents, including the source mirror transform, actual edge thickness, starless stage zero, physical gusset weights, no hidden text and the four final strips.
+
+## Environmental motion pass
+
+- The first dark drop flattens and disappears into a forked, direction-sensitive rag-fiber arrival field. It stains across fibers progressively; it does not globally fade the sheet. The binder pools ink on the left and holds the facing leaf dry until the breach. The crossing then runs 4× faster than the dam and settles into finer pigment.
+- Points, clusters and the galaxy print are successively unmasked **only inside already soaked pigment**, never at the wet front or on white stock. The Blender mechanics sit at genuine pre-reveal frames while the tide catches up; the source detents and GLB bytes are unchanged.
+- Four actual source strip meshes release in a stagger, with their own source printed edge and five matching source gussets following the same stock-normal motion. The bonded contact line and twenty feet are fixed. At the authored end frame, mesh positions and normals exactly match the underlying source. Reduced motion lands directly on the same stable result.
+- The Living Book overview separates warm near Zentrum from the blue Digital Geode cutaway and rear folds by an off-axis composition; the existing G view travels closer through the middle space. Only the Geode sculpture orientation changes, not the landmark coordinates, inspection target, reveal gate, or reader-controlled inputs.
+- Direct mechanism/mask verification: `node --test tests/challenger-f02.test.mjs tests/f02-environment-motion.test.mjs`.

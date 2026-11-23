@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { f02InkRate, f02InkBeat } from './f02Motion.ts';
 import { folioStock } from './livingPaperStock.ts';
 import { planetPattern, sourceInkRegistration, type FolioActions, type FolioIndex } from './folioLogic.ts';
 
@@ -114,37 +115,63 @@ float noise(vec2 p){
  vec2 i=floor(p),r=fract(p);r=r*r*(3.-2.*r);
  return mix(mix(hash(i),hash(i+vec2(1,0)),r.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),r.x),r.y);
 }
+// Arrival down a scored fiber direction, then cross-fiber osmosis.
+float channel(vec2 p,vec2 a,vec2 b,float inlet,float outlet,float bleed) {
+  vec2 v=b-a;
+  float t=clamp(dot(p-a,v)/dot(v,v),0.,1.);
+  vec2 d=p-a-v*t;
+  return mix(inlet,outlet,t)+length(d)*bleed;
+}
 void main(){
   vec2 p=page;
-  vec2 delta=p-vec2(-3.77,1.57);
-  float broad=length(vec2(delta.x*.405,(delta.y+delta.x*.11)*.71));
-  float rough=(noise(p*1.87)-.5)*.31+(noise(p*4.7)-.5)*.19+(noise(p*14.)-.5)*.091;
-  float dryEdge=(max(0.,abs(p.x)-4.19)*.39+max(0.,abs(p.y)-2.50)*.90);
-  float arrive=(broad+rough*clamp(broad*1.7,0.,1.)+dryEdge)/3.9;
-  if(abs(p.x)<.18) arrive+=.014;
-  float grain=noise(vec2(p.x*75.,p.y*33.));
+  vec2 origin=vec2(-3.77,1.57), delta=p-origin;
+  float broad=length(vec2(delta.x*.38,(delta.y+delta.x*.10)*.69));
+  float rough=(noise(p*2.1)-.5)*.058+(noise(p*5.1)-.5)*.036+(noise(p*18.)-.5)*.015;
+  float dryEdge=max(0.,abs(p.x)-4.25)*.11+max(0.,abs(p.y)-2.55)*.16;
+  float diffuseTime=.022+broad*.215+dryEdge;
+  // Branches are elongated fibers with different tip speeds, not colored particles.
+  vec2 branch=vec2(-2.58,1.14), gutter=vec2(-.09,.27);
+  float fiberTime=channel(p,origin,branch,.017,.079,.34);
+  fiberTime=min(fiberTime,channel(p,branch,vec2(-1.44,1.90),.079,.176,.43));
+  fiberTime=min(fiberTime,channel(p,branch,vec2(-2.93,-.14),.079,.222,.37));
+  fiberTime=min(fiberTime,channel(p,branch,vec2(-1.35,.76),.079,.218,.41));
+  fiberTime=min(fiberTime,channel(p,vec2(-1.35,.76),gutter,.218,.345,.36));
+  float left=min(diffuseTime,fiberTime)+rough*clamp(broad*1.8,0.,1.);
+  // Pearl-black ink runs along the exposed edge while there is no wet
+  // continuation on the opposite leaf. Then two faster fingers carry it across.
+  float gather=channel(p,gutter,vec2(-.09,1.98),.342,.502,.35);
+  gather=min(gather,channel(p,gutter,vec2(-.09,-2.02),.342,.527,.32));
+  left=min(left,gather+rough*.46);
+  vec2 spill=vec2(.095,.27), split=vec2(2.28,.30);
+  float flood=.482+length(vec2((p.x-spill.x)*.50,(p.y-spill.y)*.83))*.133;
+  float right=min(flood,channel(p,spill,split,.474,.546,.24));
+  right=min(right,channel(p,split,vec2(4.27,-1.34),.546,.674,.28));
+  right=min(right,channel(p,split,vec2(4.08,1.96),.546,.641,.28));
+  right=max(.472,right+rough*.63+dryEdge);
+  float arrive=p.x<0.?left:right;
+  float grain=noise(vec2(p.x*85.,p.y*29.));
   float fine=hash(floor(p*208.));
   float fiber=grain*.60+fine*.40;
   float tide=advance-arrive;
-  float spread=smoothstep(-.021,.009,tide) * step(.001,advance);
-  float soak=smoothstep(.000,.041,tide)*step(.001,advance);
-  float wet=smoothstep(.010,.029,tide)*(1.-smoothstep(.043,.103,tide))*spread;
+  float spread=smoothstep(-.009,.021,tide) * step(.001,advance);
+  float soak=smoothstep(.005,.055,tide)*step(.001,advance);
+  float wet=smoothstep(-.002,.018,tide)*(1.-smoothstep(.025,.073,tide))*spread;
   vec3 vellum=vellumWhite*mix(.945,1.013,fiber);
   float press=noise(vec2(p.x*0.9,p.y*2.0));
   float score=1.-smoothstep(.002,.016,abs(p.y+1.43+abs(p.x)*.029));
   vellum *= 1.-.060*score-.034*press;
   float rings=.18+.82*noise(p*6.3);
-  vec3 ink=mix(vec3(.020,.024,.036),vec3(.0035,.0061,.011),soak);
-  ink+=wet*vec3(.065,.092,.120)*rings;
+  vec3 ink=mix(vec3(.012,.018,.027),vec3(.0035,.0061,.011),soak);
+  ink+=wet*vec3(.064,.088,.114)*rings;
   ink+=(grain-.5)*.014;
   vec3 paper=mix(vellum,ink,spread);
   vec2 cell=clamp(vec2((p.x+4.56)/9.12,(p.y+2.85)/5.70),.002,.998);
   vec3 stars=texture2D(atlas,cell).rgb;
   // Three individual phases; the first two develop in the dark rather than
   // being revealed through a global page fade. Tide clips every star pixel.
-  float safeInterior=step(.048,tide)*step(.001,advance);
-  float points=smoothstep(.088,.232,advance);
-  float clusters=smoothstep(.390,.570,advance);
+  float safeInterior=smoothstep(.059,.090,tide)*step(.001,advance);
+  float points=smoothstep(.123,.251,advance);
+  float clusters=smoothstep(.411,.598,advance);
   float galaxies=smoothstep(.683,.903,advance);
   vec3 stellar=stars.r*points*vec3(.66,.83,.99)
     +stars.g*clusters*vec3(.20,.56,.85)
@@ -219,6 +246,9 @@ function vellumF02(root:THREE.Group):RevisionEarlyArt['update']{
     const panel=mesh(root,'F02 • white vellum with an ink-bound stellar mask',new THREE.PlaneGeometry(size.x,size.y),mat,x,0.210,0);
     panel.rotation.x=-Math.PI/2;
   }
+  const drop=mesh(root,'F02 first ink drop',new THREE.SphereGeometry(.096,12,8),
+    std(0x080c15,{roughness:.22,metalness:.24}),-3.77,.34,1.57);
+  drop.visible=false;
   const wick=new THREE.Group();wick.name='F02 • folded rag-fiber ink witness';wick.position.set(-3.79,0.225,1.60);
   wick.rotation.y=0.39;root.add(wick);
   const cut=std(0xcbb98f);
@@ -244,8 +274,14 @@ function vellumF02(root:THREE.Group):RevisionEarlyArt['update']{
     const reveal=state.f02.reveal;
     const target=destination[reveal];
     if(!init||reduced||reveal<lastReveal)advance.value=target;
-    else advance.value=Math.min(target,advance.value+Math.min(0.07,Math.max(0,dt))*.45);
+    else advance.value=Math.min(target,advance.value+Math.min(0.07,Math.max(0,dt))*f02InkRate(advance.value));
     init=true;lastReveal=reveal;
+    const a=advance.value;
+    const impact=ease(a/.040), absorb=ease((a-.039)/.088);
+    drop.visible=!reduced&&a>0&&a<.127;
+    drop.position.y=.23+.17*(1-impact);
+    drop.scale.set((.6+.83*impact)*(1-absorb*.82),Math.max(.02,(1.05-impact*.86)*(1-absorb)),(.6+.83*impact)*(1-absorb*.82));
+    root.userData.inkBeat=f02InkBeat(a);
     for(let i=0;i<fiberTips.length;i++)fiberTips[i].color.copy(dry[0]).lerp(wetColor,ease(advance.value*30-i*.055));
     cut.color.copy(dry[1]).lerp(wetColor,ease(advance.value*8-.14));
     wickFace.color.copy(dry[2]).lerp(wetColor,ease(advance.value*6-.16)*.78);

@@ -948,7 +948,16 @@ function buildF02():THREE.Group {
   originalGeode.userData.source='src/engine/drakken/CharacterFigures.ts';
   originalGeode.userData.visualScope='original author-built PALIMPSEST interpretation';
   addInkedContours(originalGeode);
+  // Rotate the original cutaway to the forward-right sight line; neither the
+  // landmark nor its separate, interior-gated inspection plate moves.
+  originalGeode.rotation.y=-.84;
   geode.add(originalGeode);
+  const faceFill=new THREE.PointLight(0xa7d5ff,2.6,2.35,2);
+  faceFill.name='F02 book light on the Digital Geode cutaway';
+  faceFill.position.set(3.02,1.53,.95);root.add(faceFill);
+  const copperFill=new THREE.PointLight(0xffd4a1,2.45,2.35,2);
+  copperFill.name='F02 book light on Zentrum engraved rings';
+  copperFill.position.set(-3.37,.97,1.24);root.add(copperFill);
   authoredFigureCount++;
   plaque(root,'DIGITAL GEODE',2.27,0.41,1.14,1.90);
   plaque(root,'THE ALL UNFOLDS',0,0.25,2.17,3.15);
@@ -1211,7 +1220,7 @@ function goFolio(index:number, deferCameraReset=false):void {
   canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
   delete canvas.dataset.revisionPhase;delete canvas.dataset.f10CandidateState;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;delete canvas.dataset.f11AuthoredFrame;delete canvas.dataset.f11Story;delete canvas.dataset.f07CandidateState;delete canvas.dataset.f08CandidateState;delete canvas.dataset.f09CandidateState;
   delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;delete canvas.dataset.f01Stage;
-  delete canvas.dataset.f02Challenger;delete canvas.dataset.f02Frame;delete canvas.dataset.f02Detent;delete canvas.dataset.f02Clip;
+  delete canvas.dataset.f02Challenger;delete canvas.dataset.f02Frame;delete canvas.dataset.f02Detent;delete canvas.dataset.f02Clip;delete canvas.dataset.f02InkBeat;delete canvas.dataset.f02Arms;
   delete canvas.dataset.f06CandidateState;
   delete canvas.dataset.f12CandidateState;
   if(index===CODA_INDEX){
@@ -1283,12 +1292,15 @@ function goFolio(index:number, deferCameraReset=false):void {
             root:stage,
             update(s,dt,r){
               procedural.update(s,dt,r);
-              challenger.update(s.f02.reveal,dt,r);
               stage.userData.inkAdvance=procedural.root.userData.inkAdvance;
+              challenger.update(s.f02.reveal,dt,r,Number(stage.userData.inkAdvance));
+              if(rig===stageOwner)canvas.dataset.f02InkBeat=String(procedural.root.userData.inkBeat);
+
               if(challenger.root.userData.status==='ready'&&rig===stageOwner){
                 canvas.dataset.f02Frame=String(challenger.root.userData.frame);
                 canvas.dataset.f02Detent=String(challenger.root.userData.detent);
                 canvas.dataset.f02Clip=String(challenger.root.userData.clip);
+                canvas.dataset.f02Arms=JSON.stringify(challenger.root.userData.armExtensions);
               }
             },
             dispose(){challenger.dispose();disposeSubtree(procedural.root);stage.clear();},
@@ -1678,7 +1690,7 @@ function toggleWitness():void {
   if(!witnessActive){
     witnessCamera={position:camera.position.clone(),target:controls.target.clone()};
     witnessActive=true;
-    beginFlight(new THREE.Vector3(1.12,1.75,1.05),new THREE.Vector3(0,1.36,-1.83),'witness');
+    beginFlight(new THREE.Vector3(1.47,1.71,1.86),new THREE.Vector3(.17,1.02,-.66),'witness');
     announce('Entering the paper galaxy. The first stars are held between the folds of the book. Return with G.');
   }else{
     witnessActive=false;
@@ -1701,6 +1713,11 @@ function fitBookCamera(openProgress:number):void {
     const {distance,focusY,focusZ}=closingReadingPose(aspect);
     camera.position.set(.028*distance,focusY+.38*distance,focusZ+.924*distance);
     controls?.target.set(0,focusY,focusZ);
+  }else if(currentFolio===1&&openProgress>.99){
+    // Read the low warm Zentrum hardware and the taller blue open Geode as
+    // foreground / middle stage, against the raised spiral in the rear.
+    camera.position.set(3.05*scale,7.34*scale,9.92*scale);
+    controls?.target.set(0,.40,.08);
   }else if(currentFolio===2&&openProgress>.99){
     camera.position.set(4.0*scale,7.4*scale,9.8*scale);
     controls?.target.set(0,.56,.08);
