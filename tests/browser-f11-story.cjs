@@ -54,6 +54,11 @@ try {
       assert.equal(s.beat,name,`checkpoint ${label} ${target}`);
       assert.ok(s.frame>=target&&s.frame<=target+2,[label,name,target,s.frame]);
       if(i===0)assert.deepEqual([s.patch,s.fibers,s.roots,s.split,s.canopy],Array(5).fill(0));
+      if(i<=6)assert.deepEqual([s.wildlife.moth,s.wildlife.bird],['absent','absent']);
+      if(i===7)assert.deepEqual([s.wildlife.moth,s.wildlife.bird],[label==='touch'?'perched':'flying','approach']);
+      if(i===8)assert.ok(s.wildlife.birdBow>.90&&s.wildlife.bird==='inspect');
+      if(i>=10)assert.deepEqual([s.wildlife.moth,s.wildlife.bird,s.wildlife.perch,s.wildlife.birdBow],
+        ['perched','still','FROND_26_3',0]);
       if(i===1)assert.deepEqual([s.patch,s.roots,s.split],[1,0,0]);
       if(i===2)assert.ok(s.redirected>.49&&s.fibers===1&&s.roots===0);
       if(i===3)assert.ok(s.gutterRoot>.45&&s.gutterRoot<1&&s.roots===0&&s.rootedCanopy===0&&s.witness===null);
