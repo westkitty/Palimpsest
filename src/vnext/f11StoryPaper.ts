@@ -171,7 +171,7 @@ export function createF11StoryPaper(pageY:Stock) {
     }
     return g;
   });
-  let rootsComplete=false,splitComplete=false;
+  let rootsComplete=false,splitComplete=false,pilotComplete=false;
   return {root,update(frame:number,reduced:boolean){
     const b=f11PaperBeats(frame);
     patch.visible=b.patch>.01;patch.scale.setScalar(Math.max(.001,b.patch));
@@ -189,7 +189,7 @@ export function createF11StoryPaper(pageY:Stock) {
     });
     witness.visible=b.gutterRoot>.001;
     rootedFoot.visible=b.gutterRoot>=.996;
-    if(witness.visible){
+    if(witness.visible&&!pilotComplete){
       const reached=b.gutterRoot;
       // Trim the score at its precise moving tip instead of revealing the next pre-drawn segment.
       leaderRibbons.forEach(({draw,layer})=>draw((_,t)=>pilot(Math.min(reached,t),layer),reached));
@@ -197,6 +197,7 @@ export function createF11StoryPaper(pageY:Stock) {
         const from=pilot(at,.004);
         return vec(from.x+dx*t,from.y+.004*Math.sin(t*Math.PI),from.z+dz*t);
       },f11Ease(49+at*8,53+at*8,frame)));
+      pilotComplete=reached===1;
     }
     inlays.visible=b.roots>.001;
     if(inlays.visible&&!rootsComplete){

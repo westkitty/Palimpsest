@@ -71,7 +71,7 @@ export function createF11WaterWick(owner:THREE.Group,pageY:(x:number)=>number){
   }
   const paleRim=stain(tide,.375,.188,0,.004);
   const darkCentre=stain(tideDark,.239,.129,1,.007);
-  let prev=-1;
+  let prev=-1,wetPrev=-1;
   const update=(frame:number)=>{
     const {bead,wet,strain,phase}=f11WickBeats(frame);
     mound.visible=bead>.005;
@@ -79,7 +79,8 @@ export function createF11WaterWick(owner:THREE.Group,pageY:(x:number)=>number){
       mound.position.set(x+.015,surface(.015,-.009,strain)+.002,z-.009);
       mound.scale.set(.086*bead,.121*bead,.073*bead);
     }
-    if(prev!==strain){
+    const shapeChanged=prev!==strain;
+    if(shapeChanged){
       for(let j=0;j<=NZ;j++)for(let i=0;i<=NX;i++){
         const dx=(2*i/NX-1)*W;
         const dz=(2*j/NZ-1)*D+(j===NZ?Math.sin(i*1.76)*.024:0);
@@ -89,7 +90,7 @@ export function createF11WaterWick(owner:THREE.Group,pageY:(x:number)=>number){
       }
       verts.needsUpdate=true;mesh.computeVertexNormals();mesh.computeBoundingSphere();prev=strain;
     }
-    paleRim(wet,strain);darkCentre(wet,strain);
+    if(shapeChanged||wetPrev!==wet){paleRim(wet,strain);darkCentre(wet,strain);wetPrev=wet;}
     return {phase,bead:Number(bead.toFixed(3)),wet:Number(wet.toFixed(3)),
       edgeSag:Number((surface(0,D,0)-surface(0,D,strain)).toFixed(3))};
   };
