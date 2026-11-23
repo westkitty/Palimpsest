@@ -63,6 +63,25 @@ export function createF04Environment(parent:THREE.Group,colony:THREE.Object3D,la
     box(flap,'Folded relay receipt tab',gray,.041,.021,.036,.037,.026,.112);
     return flap;
   });
+  // A small, anonymous working rhythm in the last already-lit dock.
+  // It turns an existing paper receipt from the receiving side to the
+  // filing side. The unfinished rail has no new lamp or destination.
+  const lastLamp=lamps.at(-1)!;
+  const terminal=new THREE.Group();terminal.name='Last lit relay · receive, check, and file';
+  terminal.position.set(lastLamp.position.x-.018,.103,-.446);
+  stage.add(terminal);
+  const terminalFace=paper(0x596a5c),receiptStock=paper(0xb99365);
+  box(terminal,'Working dock footing under the last relay',black,.174,.022,.140,0,0,0);
+  for(const side of [-1,1]){
+    box(terminal,'Laminated receiving and filing rim',trim,.030,.039,.110,side*.072,.022,-.001);
+  }
+  const shutter=new THREE.Group();shutter.name='Last relay lift-and-return hinge';
+  shutter.position.set(0,.051,-.029);terminal.add(shutter);
+  box(shutter,'Folded inspection cover',terminalFace,.132,.021,.075,0,.007,-.028);
+  box(shutter,'Burnished last inspection edge',trim,.111,.015,.012,0,.019,-.060);
+  const receipt=box(terminal,'Existing last dock receipt slides under the cover',receiptStock,.068,.010,.073,0,.026,.032);
+  box(terminal,'Terminal receiving rail stays on this card',trim,.136,.013,.013,0,.024,.060);
+  let endpointAge=0;
   // Evidence on the already-authored reverse. These are broken print folds,
   // not extra attacks, destinations, or a chronological casualty diagram.
   for(const [i,pair] of [[-.65,-.51],[-.31,.13],[.12,-.06],[.41,.32]].entries()){
@@ -70,8 +89,21 @@ export function createF04Environment(parent:THREE.Group,colony:THREE.Object3D,la
     const crack=box(colony,'Pressed fracture on the existing counter-response face',i%2?gray:ruby,.267,.012,.043,x,-.0615,z);
     crack.rotation.y=(i%2?1:-1)*(.37+i*.22);
   }
-  return {update(frame:number){
+  return {update(frame:number,dt=0,reduced=false){
     const story=f04EnvironmentalRead(frame);
+    // Run this little task after—not during—the arrival of the fifth pulse.
+    // An early pause holds the wave, but a settled outpost can keep working.
+    const endpoint=story.relays[4]>=.999;
+    endpointAge=endpoint?(endpointAge+Math.min(.075,Math.max(0,dt)))%2.84:0;
+    const cycle=reduced?0:endpointAge;
+    const cover=endpoint
+      ?THREE.MathUtils.smoothstep(cycle,.08,.47)*(1-THREE.MathUtils.smoothstep(cycle,1.64,2.11)):0;
+    const check=endpoint
+      ?THREE.MathUtils.smoothstep(cycle,.43,.92)*(1-THREE.MathUtils.smoothstep(cycle,1.37,1.88)):0;
+    shutter.rotation.x=.93*cover;
+    receipt.position.z=.032-.070*check;
+    receipt.position.y=.026+.038*check;
+    receipt.rotation.x=-.31*check;
     lens.visible=story.colonySignal;coal.visible=!story.colonySignal;
     pulse.visible=story.segment>=0;
     if(story.segment>=0){
@@ -84,7 +116,8 @@ export function createF04Environment(parent:THREE.Group,colony:THREE.Object3D,la
     }
     relays.forEach((r,i)=>{r.rotation.x=-1.07*story.relays[i];});
     return {colonySignal:story.colonySignal,pulseSegment:story.segment,pulseAlong:story.along,
-      relaysUnfolded:story.relays.filter(x=>x>.90).length,unfinishedLaneDark:true};
+      relaysUnfolded:story.relays.filter(x=>x>.90).length,unfinishedLaneDark:true,
+      endpointRoutine:{active:endpoint,cover,receipt:check}};
   },dispose(){
     all.forEach(n=>{n.removeFromParent();n.geometry.dispose();});
     mats.forEach(m=>m.dispose());stage.removeFromParent();signal.removeFromParent();

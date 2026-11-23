@@ -1517,9 +1517,9 @@ function goFolio(index:number, deferCameraReset=false):void {
         if(staged.root.userData.assetState==='ready'){
           staged.update(actual,dt,reduce);
           const {colonyFrame,expansionFrame,foldFrame,litPlanets,litEchoes,expansion,
-            colonySignal,pulseSegment,pulseAlong,relaysUnfolded,unfinishedLaneDark}=staged.root.userData;
+            colonySignal,pulseSegment,pulseAlong,relaysUnfolded,unfinishedLaneDark,endpointRoutine}=staged.root.userData;
           canvas.dataset.f04CandidateState=JSON.stringify({colonyFrame,expansionFrame,foldFrame,litPlanets,litEchoes,expansion,
-            colonySignal,pulseSegment,pulseAlong,relaysUnfolded,unfinishedLaneDark});
+            colonySignal,pulseSegment,pulseAlong,relaysUnfolded,unfinishedLaneDark,endpointRoutine});
         }else art.update(actual,dt,reduce);
       },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
     }
@@ -1538,8 +1538,8 @@ function goFolio(index:number, deferCameraReset=false):void {
       laterRevision={root:staged.root,update:(actual,dt,reduce)=>{
         if(staged.root.userData.assetState==='ready'){
           staged.update(actual,dt,reduce);
-          const {ring,step,record,planetPhase,orbitalPhase,factory}=staged.root.userData;
-          canvas.dataset.f05CandidateState=JSON.stringify({ring,step,record,planetPhase,orbitalPhase,factory});
+          const {ring,step,record,planetPhase,orbitalPhase,factory,nativeLineFrame}=staged.root.userData;
+          canvas.dataset.f05CandidateState=JSON.stringify({ring,step,record,planetPhase,orbitalPhase,factory,nativeLineFrame});
         }else art.update(actual,dt,reduce);
       },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
     }

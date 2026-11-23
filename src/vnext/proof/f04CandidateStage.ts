@@ -112,7 +112,7 @@ export function makeF04CandidateStage(
     for(const slot of slots)for(const action of channels[slot])action.time=t[slot];
     mixer.update(0);
     Object.assign(root.userData,{
-      colonyFrame, expansionFrame, foldFrame,...environment?.update(expansionFrame),
+      colonyFrame, expansionFrame, foldFrame,...environment?.update(expansionFrame,dt,reduced),
       litPlanets:lamps.filter(l=>l.scale.x>.9).length,
       litEchoes:echo.filter(l=>l.scale.x>.9).length,
       expansion:expansionFrame>=routeEnd?'complete':B.active?'advancing':'held',

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { makeFactoryFloor } from './f05FactoryFloor.ts';
+import { factoryStroke, makeFactoryFloor } from './f05FactoryFloor.ts';
 import type { FolioRuntimeState } from '../../types/atlas';
 
 const fps=24;
@@ -19,7 +19,9 @@ export function makeF05CandidateStage(ready:()=>void,failed:()=>void) {
   let asset:THREE.Group|undefined, mixer:THREE.AnimationMixer|undefined;
   let orbit:THREE.Object3D|undefined, green:THREE.Object3D|undefined, scarred:THREE.Object3D|undefined;
   const markers:{node:THREE.Object3D;step:number}[]=[];
-  const draxis:{node:THREE.Object3D;base:THREE.Quaternion}[]=[];
+  const draxis:{node:THREE.Object3D;base:THREE.Quaternion;bay:number}[]=[];
+  const inspectionBoards:{node:THREE.Object3D;bay:number}[]=[];
+  let nativeFeedCursor:THREE.Object3D|undefined;
   const ringSurface:{mat:THREE.MeshStandardMaterial;base:number}[]=[];
   let frames=[20,42,132];
   let line:ReturnType<typeof makeFactoryFloor>|undefined;
@@ -63,7 +65,10 @@ export function makeF05CandidateStage(ready:()=>void,failed:()=>void) {
       if(id.startsWith('afallenstarprimelivingsurface'))green=n;
       if(id.startsWith('afallenstarprimeafterconquest'))scarred=n;
       if(id.startsWith('gorevault044source')||id.startsWith('ringthroat029source'))
-        draxis.push({node:n,base:n.quaternion.clone()});
+        draxis.push({node:n,base:n.quaternion.clone(),bay:id.startsWith('gorevault')?1:2});
+      const board=/^bbaperture([1-4])rotatingpunchedboard$/.exec(id);
+      if(board)inspectionBoards.push({node:n,bay:Number(board[1])-1});
+      if(id==='bcutawayredslurrycursor')nativeFeedCursor=n;
       if(/^creamtypedbaylabel|^bayheading|^baydescriptor/.test(id))paperFilingLabels.push(n);
       // Reuse the actual authored records as part of the station, not as a
       // separate form strip. C still controls the original folding pivots.
@@ -88,9 +93,9 @@ export function makeF05CandidateStage(ready:()=>void,failed:()=>void) {
         n.userData.slot=id.at(-1)?.toUpperCase();controls.push(n);
       }
     });
-    if(!orbit||!green||!scarred||draxis.length!==2||markers.length!==8||controls.length!==3||
+    if(!orbit||!green||!scarred||draxis.length!==2||inspectionBoards.length!==4||!nativeFeedCursor||markers.length!==8||controls.length!==3||
       channels.A.length!==2||channels.B.length!==17||channels.C.length!==2||!ringSurface.length){
-      console.error('Incomplete F05 challenger',JSON.stringify({orbit:!!orbit,green:!!green,scarred:!!scarred,draxis:draxis.length,markers:markers.length,controls:controls.length,A:channels.A.length,B:channels.B.length,C:channels.C.length,ringSurface:ringSurface.length}));
+      console.error('Incomplete F05 challenger',JSON.stringify({orbit:!!orbit,green:!!green,scarred:!!scarred,draxis:draxis.length,markers:markers.length,controls:controls.length,articulatedBoards:inspectionBoards.length,feedCursor:!!nativeFeedCursor,A:channels.A.length,B:channels.B.length,C:channels.C.length,ringSurface:ringSurface.length}));
       fail();return;
     }
     line=makeFactoryFloor(asset);
@@ -104,8 +109,11 @@ export function makeF05CandidateStage(ready:()=>void,failed:()=>void) {
     const {A,B,C}=state.interactions;
     const delta=Math.min(.06,Math.max(dt,0));
     if(!reduced)clock+=delta;
+    const factory=line?.(B.step,delta,reduced);
+    const rhythm=factory?.rhythm;
     const dest=[A.active?38:20,bFrames[B.step]??42,C.active?159:132];
-    frames=dest.map((frame,i)=>!initialized||reduced?frame:THREE.MathUtils.damp(frames[i],frame,7,delta));
+    frames=dest.map((frame,i)=>!initialized||reduced?frame:
+      i===1&&rhythm?.arrested?frames[i]:THREE.MathUtils.damp(frames[i],frame,7,delta));
     initialized=true;
     slots.forEach((slot,i)=>channels[slot].forEach(action=>action.time=(frames[i]-1)/fps));
     mixer.update(0);
@@ -117,14 +125,24 @@ export function makeF05CandidateStage(ready:()=>void,failed:()=>void) {
     green.rotation.y=scarred.rotation.y=reduced?0:clock*.49;
     orbit.rotateOnAxis(up,reduced?0:clock*.81);
     for(const {mat,base} of ringSurface)mat.roughness=reduced?base:base+.038*Math.sin(clock*1.65);
-    draxis.forEach(({node,base},i)=>{
-      node.quaternion.copy(base);
-      if(!reduced){node.rotation.x+=.021*Math.sin(clock*1.61+i*1.8);node.rotation.z+=.016*Math.sin(clock*1.24+i*.8);}
+    // Blend on top of the real B tracks after the mixer samples them. The
+    // pulse passes from the first punched board through the two existing
+    // Draxis to the outlet. Neither the A orbital clock nor C records use it.
+    const working=B.step>0&&!reduced&&rhythm;
+    const stroke=(bay:number)=>working?factoryStroke(rhythm.phase,bay):0;
+    inspectionBoards.forEach(({node,bay})=>{
+      if(frames[1]>53+bay*20)node.rotateX(.086*stroke(bay));
     });
-    const factory=line?.(B.step,delta,reduced);
+    draxis.forEach(({node,base,bay})=>{
+      const a=stroke(bay);
+      node.quaternion.copy(base);
+      node.rotateX(.095*a);
+      node.rotateZ((bay===1?-1:1)*.047*a);
+    });
+    if(nativeFeedCursor)nativeFeedCursor.position.y+=.026*stroke(1.55);
     for(const item of paperFilingLabels)item.visible=B.step===0;
     Object.assign(root.userData,{factory,ring:orbit.visible,step:markers.filter(m=>m.node.visible).length/2,record:frames[2]>=154,
-      planetPhase:green.rotation.y,orbitalPhase:reduced?0:clock*.81});
+      planetPhase:green.rotation.y,orbitalPhase:reduced?0:clock*.81,nativeLineFrame:frames[1]});
   }
   function dispose():void {
     disposed=true;mixer?.stopAllAction();if(asset){mixer?.uncacheRoot(asset);disposeTree(asset);}
