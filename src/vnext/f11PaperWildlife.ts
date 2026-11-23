@@ -60,6 +60,7 @@ export function createF11PaperWildlife(owner:THREE.Group,frond:THREE.Object3D) {
   };
 
   const moth=group(root,'F11 paper moth, lands on a borrowed leaf face');
+  moth.scale.set(1.14,1,1.11);
   const mothBody=mesh(moth,new THREE.CylinderGeometry(.018,.027,.123,7),darker,0,.025,-.003);
   mothBody.rotation.x=Math.PI*.5;
   for(const sign of [-1,1]){
@@ -127,7 +128,7 @@ export function createF11PaperWildlife(owner:THREE.Group,frond:THREE.Object3D) {
       moth.quaternion.setFromUnitVectors(up,arrive>.99?normal:up);
       const flutter=reduced?0:Math.sin((frame-89)*1.82)*.63*(1-b.wingFold);
       const reseat=reduced?0:Math.sin(Math.PI*f11Ease(104,106.3,frame))*.09;
-      wings.forEach((a,i)=>a.rotation.z=(i===0?1:-1)*(.16+.85*b.wingFold+flutter+reseat*(i===0?1:.64)));
+      wings.forEach((a,i)=>a.rotation.z=(i===0?-1:1)*(.16+.85*b.wingFold+flutter+reseat*(i===0?1:.64)));
     }
     if(bird.visible){
       const walk=reduced?1:b.approach;

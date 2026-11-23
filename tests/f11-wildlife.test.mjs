@@ -30,6 +30,8 @@ test('six-legged moth lands on actual paper geometry and tracks that frond when 
  wild.update(80,false);assert.ok(!moth.visible&&!bird.visible);
  wild.update(93,false);assert.ok(moth.visible&&bird.visible);
  const a=wild.update(105,false);assert.deepEqual([a.moth,a.perch,a.boundToFrond],['perched',F11_MOTH_FROND,true]);
+ assert.ok(moth.getObjectByName('Moth left fold wing').rotation.z<-.9);
+ assert.ok(moth.getObjectByName('Moth right fold wing').rotation.z>.9);
  const p=moth.position.clone();
  frond.position.x+=.250;wild.update(108,false);
  assert.ok(moth.position.distanceTo(p)>.150,'moth does not float independently of the plant');
