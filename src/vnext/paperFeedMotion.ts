@@ -8,6 +8,12 @@ export function paperFeedMotion(at:number,reduced:boolean){
   return {feed,grip,press,eject,marked:reduced||at>=1.09,
     stage:reduced?'parked':at<.20?'waiting':at<.87?'feeding':at<1.29?'pressing':at<2.05?'leaving':'residue'} as const;
 }
+// Render these contact poses before proceeding, even if a frame arrives late.
+const contacts=[.49,1.03,1.15,1.68,2.05] as const;
+export function paperFeedStep(at:number,dt:number):number {
+  const boundary=contacts.find(t=>t>at+1e-6&&t<=at+dt);
+  return boundary===undefined?dt:boundary-at+1e-7;
+}
 export function depthShadowPosition(seconds:number){
   // One diffuse occlusion crosses the whole stage and returns slowly.
   return 3.8*Math.cos(Math.max(0,seconds)*Math.PI/11);

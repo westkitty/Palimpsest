@@ -1,4 +1,4 @@
-import {paperFeedMotion} from './paperFeedMotion.ts';
+import {paperFeedMotion,paperFeedStep} from './paperFeedMotion.ts';
 import * as THREE from 'three';
 import { getOpenPageY } from '../engine/BookAndDeskRig';
 import { createF11Challenger } from './challengerF11.ts';
@@ -630,12 +630,13 @@ function f12Art(world: BaseFolioWorld): MechanismArt {
   const update:MechanismArt['update']=(state,dt,reduced)=>{
     const step=Math.max(0,Math.min(dt,1));
     const now=performance.now();
-    const roleDelta=previousRoleTick===undefined||step===0||document.hidden?0:Math.min(.55,(now-previousRoleTick)/1000);
+    let roleDelta=previousRoleTick===undefined||step===0||document.hidden?0:Math.min(.55,(now-previousRoleTick)/1000);
     previousRoleTick=now;
     // The reading dwell is clock time, not a frame count. This also keeps
     // the role plates readable when the paper theatre is costly to render.
-    folioMotion+=roleDelta;
     const dwell=reduced?5.5:4.4;
+    if(mountedEnvironment&&!reduced)roleDelta=paperFeedStep((cyclePosition%1)*dwell,roleDelta);
+    folioMotion+=roleDelta;
     cyclePosition=(cyclePosition+roleDelta/dwell)%roles.length;
     const idx=Math.floor(cyclePosition);
     const cyc=(cyclePosition-idx)*dwell;
