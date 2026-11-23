@@ -4,13 +4,13 @@ const scene = fs.readFileSync('src/vnext/previewV2.ts','utf8');
 const html = fs.readFileSync('folio-vnext.html','utf8');
 const state = fs.readFileSync('src/vnext/folioLogic.ts','utf8');
 const f01=scene.split('function buildF01():THREE.Group {')[1]?.split('function spiralInstances')[0];
-const f02=scene.split('function buildF02():void {')[1]?.split('function buildF03():void {')[0];
+const f02=scene.split('function buildF02():THREE.Group {')[1]?.split('function buildF03():void {')[0];
 const f03=scene.split('function buildF03():void {')[1]?.split('function redrawPlanets():void {')[0];
 const checks=[
   ['folio sequence intact',!!f01&&!!f02&&!!f03],
   ['F01 remains starless',!(/spiralInstances|SphereGeometry|InstancedMesh/.test(f01))],
   ['F02 first visible celestial bodies',f02.includes('spiralInstances')],
-  ['F02 scale loom anchored to real page',f02.includes('galaxyPaperLoom=buildAllPaperLoom(root)')],
+  ['F02 scale loom anchored to real page',f02.includes('galaxyPaperLoom=buildAllPaperLoom(fallback)') && scene.includes('createF02Challenger(state.f02.reveal')],
   ['loom made of die-cut ribbons not remote media',scene.includes('new THREE.Float32BufferAttribute(vertices,3)')&&!/https?:\/\//.test(scene)],
   ['loom only shown after final stage',scene.includes('const expanded=state.f02.reveal===3')],
   ['camera beat explicit not automatic',scene.includes("witnessButton.addEventListener('click',toggleWitness)")],
