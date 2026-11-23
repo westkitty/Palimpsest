@@ -36,6 +36,11 @@ try{
   assert.equal(initial.study.inert,false);
   assert.equal(initial.stampPresent,true);
   assert.equal(initial.recruitmentPresent,true);
+  assert.equal(initial.stationCount,4);
+  assert.equal(initial.archiveRecessVisible,true);
+  assert.ok(initial.cityGap>.40);
+  assert.equal(initial.stampPress,0);
+  assert.equal(initial.stampFaceMarked,true);
   assert.ok(['Rebuilders','Surveyors','Relief Crews','Record Keepers'].includes(initial.role));
   await noLegacy(reduced);
   await screen(reduced,'F12-01-closed.png');
@@ -48,6 +53,7 @@ try{
   assert.equal(state.study.emission,0);
   await tap(reduced,'a');await wait(reduced,'claimFrame',28);
   state=await getState(reduced);assert.ok(state.splitDistance>initial.splitDistance+.40);
+  assert.ok(state.cityGap>initial.cityGap+.40,'same physical split as the native A tracks');
   assert.equal(state.archiveFrame,1);assert.equal(state.study.inert,true);
   await tap(reduced,'c');await wait(reduced,'archiveFrame',67);
   state=await getState(reduced);
@@ -58,8 +64,11 @@ try{
   await tap(reduced,'b');
   await reduced.waitForFunction(()=>JSON.parse(document.querySelector('#stage')?.dataset.f12CandidateState??'{}').study?.inert===false);
   assert.equal((await getState(reduced)).archiveFrame,67);
-  const seenRole=(await getState(reduced)).role;
+  const beforeRole=await getState(reduced);
+  const seenRole=beforeRole.role;
   await reduced.waitForFunction(role=>{const s=JSON.parse(document.querySelector('#stage')?.dataset.f12CandidateState??'{}');return s.role&&s.role!==role;},seenRole,{timeout:75000});
+  assert.notEqual((await getState(reduced)).stationIndex,beforeRole.stationIndex);
+  await screen(reduced,'F12-05-next-role.png');
   await tap(reduced,'a');await wait(reduced,'claimFrame',1);
   await tap(reduced,'c');await wait(reduced,'archiveFrame',1);
   await tap(reduced,'ArrowRight');
@@ -79,6 +88,8 @@ try{
   await wait(moving,'archiveFrame',67);
   await tap(moving,'c');await wait(moving,'archiveFrame',1);
   assert.equal((await getState(moving)).study.inert,false);
+  await moving.waitForFunction(()=>JSON.parse(document.querySelector('#stage')?.dataset.f12CandidateState??'{}').stampPress>.93,undefined,{timeout:45000});
+  await screen(moving,'F12-06-actual-facade-press.png');
   assert.ok(native.length>=2,'Vite-served F12 GLB loaded in both sessions');
   assert.deepEqual(errors,[]);
   console.log('PASS F12 native A/C, independent original B, public archive, role cycling, separate coda and reversibility');

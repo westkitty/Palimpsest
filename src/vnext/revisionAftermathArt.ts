@@ -471,6 +471,123 @@ function f12Art(world: BaseFolioWorld): MechanismArt {
     strip(vec(Math.cos(a)*0.027,0.008,Math.sin(a)*0.027),vec(Math.cos(a)*0.064,0.008,Math.sin(a)*0.064),0.009,0x65352e,sign);
   }
 
+  // A built city in dusk paper stock, not another printed recruiting card.
+  // Separate foundations are physical geometry: no piece traverses the cut.
+  const city=new THREE.Group();city.name='living-f12-unfinished-city';city.visible=false;root.add(city);
+  const containment=new THREE.Group(), harm=new THREE.Group();
+  containment.name='living-f12-containment-foundation';
+  harm.name='living-f12-unended-harm-foundation';city.add(containment,harm);
+  const footings=[containment,harm] as const;
+  const cityCenters=[-1.47,1.47] as const;
+  for(const [i,group] of footings.entries()){
+    group.position.set(cityCenters[i],.335,-1.88);
+    const platform=box(2.38,.082,.80,i===0?0x8f7863:0x675965,group);
+    platform.userData.slot='A';
+    box(2.42,.030,.82,0x352f3c,group,0,-.052,0);
+    // Each road stops at its own cut edge; neither sidewalks nor tool rails cross.
+    const lane=box(2.23,.017,.255,i===0?0xb8a383:0x977c76,group,0,.050,.27);
+    lane.userData.slot='A';
+    for(let d=0;d<5;d++)box(.161,.009,.032,0xe0c89a,group,-.82+d*.41,.061,.27);
+    for(let j=0;j<3;j++){
+      const x=-.88+j*.81,h=(i===0?[.49,.72,.41]:[.67,.38,.87])[j];
+      const shell=box(.51,h,.22,i===0?0x5e4b57:0x594755,group,x,h/2+.055,-.22);
+      shell.userData.slot='A';
+      for(let q=0;q<2;q++)for(let l=0;l<Math.floor(h/.14);l++){
+        const pane=mesh(new THREE.PlaneGeometry(.063,.057),paper(i===0?0xeeaf69:0xcea9b1,.40),group,
+          vec(x-.12+q*.22,.140+l*.122,-.104));
+        pane.castShadow=false;pane.userData.slot='A';
+      }
+      // An exposed upright + broken lintel, without a finished roof plane.
+      const mast=box(.047,.18,.075,0xaf8a77,group,x-.17,h+.12,-.19);
+      mast.userData.slot='A';
+      const incomplete=box(.20,.038,.068,0x997565,group,x-.09,h+.20,-.19);
+      incomplete.userData.slot='A';
+    }
+    const edge=box(.025,.15,.79,0xf0c285,group,i===0?1.17:-1.17,.014,0);
+    edge.userData.slot='A';
+  }
+  const cityHitMeshes:THREE.Mesh[]=[];
+  city.traverse(o=>{if(o instanceof THREE.Mesh&&o.userData.slot==='A')cityHitMeshes.push(o);});
+  city.userData.interactables=cityHitMeshes;
+
+  // The selected Blender horizon already carries the setting sun.
+  // An architectural facing around, never inside, the existing GLB dossier.
+  // Its own untouched hinge and public record stay the only C surface/content.
+  const recess=new THREE.Group();recess.name='living-f12-public-archive-recess';city.add(recess);
+  for(const x of [.52,3.53]){
+    box(.10,.20,3.02,0x6e5960,recess,x,.36,.42);
+    box(.035,.023,2.99,0xc39f79,recess,x,.477,.42);
+  }
+  const facade=new THREE.Group();facade.position.set(3.75,.34,.10);city.add(facade);
+  box(.62,.79,.16,0x715052,facade,0,.40,0);
+  box(.56,.065,.22,0x9a7468,facade,0,.83,.02);
+  box(.37,.33,.034,0xbe8b75,facade,0,.52,.102);
+  const facadeMark=mesh(new THREE.CircleGeometry(.105,18),paper(0x9e423c,.14),facade,vec(0,.52,.122));
+  facadeMark.visible=false;facadeMark.name='living-f12-facade-stamp-impression';
+
+  const stations=new THREE.Group();stations.name='living-f12-recruitment-stations';
+  stations.position.set(-3.37,.35,-.40);city.add(stations);
+  const roleStations=roles.map(([name],i)=>{
+    const g=new THREE.Group();g.name='living-f12-lit-station-'+i;stations.add(g);
+    const light=[0xe3a16d,0x86babd,0xe4b56d,0xc7a4c9][i];
+    box(1.62,.09,.90,0x614957,g,0,.025,.03);
+    box(1.39,.85,.062,0x5c4d5f,g,0,.51,-.35);
+    const screen=mesh(new THREE.PlaneGeometry(1.22,.72),paper(light,.43),g,vec(0,.53,-.309));
+    screen.castShadow=false;screen.receiveShadow=false;
+    // Anonymous silhouettes: role, not character likeness or a new historical claim.
+    const body=mesh(new THREE.CylinderGeometry(.118,.151,.34,7),paper(0x372d39),g,vec(-.29,.31,-.07));
+    body.rotation.z=i===1?-.20:i===0?.17:0;
+    mesh(new THREE.SphereGeometry(.095,8,5),paper(0x382c39),g,vec(-.29,.575,-.065));
+    const b=vec(-.24,.43,.008),e=i===0?vec(.19,.65,.04):vec(.30,.35,.07);
+    strip(b,e,.085,0x372d39,g);
+    strip(vec(-.36,.20,-.05),vec(-.41,.086,-.04),.068,0x372d39,g);
+    strip(vec(-.24,.20,-.05),vec(-.19,.086,-.04),.068,0x372d39,g);
+    if(i===0){
+      // Unfinished workbench lintel being set.
+      box(.61,.07,.10,0x523742,g,.35,.62,.024);
+      box(.07,.49,.10,0x523742,g,.57,.36,.024);
+      box(.31,.07,.072,0x903f48,g,.22,.74,.04).rotation.z=.24;
+    }else if(i===1){
+      // A survey head on three legs.
+      for(const [dx,dz] of [[-.15,.10],[.16,.09],[.02,-.09]]){
+        strip(vec(.35,.477,.04),vec(.35+dx,.09,.04+dz),.030,0x524251,g);
+      }
+      box(.31,.134,.15,0x3b5968,g,.355,.52,.063).rotation.z=.14;
+    }else if(i===2){
+      // Stacked supplies at the relief counter.
+      for(const [x,y] of [[.10,.17],[.43,.17],[.29,.35]]){
+        box(.27,.17,.20,0x69464a,g,x,y,.08);
+        box(.027,.174,.009,0xe8c7a3,g,x,y,.187);
+        box(.11,.028,.012,0xe8c7a3,g,x,y,.190);
+      }
+    }else{
+      // Several folded files in a distinct stepped rack.
+      for(let j=0;j<3;j++){
+        box(.11,.32,.20,0x6f535e,g,.2+j*.14,.25,.07).rotation.z=-.10;
+        box(.07,.02,.008,0xe8c7a3,g,.2+j*.14,.34,.177);
+      }
+      box(.60,.064,.26,0x4f3b4f,g,.31,.096,.07);
+    }
+    const nameplate=plate(g,1.31,.20,name,'POSTWAR RECRUITMENT',dusk,.014);
+    nameplate.position.set(0,1.03,-.285);
+    g.visible=i===0;
+    return g;
+  });
+  let mountedEnvironment=false;
+  const stampPivot=arm.position.clone();
+  root.userData.mountF12Environment=()=>{
+    mountedEnvironment=true;city.visible=true;recruitment.visible=false;leaf.visible=false;
+    // Remount the same press, towards the upright insert at z=0.22.
+    stamp.position.set(3.75,.35,.535);stamp.scale.setScalar(.92);
+    sign.visible=false;slip.visible=false;
+  };
+  root.userData.f12CityHitMeshes=cityHitMeshes;
+  root.userData.sampleF12NativeClaims=(distance:number)=>{
+    const shift=.5*Math.max(0,distance-1.57);
+    containment.position.x=cityCenters[0]-shift;
+    harm.position.x=cityCenters[1]+shift;
+    root.userData.cityGap=harm.position.x-containment.position.x-2.42;
+  };
   let cyclePosition=0, folioMotion=0, sealFlap=0, previousRoleTick:number|undefined;
   const update:MechanismArt['update']=(state,dt,reduced)=>{
     const step=Math.max(0,Math.min(dt,1));
@@ -498,6 +615,23 @@ function f12Art(world: BaseFolioWorld): MechanismArt {
     sign.visible=reduced||cyc>0.37||folioMotion<dwell;
     sealFlap=reduced?Number(state.interactions.C.active):THREE.MathUtils.lerp(sealFlap,Number(state.interactions.C.active),1-Math.exp(-8*step));
     hinge.rotation.x=-1.28*sealFlap;
+    if(mountedEnvironment){
+      for(const [i,g] of roleStations.entries())g.visible=i===idx;
+      const press=reduced?0:Math.sin(Math.PI*unit((cyc-.27)/.80))**2;
+      // Actual plate travels toward the facade and turns flush for contact.
+      arm.rotation.x=-1.16-.54*press;
+      arm.position.set(stampPivot.x,stampPivot.y+.16+.28*press,stampPivot.z+.09-.004*press);
+      stampHead.rotation.x=.25-.12*press;
+      grip.rotation.x=stampHead.rotation.x;
+      stampBacking.position.y=.037-.010*press;
+      sign.visible=false;
+      facadeMark.visible=reduced||cyc>1.05;
+      root.userData.stationIndex=idx;
+      root.userData.stationCount=roleStations.length;
+      root.userData.stampPress=press;
+      root.userData.stampFaceMarked=facadeMark.visible;
+      root.userData.archiveRecessVisible=recess.visible;
+    }
     root.userData.role=roles[idx][0];
     root.userData.roleIndex=idx;
     root.userData.archivalLeafOpen=state.interactions.C.active;

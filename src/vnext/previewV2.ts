@@ -1518,8 +1518,8 @@ function goFolio(index:number, deferCameraReset=false):void {
         if(!recruitment||!stamp||!fallbackLeaf)throw Error('F12 recruitment/stamp mounting incomplete');
         world.mountLivingBlender(stageOwner);
         stageOwner.add(art.root);art.root.visible=true;
-        recruitment.position.set(-1.61,.265,-.41);
-        stamp.position.set(4.015,.285,1.84);stamp.scale.setScalar(.64);
+        art.root.userData.mountF12Environment();
+        for(const hit of art.root.userData.f12CityHitMeshes as THREE.Mesh[])staged.controls.push(hit);
         fallbackLeaf.visible=false;scenic.root.visible=false;
         canvas.dataset.blenderFolio='12';mounted=true;
       },()=>{if(rig===stageOwner)canvas.dataset.blenderFolio='unavailable';});
@@ -1529,8 +1529,11 @@ function goFolio(index:number, deferCameraReset=false):void {
         art.update(actual,dt,reduce);staged.update(actual,dt,reduce);
         if(mounted&&rig===stageOwner){
           const {claimFrame,archiveFrame,splitDistance,archiveAngle,horizonPieces,creaseFixed}=staged.root.userData;
+          art.root.userData.sampleF12NativeClaims(splitDistance);
+          const {cityGap,stationIndex,stationCount,stampPress,stampFaceMarked,archiveRecessVisible}=art.root.userData;
           canvas.dataset.f12CandidateState=JSON.stringify({claimFrame,archiveFrame,splitDistance,archiveAngle,horizonPieces,creaseFixed,
-            study:world.symbolicStudyState(),role:art.root.userData.role,stampPresent:art.root.visible&&stamp?.visible===true,recruitmentPresent:art.root.visible&&recruitment?.visible===true});
+            study:world.symbolicStudyState(),role:art.root.userData.role,stampPresent:art.root.visible&&stamp?.visible===true,
+            recruitmentPresent:stationCount===4,cityGap,stationIndex,stationCount,stampPress,stampFaceMarked,archiveRecessVisible});
         }
       },dispose(){staged.dispose();if(mounted)world.unmountLivingBlender();art.root.removeFromParent();art.dispose();}};
     }
