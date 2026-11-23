@@ -1,6 +1,7 @@
 import { makeF07CandidateStage } from './proof/f07CandidateStage';
-import { F08FolioWorld } from '../engine/folios/FoliosWar2';
+import { F08FolioWorld, F09FolioWorld } from '../engine/folios/FoliosWar2';
 import { makeF08CandidateStage } from './proof/f08CandidateStage.ts';
+import { F09_MODEL_CENTER, makeF09CandidateStage } from './proof/f09CandidateStage.ts';
 import { makeF04CandidateStage } from './proof/f04CandidateStage';
 import { makeF05CandidateStage } from './proof/f05CandidateStage';
 import { makeF06CandidateStage } from './proof/f06CandidateStage';
@@ -19,7 +20,7 @@ import { createRevisionEarlyArt, REVISION_VAULT_TEMPLATES } from './revisionEarl
 import { createF01Challenger } from './challengerF01.ts';
 import { createF02Challenger } from './challengerF02.ts';
 import { createRevisionWar1Art } from './revisionWar1Art.ts';
-import { createRevisionWar2Art, mountF08FunctionalTheatre } from './revisionWar2Art.ts';
+import { createRevisionWar2Art, mountF08FunctionalTheatre, mountF09FunctionalTheatre } from './revisionWar2Art.ts';
 import { createRevisionAftermathArt } from './revisionAftermathArt.ts';
 import type { FolioRuntimeState } from '../types/atlas';
 import { makeF03CandidateStage } from './proof/f03CandidateStage';
@@ -1208,7 +1209,7 @@ function goFolio(index:number, deferCameraReset=false):void {
   if(!playableIndex(index))return;
   clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
   canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
-  delete canvas.dataset.revisionPhase;delete canvas.dataset.f10CandidateState;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;delete canvas.dataset.f11AuthoredFrame;delete canvas.dataset.f07CandidateState;delete canvas.dataset.f08CandidateState;
+  delete canvas.dataset.revisionPhase;delete canvas.dataset.f10CandidateState;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;delete canvas.dataset.f11AuthoredFrame;delete canvas.dataset.f07CandidateState;delete canvas.dataset.f08CandidateState;delete canvas.dataset.f09CandidateState;
   delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;
   delete canvas.dataset.f02Challenger;delete canvas.dataset.f02Frame;delete canvas.dataset.f02Detent;delete canvas.dataset.f02Clip;
   delete canvas.dataset.f06CandidateState;
@@ -1442,6 +1443,36 @@ function goFolio(index:number, deferCameraReset=false):void {
           canvas.dataset.f08CandidateState=JSON.stringify({authoredFrames,rings,plasma:art.root.userData.portalPower});
         }
       },dispose(){staged.dispose();art.dispose();}};
+    }
+    if(index===8&&laterWorld instanceof F09FolioWorld){
+      const stageOwner=rig,world=laterWorld;
+      const staged=makeF09CandidateStage((pull,star,absence)=>{
+        if(rig!==stageOwner||currentFolio!==8)return;
+        const state=laterStates[8-FIRST_LATER_FOLIO];
+        staged.update(state,0,reducedMotion);
+        if(typeof staged.root.userData.authorFrame!=='number')return;
+        world.mountBlenderModel(pull,star,absence);
+        mountF09FunctionalTheatre(art.root,F09_MODEL_CENTER);
+        art.root.userData.f09AuthoredFrame=staged.root.userData.authorFrame;
+        art.update(state,0,reducedMotion);
+        canvas.dataset.blenderFolio='09';
+      },()=>{if(rig===stageOwner&&currentFolio===8)canvas.dataset.blenderFolio='unavailable';});
+      world.root.add(staged.root);
+      laterRevision={root:staged.root,update(actual,dt,reduce){
+        staged.update(actual,dt,reduce);
+        if(canvas.dataset.blenderFolio==='09'&&rig===stageOwner){
+          art.root.userData.f09AuthoredFrame=staged.root.userData.authorFrame;
+        }
+        art.update(actual,dt,reduce);
+        if(canvas.dataset.blenderFolio==='09'&&rig===stageOwner){
+          const {authorFrame,modelState,foldDegrees,filamentTravel,activeFilamentMorphs}=staged.root.userData;
+          canvas.dataset.f09CandidateState=JSON.stringify({
+            authorFrame,modelState,foldDegrees,filamentTravel,activeFilamentMorphs,
+            witness:art.root.userData.f09Witness,slivers:art.root.userData.f09InwardSlivers,
+            latched:actual.interactions.A.locked,historicalStep:actual.interactions.B.step,survey:actual.interactions.C.active,
+          });
+        }
+      },dispose(){staged.dispose();staged.root.removeFromParent();art.dispose();}};
     }
   }
   ambientLight.intensity=index===2?0.46:0.78;

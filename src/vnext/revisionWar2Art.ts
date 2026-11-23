@@ -278,7 +278,9 @@ function heliocide(root: THREE.Group, bump: THREE.Texture | undefined): UpdateAr
     else if(on)t+=dt;
     else t=0;
     was=on;
-    const progress=on?(reduced?1:ease(.17,.75,t)):0;
+    const authoredFrame = root.userData.f09AuthoredFrame as number|undefined;
+    const progress = on ? reduced ? 1 : authoredFrame===undefined ? ease(.17,.75,t)
+      : ease(13,48,authoredFrame) : 0;
     const drawn=on?(reduced?1:ease(0,.27,t)):0;
     extraction.position.x=star.x+.33+drawn*.11;
     slip.scale.x=1+drawn*.21;
@@ -289,18 +291,31 @@ function heliocide(root: THREE.Group, bump: THREE.Texture | undefined): UpdateAr
       elbow.rotation.z=progress*(.56-i*.105);
     });
     fibers.forEach(({fragment,start},i)=>{
-      const flight=clamp((t-.16-i%5*.036)/.72);
+      const flight=authoredFrame===undefined ? clamp((t-.16-i%5*.036)/.72)
+        : clamp((authoredFrame-13-i%5*.57)/31);
       fragment.visible=on&&!reduced&&flight>0&&flight<1;
       if(!fragment.visible)return;
       const inward=Math.pow(flight,1.28);
-      pos.copy(start).lerp(star,inward);
+      // When the real armillary is loaded, the physical lens seats slightly left/lower.
+      // The witness still begins at the same printed stock and is pulled into the actual center.
+      const target=(root.userData.f09ModelCenter as THREE.Vector3|undefined)??star;
+      pos.copy(start).lerp(target,inward);
       pos.y+=Math.sin(inward*Math.PI)*(.05+i%4*.018);
       fragment.position.copy(pos);
-      dir.copy(star).sub(pos).normalize();
+      dir.copy(target).sub(pos).normalize();
       fragment.quaternion.setFromUnitVectors(unitX,dir);
       fragment.scale.set(1+inward*.75,Math.max(.25,1-inward),1);
     });
+    root.userData.f09Witness=blades.map(({tab})=>Number(tab.rotation.z.toFixed(3)));
+    root.userData.f09InwardSlivers=fibers.filter(({fragment})=>fragment.visible).length;
   };
+}
+
+/** Keep the approved witness comb and its ink; replace just the redundant temporary pull slip. */
+export function mountF09FunctionalTheatre(root:THREE.Group, center:THREE.Vector3):void {
+  const slip=root.getObjectByName('F09 · Starsilk slip pulled from the model');
+  if(slip)slip.visible=false;
+  root.userData.f09ModelCenter=center;
 }
 
 function siege(root: THREE.Group, world: BaseFolioWorld, bump: THREE.Texture | undefined): UpdateArt {

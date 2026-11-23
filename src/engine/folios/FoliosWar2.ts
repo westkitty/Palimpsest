@@ -401,6 +401,21 @@ export class F09FolioWorld extends BaseFolioWorld {
   private gimbalInner!: THREE.Mesh;
   private starCollapsed = false;
   private collapseProgress = 0;
+  private legacyModel!: THREE.Group;
+  private legacyModelBase!: THREE.Object3D;
+  private livingModelMounted = false;
+
+  /** Living-only replacement after the real Blender payload is available; B/C and the paper levers remain native. */
+  public mountBlenderModel(...targets: THREE.Object3D[]): void {
+    this.livingModelMounted = true;
+    this.legacyModel.visible = false;
+    this.legacyModelBase.visible = false;
+    this.legacyModel.traverse(n=>{
+      const index=this.interactables.indexOf(n);
+      if(index>=0)this.interactables.splice(index,1);
+    });
+    targets.forEach(target=>this.bindMechanismTarget(target,'A'));
+  }
 
   // Sequential 4-star cluster bar [B]
   private seqStars: { star: THREE.Mesh; hole: THREE.Mesh }[] = [];
@@ -430,9 +445,10 @@ export class F09FolioWorld extends BaseFolioWorld {
     const modelBaseY = this.pageY(-1.02);
     const ped = this.buildLayeredTerrace([1.36, 1.12], [1.36, 1.12], 0.025, [0x242830, 0x353b47], 0xc2a25d);
     ped.position.set(-1.02, modelBaseY, -0.34);
+    this.legacyModelBase=ped;
     this.root.add(ped);
 
-    const modelGroup = new THREE.Group();
+    const modelGroup = this.legacyModel = new THREE.Group();
     modelGroup.position.set(-1.02, modelBaseY + 0.56, -0.34);
 
     const plaque = this.makeCardLabel('MODEL STAR', 'Irreversible Filament Law', 1.36, 0.27, '#22262C', '#FAF3E4', 0.22);
@@ -574,6 +590,10 @@ export class F09FolioWorld extends BaseFolioWorld {
       k,
     );
 
+    if (this.livingModelMounted) {
+      this.animateLevers(dt,reducedMotion);
+      return;
+    }
     const collapseTarget = this.starCollapsed ? 1 : 0;
     if (reducedMotion) {
       this.collapseProgress = collapseTarget;
