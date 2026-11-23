@@ -34,6 +34,8 @@ const url=(process.env.PALIMPSEST_STANDALONE
       const stage=p.locator('#stage');
       const ready=()=>p.waitForFunction(()=>document.querySelector('#stage')?.dataset.blenderFolio==='09',null,{timeout:20000});
       const state=()=>stage.evaluate(e=>JSON.parse(e.dataset.f09CandidateState));
+      const field=(key,value)=>p.waitForFunction(([key,value])=>
+        JSON.parse(document.querySelector('#stage').dataset.f09CandidateState||'{}')[key]===value,[key,value]);
       const save=async(label)=>{if(output)await p.screenshot({path:path.join(output,'F09-'+form+'-'+label+'.png')});};
       await p.goto(url);await ready().catch(async e=>{throw new Error(JSON.stringify({errors,messages}),{cause:e});});
       await p.waitForFunction(()=>document.querySelector('#stage')?.dataset.bookPhase==='open',null,{timeout:15000});
@@ -43,12 +45,14 @@ const url=(process.env.PALIMPSEST_STANDALONE
       assert.deepEqual(before.witness,[0,0,0]); assert.equal(before.historicalStep,0);
       await save('model');
       await p.keyboard.press('b');
-      assert.equal((await state()).historicalStep,1);
+      await field('historicalStep',1);
       assert.equal((await state()).authorFrame,1);
       await p.keyboard.press('c');
-      assert.equal((await state()).survey,true);
+      await field('survey',true);
       assert.equal((await state()).historicalStep,1);
-      await p.keyboard.press('a');
+      if(form==='desktop')await p.mouse.click(551,405); // original mesh of cyan pull ring, not keyboard/overlay
+      else await p.keyboard.press('a');
+      await field('latched',true);
       if(form==='desktop'){
         await p.waitForFunction(()=>JSON.parse(document.querySelector('#stage').dataset.f09CandidateState).authorFrame>26);
         await save('inward-pull');
@@ -72,10 +76,10 @@ const url=(process.env.PALIMPSEST_STANDALONE
       await save('latched');
       await p.keyboard.press('a');assert.equal((await state()).authorFrame,70);
       for(let i=0;i<4;i++)await p.keyboard.press('b');
-      assert.equal((await state()).historicalStep,4);
+      await field('historicalStep',4);
       assert.equal((await state()).authorFrame,70);
       await p.keyboard.press('c');
-      assert.equal((await state()).survey,false);
+      await field('survey',false);
       await p.reload();await ready();
       await p.waitForFunction(()=>JSON.parse(document.querySelector('#stage').dataset.f09CandidateState||'{}').authorFrame===70);
       const restored=await state();
