@@ -5,6 +5,7 @@ const ease=(a:number,b:number,t:number)=>THREE.MathUtils.smoothstep(t,a,b);
 export function createF10StoryPaper(world:F10FolioWorld,pageY:(x:number)=>number) {
   const root=new THREE.Group();root.name='F10 Living inhabited margin and protocol threshold';
   const {horizon,protocol}=world.livingWitnessHandles();
+  const protocolRest=protocol.position.clone(),protocolRestPitch=protocol.rotation.x;
   const token={interactionType:'folioMechanism',worldId:9,slot:'C',label:'[C] Open Postwar Protocol threshold'};
   const hits:THREE.Mesh[]=[];
   const paper=(color:number)=>new THREE.MeshStandardMaterial({color,roughness:.86,side:THREE.DoubleSide,flatShading:true});
@@ -62,16 +63,17 @@ export function createF10StoryPaper(world:F10FolioWorld,pageY:(x:number)=>number
   // The exact source heading, with no technical content or new wording.
   let labelMaterial:THREE.MeshBasicMaterial|undefined;
   let texture:THREE.CanvasTexture|undefined;
+  let title:THREE.Mesh|undefined;
   const c=document.createElement('canvas');c.width=512;c.height=112;
   const ctx=c.getContext('2d');
   if(ctx){
     ctx.fillStyle='#2a3039';ctx.fillRect(0,0,512,112);ctx.strokeStyle='#aa936d';ctx.lineWidth=3;ctx.strokeRect(5,5,502,102);
-    ctx.fillStyle='#e4cfaa';ctx.font='700 32px Georgia, serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='#e4cfaa';ctx.font='700 42px Georgia, serif';ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillText('POSTWAR PROTOCOLS',256,57,480);
     texture=new THREE.CanvasTexture(c);texture.colorSpace=THREE.SRGBColorSpace;
     labelMaterial=new THREE.MeshBasicMaterial({map:texture,toneMapped:false,side:THREE.DoubleSide});
     const sign=new THREE.Mesh(new THREE.PlaneGeometry(1.63,.152),labelMaterial);
-    sign.position.set(0,.386,.003);sign.rotation.x=-.36;gate.add(sign);touch(sign);
+    sign.position.set(0,.386,.003);sign.rotation.x=-.30;gate.add(sign);touch(sign);title=sign;
   }
   protocol.visible=false;
   const amberTarget=new THREE.Color(0xd49a58),dimTarget=new THREE.Color(0x87674a);
@@ -86,6 +88,12 @@ export function createF10StoryPaper(world:F10FolioWorld,pageY:(x:number)=>number
     const eased=ease(0,1,openness);
     shutter[0].rotation.y=1.53*eased;shutter[1].rotation.y=-1.53*eased;
     protocol.visible=open&&eased>.38;
+    // Raise and tip the exact source card over the open threshold. Leave
+    // the titleplate shut only while closed; it must not obscure the record.
+    const reveal=ease(.32,.97,openness);
+    protocol.position.set(protocolRest.x,protocolRest.y+.47*reveal,protocolRest.z-.081*reveal);
+    protocol.rotation.x=protocolRestPitch+.39*reveal;
+    if(title)title.visible=eased<.55;
     margin.visible=!ground;
     // Tint only windows on the inhabited side. The same black streak stays
     // unlit, untextured and entirely unaffected, along with the schematic.
@@ -96,6 +104,7 @@ export function createF10StoryPaper(world:F10FolioWorld,pageY:(x:number)=>number
   },dispose(){
     for(const n of hits){const i=world.interactables.indexOf(n);if(i>=0)world.interactables.splice(i,1);}
     texture?.dispose();labelMaterial?.dispose();protocol.visible=true;
+    protocol.position.copy(protocolRest);protocol.rotation.x=protocolRestPitch;
     horizonWindows.traverse(o=>{if(o instanceof THREE.Mesh)o.geometry.dispose();});
     horizonWindows.removeFromParent();amber.dispose();dimAmber.dispose();
   }};
