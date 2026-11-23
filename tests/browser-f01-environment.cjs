@@ -8,6 +8,7 @@ const out=process.env.PALIMPSEST_PROOF_DIR;
   '--no-sandbox','--disable-dev-shm-usage','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader']});
  try{
   for(const [mode,viewport,motion] of [['desktop',{width:1120,height:760},'no-preference'],['touch',{width:412,height:830},'reduce']]){
+   if(process.env.PALIMPSEST_PROOF_FORM&&process.env.PALIMPSEST_PROOF_FORM!==mode) continue;
    const p=await browser.newPage({viewport,reducedMotion:motion,hasTouch:mode==='touch'});
    const errors=[];p.on('pageerror',x=>errors.push(String(x)));
    await p.addInitScript(()=>{
@@ -25,7 +26,7 @@ const out=process.env.PALIMPSEST_PROOF_DIR;
    });
    await p.goto(base+'/folio-vnext.html?folio=1');
    const stage=p.locator('#stage');
-   const snap=label=>out?p.screenshot({path:path.join(out,'F01-'+mode+'-'+label+'.png')}):Promise.resolve();
+   const snap=label=>out?p.screenshot({path:path.join(out,'F01-'+mode+'-'+label+'.png'),timeout:90000}):Promise.resolve();
    const verify=(state,timeout=90000)=>p.waitForFunction(req=>{
      const node=document.querySelector('#stage');if(!node?.dataset.f01Stage)return false;
      const s=JSON.parse(node.dataset.f01Stage);
