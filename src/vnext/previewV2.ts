@@ -1,3 +1,4 @@
+import { makeF07CandidateStage } from './proof/f07CandidateStage';
 import { makeF04CandidateStage } from './proof/f04CandidateStage';
 import { makeF05CandidateStage } from './proof/f05CandidateStage';
 import { cssStock, folioStock, isDarkStock } from './livingPaperStock.ts';
@@ -399,7 +400,7 @@ function onPaperPointerUp(e:PointerEvent):void {
     }
     return;
   }
-  if((currentFolio===3&&canvas.dataset.blenderFolio==='04')||(currentFolio===4&&canvas.dataset.blenderFolio==='05')){
+  if((currentFolio===3&&canvas.dataset.blenderFolio==='04')||(currentFolio===4&&canvas.dataset.blenderFolio==='05')||(currentFolio===6&&canvas.dataset.blenderFolio==='07')){
     const slots:THREE.Mesh[]=laterRevision?.root.userData.interactables??[];
     for(const hit of mechanismRaycaster.intersectObjects(slots,false)){
       const slot=hit.object.userData.slot;
@@ -1185,7 +1186,7 @@ function goFolio(index:number, deferCameraReset=false):void {
   if(!playableIndex(index))return;
   clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
   canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
-  delete canvas.dataset.revisionPhase;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;delete canvas.dataset.f11AuthoredFrame;
+  delete canvas.dataset.revisionPhase;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;delete canvas.dataset.f11AuthoredFrame;delete canvas.dataset.f07CandidateState;
   delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;
   delete canvas.dataset.f02Challenger;delete canvas.dataset.f02Frame;delete canvas.dataset.f02Detent;delete canvas.dataset.f02Clip;
   if(index===CODA_INDEX){
@@ -1349,6 +1350,37 @@ function goFolio(index:number, deferCameraReset=false):void {
         }else art.update(actual,dt,reduce);
       },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
     }
+    if(index===6){
+      const folioRig=rig;
+      const legacy=[...folioRig.children];
+      const staged=makeF07CandidateStage(phase=>{
+        if(rig!==folioRig||currentFolio!==6)return;
+        if(phase==='fallback'){canvas.dataset.blenderFolio='unavailable';return;}
+        if(phase!=='ready')return;
+        // The already-approved supplementary relief actors exist only here.
+        // Their bench is relocated onto the new dark page; the procedural
+        // vignette beneath supplies is not duplicated by the Blender GLB.
+        folioRig.add(art.root);
+        const relief=art.root.getObjectByName('F07 · illustrated Administration relief supplies');
+        relief?.position.set(-3.77,.19,1.02);
+        staged.update(laterStates[3],0,reducedMotion);
+        for(const node of legacy)node.visible=false;
+        canvas.dataset.blenderFolio='07';
+      });
+      staged.root.userData.interactables=staged.controls;
+      folioRig.add(staged.root);
+      const priorOwner=laterRevision;
+      laterRevision={root:staged.root,update:(actual,dt,reduce)=>{
+        art.update(actual,dt,reduce);
+        if(staged.root.userData.assetState==='ready'){
+          staged.update(actual,dt,reduce);
+          canvas.dataset.f07CandidateState=JSON.stringify({...staged.audit,
+            reliefActors:Number(Boolean(art.root.getObjectByName('F07 · anonymous relief worker')))+
+              Number(Boolean(art.root.getObjectByName('F07 · anonymous recipient'))),
+          });
+        }
+      },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
+    }
   }
   ambientLight.intensity=index===2?0.46:0.78;
   keyLight.intensity=index===2?2.66:1.96;rimLight.intensity=index===2?0.56:0.97;
@@ -1385,7 +1417,7 @@ function animate(dt:number):void {
   if(currentFolio<FIRST_LATER_FOLIO)animateEarlyPaperTabs(dt);
   if(currentFolio>=FIRST_LATER_FOLIO){
     activeTime+=dt;
-    if(currentFolio!==3||canvas.dataset.blenderFolio!=='04'){
+    if(!((currentFolio===3&&canvas.dataset.blenderFolio==='04')||(currentFolio===6&&canvas.dataset.blenderFolio==='07'))){
       laterWorld?.update(dt,activeTime,reducedMotion);
       livingStagecraft?.update(dt,reducedMotion);
     }
