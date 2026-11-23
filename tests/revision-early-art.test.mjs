@@ -33,7 +33,7 @@ test('F02 spreads locally and stages stars only on the same saturated ink sample
   const sheets = art.root.children.filter(node => node.material?.isShaderMaterial);
   assert.equal(sheets.length, 2);
   assert.strictEqual(sheets[0].material.uniforms.advance, sheets[1].material.uniforms.advance);
-  assert.match(sheets[0].material.fragmentShader, /safeInterior=step\(\.048,tide\)/);
+  assert.match(sheets[0].material.fragmentShader, /safeInterior=smoothstep\(\.059,\.090,tide\)\*step\(\.001,advance\)/);
   assert.match(sheets[0].material.fragmentShader, /paper\+=stellar\*safeInterior/);
   const revisit = createRevisionEarlyArt(1);
   revisit.update(state, 0, false);
