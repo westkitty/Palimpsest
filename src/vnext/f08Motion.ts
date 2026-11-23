@@ -6,7 +6,9 @@ export function f08CueClock(previous:number,wasOn:boolean,on:boolean,dt:number,s
   if(snap)return on?F08_ACT_DURATION:0;
   // If A is re-engaged during closure, retain its current paper pose, but
   // guarantee a dark interval before firing the aperture again.
-  const seed=on&&!wasOn?Math.min(previous,.805):previous;
+  // The longer visible reflection must not lengthen the existing shutter
+  // release after A is cut. The aperture follows its original close clock.
+  const seed=on&&!wasOn?Math.min(previous,.805):!on&&wasOn?Math.min(previous,2.28):previous;
   return Math.max(0,Math.min(F08_ACT_DURATION,seed+Math.min(.07,Math.max(0,dt))*(on?1:-2.25)));
 }
 export function f08Cue(t:number,on:boolean) {

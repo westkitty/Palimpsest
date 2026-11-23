@@ -62,10 +62,11 @@ export function newF08ThresholdResponse(pageY:StockHeight,shoes:THREE.Group){
   const shoeReflection=face(shoes,'F08 cyan contact on original Marcel support',[
     v(-.175,.014,-.101),v(.175,.014,-.101),v(.175,.014,-.056),v(-.175,.014,-.056),
   ],contact);shoeReflection.renderOrder=3;shoeReflection.visible=false;
-  return {root,update(t:number,on:boolean,reduced:boolean){
+  return {root,update(t:number,on:boolean,reduced:boolean,dt:number){
     const cue=f08ThresholdCue(t,on,reduced);
     fold.forEach(({hinge,shine,glint},i)=>{
-      hinge.rotation.x=.10+cue.lean[i]*(i<2?.95:.73);
+      hinge.rotation.x=on?.10+cue.lean[i]*(i<2?.95:.73):
+        reduced||t<=0?.10:.10+(hinge.rotation.x-.10)*Math.exp(-Math.max(0,dt)*7.2);
       awake(glint,cue.edges[i]);shine.visible=cue.edges[i]>.014;
     });
     strips.forEach(({reflected,m},i)=>{

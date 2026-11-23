@@ -316,7 +316,7 @@ function aureal(root: THREE.Group, bump: THREE.Texture | undefined): UpdateArt {
     root.userData.foldLight=cue.plasma*3.3+cue.rim*.28+cue.impulse*2.5;
     const liveThreshold=root.userData.f08NativeThreshold===true;
     threshold.root.visible=liveThreshold;
-    const witness=threshold.update(liveThreshold?cueTime:0,liveThreshold&&on,reduced);
+    const witness=threshold.update(liveThreshold?cueTime:0,liveThreshold&&on,reduced,dt);
     root.userData.thresholdResponse=liveThreshold?witness:undefined;
     root.userData.hookshotTraffic=traffic.update(liveThreshold,on,cue.plasma,dt,reduced);
     root.userData.marcelLight=liveThreshold?witness.actorLight:cue.plasma*.84+cue.impulse*.68;

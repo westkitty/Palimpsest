@@ -19,6 +19,7 @@ test('F08 cuts light immediately on A off, with reversible paper and safe reacti
   assert.equal(f08Cue(re,true).phase,'open-dark');
   assert.equal(f08CueClock(0,false,true,.05,true),F08_ACT_DURATION);
   assert.equal(f08CueClock(2,true,false,.05,true),0);
+  assert.equal(f08CueClock(F08_ACT_DURATION,true,false,.05,false),f08CueClock(2.28,true,false,.05,false));
 });
 test('F08 unfolds four exact attached hinges as one traveling release',()=>{
   assert.deepEqual(f08LeafTravel(0),[0,0,0,0]);
