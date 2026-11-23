@@ -1361,8 +1361,8 @@ function goFolio(index:number, deferCameraReset=false):void {
             if(staged.root.userData.assetState!=='ready')procedural.update(current,dt,reduce);
             staged.update(current,dt,reduce);
             if(rig===folioRig&&staged.root.userData.assetState==='ready'){
-              const {template,generation,sourceVisible,outputVisible,sourceRoll,printedProfileVertices,profileKey,geometrySignature,folded,pressDepth,sleeveOpen}=staged.root.userData;
-              canvas.dataset.f03WorkshopState=JSON.stringify({template,generation,sourceVisible,outputVisible,sourceRoll,printedProfileVertices,profileKey,geometrySignature,folded,pressDepth,sleeveOpen});
+              const {template,generation,sourceVisible,outputVisible,sourceRoll,printedProfileVertices,profileKey,geometrySignature,folded,pressDepth,sleeveOpen,phase,cardDraw}=staged.root.userData;
+              canvas.dataset.f03WorkshopState=JSON.stringify({template,generation,sourceVisible,outputVisible,sourceRoll,printedProfileVertices,profileKey,geometrySignature,folded,pressDepth,sleeveOpen,phase,cardDraw});
             }
           },dispose:()=>{staged.dispose();procedural.root.removeFromParent();disposeSubtree(procedural.root);}};
         }

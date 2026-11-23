@@ -58,42 +58,87 @@ function perimeter(parent:THREE.Group,name:string,outline:THREE.Vector2[],materi
     ink.rotation.y=-Math.atan2(b.y-a.y,b.x-a.x);
   }
 }
-function foundryNet(parent:THREE.Group,target:THREE.Group,color:number) {
-  // Lay out the very same scored gores used by the selected Globe. Their
-  // original vertex destination is retained; this is folding the card, not
-  // scaling an independently generated sphere into view.
+function foundryNet(target:THREE.Group) {
   const gores=target.children.filter((o):o is THREE.Mesh=>o instanceof THREE.Mesh&&o.name.startsWith('Scored and folded cardstock gore '));
-  const stock=asColor(color),crease=asColor(0x423f39);
-  const pieces=gores.map((g,i)=>{
-    const geo=g.geometry.clone();
+  const pieces=gores.map((paper,i)=>{
+    const geo=paper.geometry;
     const from=geo.getAttribute('position');
     const original=Float32Array.from(from.array);
-    const paper=add(parent,'Fresh paper net gore '+(i+1),geo,stock);
-    const seam=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0x493e45}));
+    // Cut stock exposes a pale crease on the same vertices as each sheet. It
+    // stays visible all the way to the pinned sphere: there is no model swap.
+    const seam=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({
+      color:0xf9d7a0,transparent:true,opacity:.9,depthWrite:false,
+    }));
     const lines=new Float32Array((from.count/3-1)*6);
     seam.geometry.setAttribute('position',new THREE.BufferAttribute(lines,3));paper.add(seam);
     paper.frustumCulled=false;seam.frustumCulled=false;
     return {geo,from,original,lines,seam,i};
   });
-  const tab=box(parent,'Slide-out folded sheet edge tab',crease,.19,.016,.052,0,-.010,.282);
+  // Keep each exact authored land/ink/facet as an attached piece of this
+  // assembly. Their own rest transforms are the canon, not replacements.
+  // This includes pole pins and atmospheric layers as well as landforms.
+  const wildlife=target.children.filter(o=>!gores.includes(o as THREE.Mesh)).map((o,i)=>({
+    o,i,p:o.position.clone(),q:o.quaternion.clone(),s:o.scale.clone(),
+  }));
+  const flatPose=new THREE.Quaternion();
+  const liftedPose=target.quaternion.clone();
+  const raisedPose=liftedPose.clone().premultiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(.20,0,-.11)));
+  const leanPose=liftedPose.clone().premultiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-.09,.14,.043)));
+  const axisZ=new THREE.Vector3(0,0,1), foldedPose=new THREE.Quaternion();
   let previous=-1;
   return (p:number)=>{
     if(p===previous)return;previous=p;
+    const crease=ease(.03,.30,p);
+    const wrap=ease(.24,.73,p);
+    const landing=ease(.75,1,p);
+    if(p<.55)target.quaternion.slerpQuaternions(flatPose,raisedPose,ease(.13,.55,p));
+    else if(p<.83)target.quaternion.slerpQuaternions(raisedPose,leanPose,ease(.55,.83,p));
+    else target.quaternion.slerpQuaternions(leanPose,liftedPose,ease(.83,1,p));
     for(const {geo,from,original,lines,seam,i} of pieces){
+      // Start at the central score; ribs down either side rise one pair
+      // later. Lean while closing so the still-open hemisphere reads clearly.
+      const distance=Math.abs(i-(pieces.length-1)/2)/((pieces.length-1)/2);
+      const gather=ease(.25+distance*.18,.69+distance*.07,p);
+      const unfold=ease(.05+distance*.13,.40+distance*.13,p);
+      const center=(i+.5)/pieces.length-.5;
       for(let j=0;j<from.count;j++){
         const k=Math.floor(j/3),j3=j*3,within=j%3;
-        const flatX=(((i+within*.5)/pieces.length)-.5)*.54;
-        const flatZ=(k/(from.count/3-1)-.5)*.51;
-        const bend=Math.sin(p*Math.PI)*(.09+.038*Math.cos(k*.65))*(.38+i/pieces.length);
-        from.setXYZ(j,THREE.MathUtils.lerp(flatX,original[j3],p),original[j3+1]*p+bend,THREE.MathUtils.lerp(flatZ,original[j3+2],p));
+        const row=k/(from.count/3-1), taper=Math.sin(row*Math.PI);
+        const flatX=center*.57+(within-1)*(.507/pieces.length)*.5*(.19+.81*taper);
+        const flatZ=(row-.5)*.52;
+        const angle=center*1.49*unfold;
+        const tent=flatX*Math.tan(angle)+Math.sin(row*Math.PI)*(.035+.045*(1-distance))*crease;
+        const scoredY=tent+(within===1?.019:0)*taper*unfold;
+        const scoredZ=flatZ*(1-.094*unfold);
+        const horizontal=flatX*Math.cos(angle)*(1-.12*unfold);
+        const openBeat=Math.sin(Math.PI*gather)*wrap*(.022+.077*distance)*taper;
+        from.setXYZ(j,
+          THREE.MathUtils.lerp(horizontal,original[j3],gather),
+          THREE.MathUtils.lerp(scoredY,original[j3+1],gather)+openBeat,
+          THREE.MathUtils.lerp(scoredZ,original[j3+2],gather));
         if(within===0&&k>0){
           const a=j-3,l=(k-1)*6;
-          lines.set([from.getX(a),from.getY(a)+.006,from.getZ(a),from.getX(j),from.getY(j)+.006,from.getZ(j)],l);
+          lines.set([from.getX(a),from.getY(a)+.004*(1-landing),from.getZ(a),from.getX(j),from.getY(j)+.004*(1-landing),from.getZ(j)],l);
         }
       }
       from.needsUpdate=true;seam.geometry.getAttribute('position').needsUpdate=true;geo.computeVertexNormals();
+      seam.material.opacity=.78*(1-ease(.63,.98,p));
+      seam.visible=p<.98;
     }
-    tab.visible=p<.35;
+    for(const {o,i,p:rest,q,s} of wildlife){
+      const pinned=o.name==='Pinned polar fold stack'||o.name==='Raised paper seams';
+      const offset=(i%9)*.012;
+      const seat=pinned?ease(.67,.80,p):ease(.58+offset,.83+offset,p);
+      o.visible=seat>.01;
+      if(!o.visible)continue;
+      const turn=(1-seat)*(i%2===0?-.66:.66);
+      foldedPose.setFromAxisAngle(axisZ,turn);
+      o.position.set(rest.x*(.70+.30*seat),rest.y*(.70+.30*seat),rest.z*(.70+.30*seat));
+      o.quaternion.copy(q).premultiply(foldedPose);
+      o.scale.copy(s);
+      if(!pinned)o.scale.multiplyScalar(.18+.82*seat);
+      else o.scale.multiplyScalar(Math.max(.014,seat));
+    }
   };
 }
 
@@ -148,21 +193,35 @@ export function makeF03PaperWorkshop() {
   for(const side of [-1,1])box(delivery,'Low output paper guide',stock,.057,.078,.57,side*.35,.048);
   registers.push(Array.from({length:4},(_,i)=>
     box(delivery,'Inherited print notch',asColor(0x695449),.053,.027,.048,(i-1.5)*.088,.042,.292)));
-  const carrier=new THREE.Group(), resultPivot=new THREE.Group(),feed=new THREE.Group(), dieShape=new THREE.Group();
-  carrier.name='Selected source rolling carrier';resultPivot.name='Settled Notebook variant';feed.name='Pressed blank card travels and buckles';dieShape.name='Selected physical silhouette';
-  root.add(carrier,resultPivot,feed);ram.add(dieShape);
+  const carrier=new THREE.Group(), feed=new THREE.Group(), dieShape=new THREE.Group();
+  carrier.name='Selected source rolling carrier';feed.name='Same sheet travels, scores, folds and settles';dieShape.name='Selected physical silhouette';
+  root.add(carrier,feed);ram.add(dieShape);
+  // This moving card is the book mechanism: the physical cut gutters fold
+  // away from the net into a cardstock nest under the same mounted globe.
+  const sled=new THREE.Group();sled.name='Fold-out scored assembly card';feed.add(sled);
+  const sledStock=asColor(0xb58c54),sledEdge=asColor(0xdbc08b), sledCrease=asColor(0x8e634e);
+  box(sled,'Card emboss reverse — full thickness',sledStock,.61,.025,.582,0,-.023);
+  for(const z of [-1,1]){
+    box(sled,'Burnished card top score',sledEdge,.585,.006,.008,0,-.009,z*.258);
+    for(const side of [-1,1])box(sled,'Empty cut out by registration',sledCrease,.019,.004,.031,side*.274,-.008,z*.251);
+  }
+  const cheeks=[-1,1].map(sign=>{
+    const pivot=new THREE.Group();pivot.position.x=sign*.292;sled.add(pivot);
+    box(pivot,'Stock gusset closes into the base',sledEdge,.112,.012,.565,sign*.053,-.018);
+    box(pivot,'Outer fold darkens at the score',sledCrease,.009,.015,.555,sign*.097,-.017);
+    return {pivot,sign};
+  });
   let selectionParts:THREE.Group[]=[], foldPaper:(p:number)=>void=()=>{};
   let family:Template|undefined, generation=-1, vaultOpen=false;
   let roll=1, printing=4, door=0, lastClock=0, profile=0, geometrySignature=0;
   function rebuild(template:Template,variant:number){
     // Remove only the per-selection resources and leave native mechanics and
     // permanent paper fixtures alone. Scope through a temporary disposal root.
-    const sourceModel=new THREE.Group(),outModel=new THREE.Group(), paperModel=new THREE.Group(),profileModel=new THREE.Group();
-    carrier.clear();resultPivot.clear();feed.clear();dieShape.clear();
-    carrier.add(sourceModel);resultPivot.add(outModel);feed.add(paperModel);dieShape.add(profileModel);
-    selectionParts=[sourceModel,outModel,paperModel,profileModel];
+    const sourceModel=new THREE.Group(), paperModel=new THREE.Group(),profileModel=new THREE.Group();
+    carrier.add(sourceModel);feed.add(paperModel);dieShape.add(profileModel);
+    selectionParts=[sourceModel,paperModel,profileModel];
     const source=foldedGlobe(sourceModel,template,0,.272,true);
-    const result=foldedGlobe(outModel,template,variant,.208,false);
+    const result=foldedGlobe(paperModel,template,variant,.236,false);
     if(template===1){
       // The existing printed pattern gets a thicker spot ink at book scale;
       // keep the exact canonical arrangement/geometry, not new features.
@@ -176,12 +235,9 @@ export function makeF03PaperWorkshop() {
     perimeter(profileModel,'Pressed rim follows actual globe contour',outline,key,.78,.027,.017);
     const imprintPlate=new THREE.Group();paperModel.add(imprintPlate);imprintPlate.position.y=.015;
     perimeter(imprintPlate,'Imprint inherited from the same globe profile',outline,imprint,.77,.018,.010);
-    foldPaper=foundryNet(paperModel,result,REVISION_VAULT_TEMPLATES[template].stock);
-    const pressT=foldPaper;
-    const unturned=new THREE.Quaternion();
+    const pressT=foundryNet(result);
     foldPaper=(p:number)=>{
       imprintPlate.visible=p<.18;
-      paperModel.quaternion.slerpQuaternions(unturned,result.quaternion,ease(.43,1,p));
       pressT(p);
     };
     const ir=sourceInkRegistration(template);
@@ -203,7 +259,7 @@ export function makeF03PaperWorkshop() {
     }
     if(!first&&!vaultOpen&&s.vaultOpen)roll=0;
     if(!first&&newPrint&&s.generation>0&&!(vaultOpen||generation>0))roll=0;
-    if(reduced||first){roll=1;printing=4;door=Number(s.vaultOpen);}
+    if(reduced||first){roll=1;printing=5;door=Number(s.vaultOpen);}
     else{
       roll=clamp(roll+elapsed*1.62);
       if(s.generation>0&&roll===1)printing+=elapsed;
@@ -222,21 +278,29 @@ export function makeF03PaperWorkshop() {
     // The pressing order is explicit: source seats, die closes, the blank
     // moves out still flat, then its exact gores buckle up from the card.
     const t=s.generation>0?printing:0;
-    const pressed=ease(.10,.53,t)*(1-ease(.61,.89,t));
+    const pressed=ease(.10,.53,t)*(1-ease(.75,1.08,t));
     ram.position.y=.366-.286*pressed;
-    const paperTravel=ease(.81,1.39,t);
-    const folded=ease(1.23,2.04,t);
-    sheet.visible=s.generation===0||t<.84;
-    feed.visible=s.generation>0&&t>=.84&&folded<.998;
-    feed.position.set(diePlace.x,.293,diePlace.z).lerp(pos(outputPlace.x,.261,outputPlace.z),paperTravel);
-    feed.position.y+=(outputPlace.y-.261)*folded;
+    // Pull the scored card fully clear before anything stands. Give the
+    // accordion and globe assembly separate inspectable beats rather than
+    // playing another scale tween while the blank is still in flight.
+    const paperTravel=ease(.99,1.72,t);
+    const folded=ease(1.79,4.20,t);
+    const cardSettle=ease(3.75,4.20,t);
+    sheet.visible=s.generation===0||t<1.01;
+    feed.visible=s.generation>0&&t>=1.01;
+    feed.position.set(diePlace.x,.281,diePlace.z).lerp(pos(outputPlace.x,.251,outputPlace.z),paperTravel);
+    feed.position.y+=Math.sin(Math.PI*paperTravel)*.037;
+    feed.rotation.y=Math.sin(Math.PI*paperTravel)*-.076;
+    sled.position.y=-.003-.025*cardSettle;
+    for(const {pivot,sign} of cheeks)pivot.rotation.z=sign*(ease(.02,.27,folded)*.96-ease(.66,.95,folded)*.81);
+    selectionParts[1].position.y=.004+(outputPlace.y-.247)*ease(.17,.78,folded)+Math.sin(Math.PI*folded)*.11;
     foldPaper(folded);
-    resultPivot.visible=s.generation>0&&folded>=.998;
-    resultPivot.position.copy(outputPlace);
+    const phase=s.generation===0?'waiting':t<1.01?'impress':t<1.72?'draw':folded<.29?'score':
+      folded<.68?'wrap':folded<.999?'seat':'rest';
     Object.assign(root.userData,{
       family:s.template,template:REVISION_VAULT_TEMPLATES[s.template].name,generation:s.generation,
-      sourceVisible:carrier.visible,outputVisible:resultPivot.visible,sourceRoll:roll,printedProfileVertices:profile,
-      profileKey:sourceInkRegistration(s.template).join(''),geometrySignature,folded,pressDepth:pressed,sleeveOpen:door,
+      sourceVisible:carrier.visible,outputVisible:feed.visible&&folded>=.999,sourceRoll:roll,printedProfileVertices:profile,
+      profileKey:sourceInkRegistration(s.template).join(''),geometrySignature,folded,pressDepth:pressed,sleeveOpen:door,phase,cardDraw:paperTravel,
     });
   }
   return {root,update,dispose:()=>{clearSelection();dispose(root);}};

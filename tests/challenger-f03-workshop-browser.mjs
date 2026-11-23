@@ -30,6 +30,17 @@ async function verify(p,values){
     return Object.entries(expected).every(([k,v])=>now[k]===v);
   },values,{timeout:45000});
 }
+async function beat(p,phase,name){
+  await p.waitForFunction(([expected,freeze])=>{
+    const x=JSON.parse(document.querySelector('#stage')?.dataset.f03WorkshopState??'{}');
+    const timing=expected==='draw'?x.cardDraw>.47:expected==='score'?x.folded>.182:expected==='wrap'?x.folded>.46:x.folded>.80;
+    const ready=x.phase===expected&&timing&&!x.outputVisible&&x.sourceRoll===1;
+    if(ready&&freeze)window.__f03ProofPause=performance.now();
+    return ready;
+  },[phase,Boolean(proof)],{timeout:45000});
+  await screen(p,name);
+  await p.evaluate(()=>delete window.__f03ProofPause);
+}
 async function screen(p,name){
   if(proof){await mkdir(proof,{recursive:true});await p.screenshot({path:join(proof,name)});}
 }
@@ -53,24 +64,16 @@ try{
   },null,{timeout:45000});
   await screen(desktop,'F03-02-notebook-press.png');
   await desktop.evaluate(()=>delete window.__f03ProofPause);
-  // New print for the fold snapshot; PNG capture can block for longer than
-  // one complete press on a busy software renderer.
-  await verify(desktop,{outputVisible:true,folded:1,generation:1});
-  await control(desktop,'c');
-  await desktop.waitForFunction(()=>{
-    const x=JSON.parse(document.querySelector('#stage')?.dataset.f03WorkshopState??'{}');
-    const ready=x.folded>.20&&x.folded<.95&&!x.outputVisible;
-    if(ready)window.__f03ProofPause=performance.now();
-    return ready;
-  },null,{timeout:45000});
-  await screen(desktop,'F03-03-paper-buckles.png');
-  await desktop.evaluate(()=>delete window.__f03ProofPause);
+  await beat(desktop,'draw','F03-03-card-draw.png');
+  await beat(desktop,'score','F03-04-scores-rise.png');
+  await beat(desktop,'wrap','F03-05-crown-wraps.png');
+  await beat(desktop,'seat','F03-06-inherited-land-seats.png');
   await verify(desktop,{sourceVisible:true,outputVisible:true,folded:1,profileKey:'1001'});
-  await screen(desktop,'F03-04-Syrrian-IV-pair.png');
+  await screen(desktop,'F03-07-Syrrian-IV-pair.png');
   await control(desktop,'b');
-  await verify(desktop,{template:'Nimbus III',outputVisible:true,folded:1,profileKey:'0110',generation:2});
+  await verify(desktop,{template:'Nimbus III',outputVisible:true,folded:1,profileKey:'0110',generation:1,phase:'rest'});
   assert.notEqual((await state(desktop)).geometrySignature,base.geometrySignature);
-  await screen(desktop,'F03-05-Nimbus-III-pair.png');
+  await screen(desktop,'F03-08-Nimbus-III-pair.png');
   await desktop.close();
 
   const phone=await use({...devices['Pixel 7'],reducedMotion:'reduce'});
@@ -80,9 +83,9 @@ try{
   await phone.locator('[data-mechanism="b" i]').tap();
   await phone.locator('[data-mechanism="b" i]').tap();
   await phone.locator('[data-mechanism="c" i]').tap();
-  await verify(phone,{template:'Cirrus I',sourceVisible:true,outputVisible:true,folded:1,profileKey:'1100'});
+  await verify(phone,{template:'Cirrus I',sourceVisible:true,outputVisible:true,folded:1,profileKey:'1100',phase:'rest'});
   await phone.locator('#toggle-panels').tap();
-  await screen(phone,'F03-06-phone-Cirrus-I-pair.png');
+  await screen(phone,'F03-09-phone-Cirrus-I-pair.png');
   assert.deepEqual(failures,[]);
-  console.log('PASS F03 native Blender, sleeve roll, matched die, actual flattened gores buckle then settle, three distinct template states, and phone touch');
+  console.log('PASS F03 native Blender, sleeve roll, matched die, card draws flat, scores rise, gores wrap, native land slots onto the same sheet, and assembly rests, three distinct template states, and phone touch');
 }finally{await browser.close();}
