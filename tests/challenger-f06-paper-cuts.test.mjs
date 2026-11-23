@@ -39,3 +39,26 @@ test('wear is monotone on one campaign relief and restored on a later mount',()=
   resetF06TerrainWear();
   assert.equal(attachF06AttritionTerrain(new THREE.Group()).update(0,0,true).wearMask,1);
 });
+
+test('all four selections physically age the same coast, attached crossing and climate stock',()=>{
+  resetF06TerrainWear();
+  const world=new THREE.Group(), terrain=attachF06AttritionTerrain(world);
+  const geography=world.children[0];
+  const ribs=geography.children.filter(o=>o.name.includes('same shoreline')||o.name.includes('layered stock rib'));
+  const left=world.getObjectByName('Tethered road fold -1');
+  const right=world.getObjectByName('Tethered road fold 1');
+  const climate=world.getObjectByName('F06 climate stress · hinged archival paper band');
+  assert.equal(ribs.length,8);
+  const first=terrain.update(0,0,true);
+  const start=ribs.map(o=>o.position.toArray());
+  const ages=[first,...[1,2,3].map(i=>terrain.update(i,0,true))];
+  assert.ok(ages.every((a,i)=>!i||(a.terrainStress>ages[i-1].terrainStress&&a.climateCurl>ages[i-1].climateCurl)));
+  assert.equal(ages[3].bridgeFailure,1);
+  assert.ok(left.rotation.z<-.60&&right.position.y<-.09&&climate.rotation.x>.90);
+  assert.ok(ribs.every((rib,i)=>rib.position.toArray().some((n,j)=>n!==start[i][j])));
+  assert.deepEqual(geography.children.filter(o=>o.name.includes('layered stock rib')),ribs);
+  const rewind=terrain.update(0,0,true);
+  assert.equal(rewind.wearMask,15);
+  assert.deepEqual(ribs.map(o=>o.position.toArray()),start);
+  resetF06TerrainWear();
+});

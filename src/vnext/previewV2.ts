@@ -1445,8 +1445,8 @@ function goFolio(index:number, deferCameraReset=false):void {
       laterRevision={root:staged.root,update:(actual,dt,reduce)=>{
         if(staged.root.userData.assetState==='ready'){
           staged.update(actual,dt,reduce);
-          const {era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell,physicalBlankApertures,specimenYaw,wearMask,routeLayerCount,paperRipple}=staged.root.userData;
-          canvas.dataset.f06CandidateState=JSON.stringify({era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell,physicalBlankApertures,specimenYaw,wearMask,routeLayerCount,paperRipple});
+          const {era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell,physicalBlankApertures,specimenYaw,wearMask,routeLayerCount,paperRipple,terrainStress,climateCurl,bridgeFailure,geographyRibs}=staged.root.userData;
+          canvas.dataset.f06CandidateState=JSON.stringify({era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell,physicalBlankApertures,specimenYaw,wearMask,routeLayerCount,paperRipple,terrainStress,climateCurl,bridgeFailure,geographyRibs});
         }else art.update(actual,dt,reduce);
       },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
     }
@@ -1803,6 +1803,10 @@ function fitBookCamera(openProgress:number):void {
   }else if(currentFolio===4&&openProgress>.99){
     camera.position.set(.55*scale,6.9*scale,9.25*scale);
     controls?.target.set(0,.38,.10);
+  }else if(currentFolio===5&&openProgress>.99){
+    const readingScale=Math.max(.94,1.06/aspect);
+    camera.position.set(-.28*readingScale,8.32*readingScale,7.85*readingScale);
+    controls?.target.set(0,.41,-.10);
   }else if(currentFolio===6&&openProgress>.99&&aspect<.85){
     // Tighter, steeper whole-spread framing keeps the painted field and
     // the small foreground relief readable together on a portrait phone.

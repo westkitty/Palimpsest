@@ -35,54 +35,136 @@ const routes=[
   points([[-1.03,.087],[-.60,-.14],[-.25,-.074],[.099,-.155],[.46,-.01],[.73,.19],[1.03,.21]]),
 ] as const;
 
+function cutStock(root:THREE.Object3D,name:string,outline:readonly [number,number][],thick:number,material:THREE.Material){
+  const shape=new THREE.Shape(outline.map(([x,z])=>new THREE.Vector2(x,-z)));
+  const geom=new THREE.ExtrudeGeometry(shape,{depth:thick,bevelEnabled:false,steps:1,curveSegments:1});
+  geom.rotateX(-Math.PI/2);
+  const m=new THREE.Mesh(geom,material);
+  m.name=name;m.castShadow=m.receiveShadow=true;root.add(m);return m;
+}
+const ease=(x:number)=>THREE.MathUtils.smoothstep(clamp(x),0,1);
+const stress=[.065,.33,.66,1] as const;
+
+// These are four readings of the same teaching stock, not four planets,
+// reconstructed events, dated battle sites or a scale of casualties.
 export function attachF06AttritionTerrain(parent:THREE.Object3D){
-  const relief=new THREE.Group();relief.name='F06 one accumulating schematic campaign relief';
-  relief.position.set(-1.69,.235,-.935);parent.add(relief);
-  const brass=paper(0x85684d),sienna=paper(0x5b3a34), slate=paper(0x465365), dust=paper(0x918279), shadow=paper(0x25272d);
-  box(relief,'Bonded relief base',2.42,.039,.80,shadow);
-  box(relief,'Pressed slate terrain perimeter',2.39,.023,.762,brass,0,.023);
-  const terrain:THREE.Mesh[]=[];
-  for(let i=0;i<8;i++){
-    const center=-1.04+i*.297;
-    const leaf=box(relief,'Scored campaign paper rib '+i,.292,.036,.675,i%3===0?slate:shadow,center,.042,0);
-    const peak=box(leaf,'Low raised unscaled terrain contour',.247,.037+i%3*.017,.29+i%2*.112,i%2===0?dust:sienna,0,.026,-.17+(i%3)*.10);
-    peak.rotation.y=-.42+i%3*.23;
-    terrain.push(leaf);
+  const relief=new THREE.Group();
+  relief.name='F06 one accumulating schematic campaign relief';
+  relief.position.set(-1.78,.235,-1.11);
+  relief.scale.set(1.10,1,1.08);
+  parent.add(relief);
+  const cut=paper(0xbf8a60), back=paper(0x202531), inset=paper(0x392b2e);
+  const ivory=paper(0xd9b985), underside=paper(0x9c694a), deepRust=paper(0x7e4b43);
+  const calm=new THREE.Color(0x577c82), exhausted=new THREE.Color(0x8a5046);
+  const airFair=new THREE.Color(0x81a3a5), airWorn=new THREE.Color(0x744c50), silt=new THREE.Color(0xab876b);
+  box(relief,'Bonded relief base',2.77,.045,1.13,back);
+  box(relief,'Paper mat exposed below broken earth',2.69,.027,1.04,inset,0,.026);
+  // Thick, fixed substrate stays visible through opened terrain seams.
+  const terrain=Array.from({length:8},(_,i)=>{
+    const rib=new THREE.Group();
+    rib.name='F06 original geography · layered stock rib '+(i+1);
+    relief.add(rib);
+    const x=(i-3.5)*.302;
+    const wav=(i%3-1)*.047;
+    const outline:[number,number][]=[
+      [-.158,-.39+wav],[-.104,-.52+wav],[.142,-.47-wav],[.155,-.26+wav],
+      [.124,-.08-wav],[.162,.15+wav],[.133,.32-wav],[.088,.43+wav],
+      [-.155,.36-wav],[-.136,.16+wav],[-.163,-.08-wav],
+    ];
+    const face=paper(0x547982);
+    cutStock(rib,'Through-cut earth fibers · exposed edge',outline,.031,cut);
+    cutStock(rib,'Pressed geographic surface · same shoreline',outline,.035,face).position.y=.030;
+    const cap=cutStock(rib,'Original raised foothill face',
+      [[-.13,-.37+wav],[-.037,-.48],[.094,-.35],[.125,-.24],[-.015,-.13+wav],[-.12,-.22]],
+      .042,face);
+    cap.position.y=.060;cap.rotation.z=(i%3-1)*.13;
+    return {rib,face,x,buckle:[-.08,.19,-.31,.24,-.18,.30,-.14,.09][i],sink:[.024,.065,.015,.042,.082,.037,.055,.012][i]};
+  });
+  // One physical crossing over the fixed cut lines. The same two attached
+  // bridge leaves buckle and lose alignment; the underlying paper ribs stay.
+  const crossing=new THREE.Group();crossing.name='F06 infrastructure · the same joined crossing';relief.add(crossing);
+  crossing.position.set(.095,.123,.20);
+  const bridges=[-1,1].map(side=>{
+    const hinge=new THREE.Group();hinge.name='Tethered road fold '+side;hinge.position.x=side*.475;
+    crossing.add(hinge);
+    box(hinge,'Pasted infrastructure support',.082,.083,.21,underside,0,-.041,0);
+    box(hinge,'Physical deck half across the fault',.48,.036,.18,ivory,-side*.236,0,0);
+    box(hinge,'Scored deck edge',.465,.024,.027,cut,-side*.232,.016,-.086);
+    return hinge;
+  });
+  const brace=cutStock(relief,'Countermeasure: low bonded paper stitch across worn cut',
+    [[-.39,.29],[-.16,.19],[.46,.23],[.44,.33],[-.14,.31],[-.48,.395]],.024,deepRust);
+  // At the back of the same relief, air is scored as thin horizontal stock,
+  // curving and lowering into a dirty front instead of adding a second scene.
+  const atmosphere=new THREE.Group();
+  atmosphere.name='F06 climate stress · hinged archival paper band';
+  atmosphere.position.set(.02,.24,-.46);relief.add(atmosphere);
+  const air=paper(0x81a3a5),front=paper(0xc5ac8b);
+  const bands=[0,1,2].map(i=>{
+    const n=new THREE.Group();
+    n.name='Climate pressure paper joint '+(i+1);
+    n.position.set(-.26+i*.26,i*.067,-i*.022);
+    atmosphere.add(n);
+    const outline:[number,number][]=[[-.94,-.09],[-.72,-.175],[-.39,-.106],[-.20,-.161],[.13,-.098],
+      [.36,-.15],[.83,-.052],[.92,.037],[.52,.121],[.18,.072],[-.15,.136],[-.48,.082],[-.82,.09]];
+    cutStock(n,'Scored folded climate stock',outline,.019,i===0?front:air);
+    return n;
+  });
+  for(const x of [-.67,.63]){
+    box(relief,'Permanent folded back hinge foot',.13,.083,.21,deepRust,x,.102,-.43);
+    box(relief,'Paper web from fixed foot to climate hinge',.055,.195,.069,underside,x,.181,-.46).rotation.z=x*.15;
   }
   const older:THREE.MeshStandardMaterial[]=[];
   const tracks=routes.map((route,i)=>{
-    const layer=new THREE.Group();layer.name='A archive crease layer '+(i+1);relief.add(layer);layer.position.y=.115+i*.006;
+    const layer=new THREE.Group();layer.name='A archive crease layer '+(i+1);relief.add(layer);layer.position.y=.094+i*.003;
     const ink=paper(0x827c71);older.push(ink);
-    for(let j=0;j<route.length-1;j++){
-      joinedEdge(layer,route[j],route[j+1],.029,ink,'Raised scored route edge');
-      const center=route[j].clone().lerp(route[j+1],.53);
-      const hatch=box(layer,'Nonquantitative wear score',.085,.018,.020,i%2===0?slate:sienna,center.x,-.010,center.z+.015);
-      hatch.rotation.y=-.81;
-    }
+    for(let j=0;j<route.length-1;j++)joinedEdge(layer,route[j],route[j+1],.020,ink,'Pressed archive route edge');
     return layer;
   });
-  let seen=previousWear(), sight=0, last=-1;
+  let seen=previousWear(), sight=0, last=-1, from=0, shown=0;
   function update(era:number,seconds:number,reduced:boolean) {
     if(last!==era){
       const next=seen|(1<<era);
       if(next!==seen){seen=next;recordWear(seen);}
+      from=last<0?stress[era]:shown;
       sight=last<0||reduced?1:0;
       last=era;
     }
-    sight=reduced?1:clamp(sight+seconds*1.95);
+    sight=reduced?1:clamp(sight+seconds*1.23);
+    shown=THREE.MathUtils.lerp(from,stress[era],ease(sight));
+    const stamp=1-sight;
+    const age=tracks.filter((_,i)=>Boolean(seen&(1<<i))).length;
     tracks.forEach((g,i)=>{
       g.visible=Boolean(seen&(1<<i));
-      g.scale.x=i===era?.12+.88*THREE.MathUtils.smoothstep(sight,0,1):1;
-      older[i].color.setHex(i===era?0xdba272:i%2===0?0x818b98:0x9a7366);
+      g.position.y=.129+i*.003-.052*shown;
+      older[i].color.setHex(i===era?0xca966b:i%2===0?0x858d90:0x8a675d);
     });
-    terrain.forEach((rib,i)=>{
-      const time=clamp((sight-i*.061)*2.25);
-      const fade=1-sight;
-      const wave=reduced||sight>=1?0:Math.sin(Math.PI*time)*fade;
-      rib.position.y=.042+.049*wave;
-      rib.rotation.z=.13*wave;
+    terrain.forEach(({rib,face,x,buckle,sink},i)=>{
+      const w=reduced||sight>=1?0:Math.sin(Math.PI*clamp((sight-i*.037)*2.6))*stamp;
+      rib.position.set(x*(1+.072*shown),.047-.51*sink*shown+.038*w,(i%2?.034:-.036)*shown);
+      rib.rotation.set(-buckle*.49*shown,.19*buckle*shown,buckle*shown+.14*w);
+      face.color.copy(calm).lerp(exhausted,clamp(shown*.81+((i%3)-1)*.20));
     });
-    return {wearMask:seen,routeLayerCount:tracks.filter(t=>t.visible).length,paperRipple:1-sight};
+    const lead=ease((shown-.18)/.81);
+    bridges.forEach((hinge,i)=>{
+      hinge.rotation.z=(i===0?-.64:.45)*lead;
+      hinge.rotation.y=(i===0?.38:-.27)*lead;
+      hinge.position.y=(i===0?.048:-.096)*lead;
+    });
+    brace.position.y=.058;brace.visible=shown>.63;
+    air.color.copy(airFair).lerp(airWorn,shown*.90);
+    front.color.copy(airFair).lerp(silt,shown*.90);
+    atmosphere.rotation.x=.17+.77*shown+(reduced?0:stamp*.10);
+    atmosphere.position.y=.24+.074*shown;
+    bands.forEach((band,i)=>{
+      band.rotation.z=(i%2?-.36:.19)*shown;
+      band.position.z=-i*.022+.112*shown*(1-i*.17);
+    });
+    // The pressed bridge/base get darker by use, even if an earlier
+    // historical reading is reselected. No future physical state is projected.
+    cut.color.setHex(age>2?0xa17055:0xc28d63);
+    return {wearMask:seen,routeLayerCount:age,paperRipple:stamp,terrainStress:shown,
+      climateCurl:atmosphere.rotation.x,bridgeFailure:lead,geographyRibs:terrain.length};
   }
   return {update};
 }

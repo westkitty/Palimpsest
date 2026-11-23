@@ -103,6 +103,13 @@ export function makeF06CandidateStage(bump:THREE.Texture, ready:()=>void, failed
       const apertures=cutF06UnknownLossCells(leaves);
       if(apertures!==4)throw Error('F06 documented blank cells missing');
       const terrain=attachF06AttritionTerrain(ledgerParent);
+      // Keep the reviewed print mesh uncut and readable after the taller
+      // relief is seated: print on the existing front storm card's open field.
+      const headingCard=get('Storm_horizon_•_bonded_rear_card_3');
+      const heading=get('Folio_architecture'), chronology=get('Source_chronology');
+      headingCard.add(heading,chronology);
+      heading.position.set(.87,.030,-.315);
+      chronology.position.set(.87,.030,-.150);
       const specimenRotator=new THREE.Group();
       specimenRotator.name='F06 independently revolving sourced specimen';
       seat.add(specimenRotator);
