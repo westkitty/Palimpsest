@@ -1,4 +1,4 @@
-import { newF09CollapsingPaperGround } from './f09EnvironmentalTheatre.ts';
+import { makeF09RuptureBed, newF09CollapsingPaperGround } from './f09EnvironmentalTheatre.ts';
 import * as THREE from 'three';
 import { f08CueClock, f08Cue } from './f08Motion.ts';
 import type { FolioRuntimeState } from '../types/atlas';
@@ -339,6 +339,7 @@ function heliocide(root: THREE.Group, bump: THREE.Texture | undefined): UpdateAr
   grip.position.set(.39,0,0);
   grip.rotation.x=-.46;
   const dir=new THREE.Vector3(), pos=new THREE.Vector3(), unitX=new THREE.Vector3(1,0,0);
+  const fallbackRupture=makeF09RuptureBed(root,star.clone().setY(pageY(star.x)+.47));
   let was=false, initialized=false, t=0;
   return (state,dt,reduced)=>{
     const on=state.interactions.A.active||state.interactions.A.locked;
@@ -348,6 +349,12 @@ function heliocide(root: THREE.Group, bump: THREE.Texture | undefined): UpdateAr
     else t=0;
     was=on;
     const authoredFrame = root.userData.f09AuthoredFrame as number|undefined;
+    const rupture=root.userData.f09RuptureBed as ReturnType<typeof makeF09RuptureBed>|undefined;
+    const destructionClock=authoredFrame??(on?1+t*18:1);
+    const destruction=destructionClock<46?-1:(destructionClock-46)/19;
+    if(rupture)fallbackRupture.update(-1,reduced);
+    root.userData.f09RuptureBedFractures=(rupture??fallbackRupture).update(destruction,reduced);
+    comb.visible=destructionClock<55;
     const foldingPaper=root.userData.f09PaperGround as ReturnType<typeof newF09CollapsingPaperGround>|undefined;
     root.userData.f09WholePaperWaves=foldingPaper?.update(authoredFrame??1,reduced)??[0,0,0];
     const drawn=on?(reduced?1:ease(0,.27,t)):0;
@@ -387,6 +394,7 @@ export function mountF09FunctionalTheatre(root:THREE.Group, center:THREE.Vector3
   if(slip)slip.visible=false;
   root.userData.f09ModelCenter=center;
   root.userData.f09PaperGround=newF09CollapsingPaperGround(root,center);
+  root.userData.f09RuptureBed=makeF09RuptureBed(root,center);
 }
 
 function siege(root: THREE.Group, world: BaseFolioWorld, bump: THREE.Texture | undefined): UpdateArt {

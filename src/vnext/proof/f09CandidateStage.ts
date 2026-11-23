@@ -45,6 +45,9 @@ export function bindF09CandidateStage(model:THREE.Group,animations:THREE.Animati
         ...iris.map(t=>new THREE.AnimationClip(t.name.split('.')[0],clip.duration,[t]))];
       const mixer=authoredSlotMixer<string>(root,native,c=>c.name,FPS);
       const q0=gimbals.map(n=>n.quaternion.clone()),adjust=new THREE.Quaternion(),axis=new THREE.Vector3(0,1,0);
+      const ringSeats=gimbals.map(n=>n.position.clone());
+      const scaffold=root.children.filter(n=>/^F09 (Gimbal (bridge|pin)|Slate die-cut|Hairline border|Printed dial)/.test(n.name));
+      const scaffoldSeats=scaffold.map(n=>n.position.clone());
       let shown=false,frame=1;
       const update=(state:FolioRuntimeState,dt:number,reduced:boolean)=>{
         const a=state.interactions.A,locked=a.active||a.locked;
@@ -60,11 +63,24 @@ export function bindF09CandidateStage(model:THREE.Group,animations:THREE.Animati
         mixer.sample([['extraction',moment],...iris.map((t,i)=>[t.name.split('.')[0],cue.petals[i]] as [string,number])]);
         star.visible=!held;
         absence.visible=held;
-        gimbals.forEach((n,i)=>n.quaternion.copy(q0[i]).multiply(adjust.setFromAxisAngle(axis,reduced?0:cue.gimbal[i])));
+        gimbals.forEach((n,i)=>{
+          const fracture=THREE.MathUtils.smoothstep(frame,48+i*2,63+i*2);
+          n.visible=fracture<.96;
+          n.position.copy(ringSeats[i]);
+          n.position.y+=reduced?0:Math.sin(fracture*Math.PI)*(.32+i*.12)-fracture*.72;
+          n.position.x+=reduced?0:Math.sin(fracture*Math.PI)*(.19+i*.08)*(i===1?-1:1);
+          n.quaternion.copy(q0[i]).multiply(adjust.setFromAxisAngle(axis,reduced?0:cue.gimbal[i]+fracture*(i-1)*1.75));
+        });
+        scaffold.forEach((n,i)=>{
+          const shear=THREE.MathUtils.smoothstep(frame,48+i%5,61+i%6);
+          n.visible=shear<.92;
+          n.position.copy(scaffoldSeats[i]);
+          n.position.y-=shear*.42;
+        });
         const petalDegrees=spokes.map(s=>THREE.MathUtils.radToDeg(2*Math.acos(THREE.MathUtils.clamp(s!.quaternion.w,-1,1))));
         return {authorFrame:frame,modelState:held?'matte-absence':frame<10?'star':'extraction',
           environmentalBeat:cue.phase,foldDegrees:petalDegrees[0],petalDegrees,
-          gimbal:reduced?[0,0,0]:cue.gimbal,
+          gimbal:reduced?[0,0,0]:cue.gimbal, survivingRings:gimbals.filter(n=>n.visible).length,
           filamentTravel:-(pull.position.x+.96),
           activeFilamentMorphs:filament.morphTargetInfluences!.filter(x=>x>.03).length};
       };

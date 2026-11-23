@@ -1,3 +1,4 @@
+import { armsF09, f09ForcedBeat, F09_INDEX } from './f09ForcedTurn.ts';
 import {closingReadingPose,createEnvironmentalClosing} from './environmentClosing.ts';
 import { makeF07CandidateStage } from './proof/f07CandidateStage';
 import { F08FolioWorld, F09FolioWorld } from '../engine/folios/FoliosWar2';
@@ -125,6 +126,38 @@ type PhysicalTurn = {
   swapped: boolean;
 };
 let physicalTurn: PhysicalTurn | null = null;
+let f09Run:number|null=null;
+let f09LastBeat:ReturnType<typeof f09ForcedBeat>|null=null;
+let f09FallbackDeadline:number|undefined;
+function cancelF09Run():void{
+  f09Run=null;f09LastBeat=null;
+  if(f09FallbackDeadline!==undefined){window.clearTimeout(f09FallbackDeadline);f09FallbackDeadline=undefined;}
+  delete canvas.dataset.f09Catastrophe;
+  delete fallback.dataset.f09Catastrophe;
+}
+function advanceF09Run(dt:number):void{
+  if(f09Run===null||currentFolio!==F09_INDEX)return;
+  f09Run+=dt;
+  const beat=f09ForcedBeat(f09Run,reducedMotion);
+  canvas.dataset.f09Catastrophe=beat;
+  if(!renderer&&beat!=='turn'){
+    fallback.dataset.f09Catastrophe=beat;
+    f09FallbackDeadline=window.setTimeout(()=>advanceF09Run(.05),50);
+  }
+  if(beat===f09LastBeat)return;
+  f09LastBeat=beat;
+  if(beat==='aftermath'){
+    if(!renderer)fallbackPage(F09_INDEX);
+    announce('The model star and its mounting bed are gone. The leaf will turn.');
+  }
+  if(beat==='turn'){
+    cancelF09Run();
+    if(inspection!=='overview')leaveMini();
+    if(renderer)beginPhysicalTurn(1,null,0);
+    else{goFolio(F09_INDEX+1);fallbackPage(F09_INDEX+1);}
+    return;
+  }
+}
 const bookRaycaster = new THREE.Raycaster();
 const bookPointer = new THREE.Vector2();
 function bookHit(event: PointerEvent, object: THREE.Object3D): boolean {
@@ -146,7 +179,7 @@ function openPhysicalCover():void {
   announce('Opening the closed book to the first folio and its three original paper figures.');
 }
 function beginPhysicalTurn(direction:-1|1,pointerId:number|null,startX:number):void {
-  if(bookPhase!=='open' || physicalTurn || inspection!=='overview')return;
+  if(bookPhase!=='open' || physicalTurn || f09Run!==null || inspection!=='overview')return;
   const target=currentFolio+direction;
   if(!playableIndex(target))return;
   const startProgress=direction===1?0:1;
@@ -172,7 +205,7 @@ function onPhysicalPointerDown(event:PointerEvent):void {
     canvas.style.cursor='grabbing';
     return;
   }
-  if(bookPhase!=='open' || physicalTurn || inspection!=='overview')return;
+  if(bookPhase!=='open' || physicalTurn || f09Run!==null || inspection!=='overview')return;
   if((currentFolio===3&&canvas.dataset.blenderFolio==='04')||(currentFolio===6&&canvas.dataset.blenderFolio==='07')){
     const controls=(laterRevision?.root.userData.interactables??[]) as THREE.Mesh[];
     // The generous page-turn hit volume extends behind an outer A/C tab.
@@ -1172,8 +1205,8 @@ function updateNav():void {
     const study=laterStates[index-FIRST_LATER_FOLIO];
     progress.textContent=`F${String(index+1).padStart(2,'0')} / F12`;
     document.querySelectorAll('.chapter-lines span').forEach((line,i)=>line.classList.toggle('active',i<=Math.min(2,Math.floor(index/4))));
-    prevButton.disabled=false;
-    nextButton.disabled=false;
+    prevButton.disabled=f09Run!==null;
+    nextButton.disabled=f09Run!==null;
     nextButton.textContent=index===11?'Closing pop-out →':'Next →';
     title.textContent=copy.title;
     description.textContent=copy.description;
@@ -1217,7 +1250,7 @@ function updateNav():void {
 }
 function goFolio(index:number, deferCameraReset=false):void {
   if(!playableIndex(index))return;
-  clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
+  cancelF09Run();clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
   canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
   delete canvas.dataset.revisionPhase;delete canvas.dataset.f10CandidateState;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;delete canvas.dataset.f11AuthoredFrame;delete canvas.dataset.f11Story;delete canvas.dataset.f07CandidateState;delete canvas.dataset.f08CandidateState;delete canvas.dataset.f09CandidateState;
   delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;delete canvas.dataset.f01Stage;
@@ -1496,11 +1529,12 @@ function goFolio(index:number, deferCameraReset=false):void {
         }
         art.update(actual,dt,reduce);
         if(canvas.dataset.blenderFolio==='09'&&rig===stageOwner){
-          const {authorFrame,modelState,foldDegrees,filamentTravel,activeFilamentMorphs,environmentalBeat,petalDegrees,gimbal}=staged.root.userData;
+          const {authorFrame,modelState,foldDegrees,filamentTravel,activeFilamentMorphs,environmentalBeat,petalDegrees,gimbal,survivingRings}=staged.root.userData;
           canvas.dataset.f09CandidateState=JSON.stringify({
-            authorFrame,modelState,foldDegrees,filamentTravel,activeFilamentMorphs,environmentalBeat,petalDegrees,gimbal,
+            authorFrame,modelState,foldDegrees,filamentTravel,activeFilamentMorphs,environmentalBeat,petalDegrees,gimbal,survivingRings,
             waves:art.root.userData.f09WholePaperWaves,
             witness:art.root.userData.f09Witness,slivers:art.root.userData.f09InwardSlivers,
+            ruptureFragments:art.root.userData.f09RuptureBedFractures,
             latched:actual.interactions.A.locked,historicalStep:actual.interactions.B.step,survey:actual.interactions.C.active,
           });
         }
@@ -1633,13 +1667,19 @@ function handleAction(slot:Slot):void {
   if(currentFolio>=FIRST_LATER_FOLIO){
     if(inspection!=='overview'){announce('Return to the overview before operating a mechanism.');return;}
     const idx=currentFolio-FIRST_LATER_FOLIO;
-    const next=operateLater(laterStates[idx],slot);
+    const prior=laterStates[idx];
+    const next=operateLater(prior,slot);
+    const catastrophe=armsF09(currentFolio,slot,prior.interactions.A.locked,next.interactions.A.locked);
+    if(catastrophe){f09Run=0;f09LastBeat=null;}
     laterStates[idx]=next;saveLaterStudy();
     laterWorld?.syncState(next,activeSpecimen(next),activeTime);
     livingStagecraft?.sync(next);
     updateNav();
     if(!renderer)fallbackPage(currentFolio);
-    announce(`${revisionCopy(currentFolio as LaterFolioIndex).actions[slot==='A'?0:slot==='B'?1:2]}. ${indicator.textContent}`);
+    if(catastrophe){
+      announce('Starsilk withdrawn. The model is failing.');
+      advanceF09Run(0);
+    }else announce(`${revisionCopy(currentFolio as LaterFolioIndex).actions[slot==='A'?0:slot==='B'?1:2]}. ${indicator.textContent}`);
     return;
   }
   if(inspection!=='overview'){
@@ -1879,7 +1919,7 @@ function moveMini(dt:number):void {
 }
 function nextFolio(direction:number):void {
   if(bookPhase==='closed'){openPhysicalCover();return;}
-  if(bookPhase!=='open' || physicalTurn)return;
+  if(bookPhase!=='open' || physicalTurn || f09Run!==null)return;
   if(inspection!=='overview')leaveMini();
   const next=currentFolio+direction;
   if(!playableIndex(next))return;
@@ -1973,7 +2013,9 @@ function fallbackPage(index:number):void {
     if(isLater){
       const scene=laterArt.querySelector<SVGGElement>('#later-plate-scene');
       if(scene){
-        scene.innerHTML=revisionDiagram(index,laterStates[index-FIRST_LATER_FOLIO].interactions.A.active)??getLaterDiagram(index);
+        const active=laterStates[index-FIRST_LATER_FOLIO].interactions.A.active;
+        const showRuin=index===F09_INDEX&&f09Run!==null? f09ForcedBeat(f09Run,reducedMotion)==='aftermath':active;
+        scene.innerHTML=revisionDiagram(index,showRuin)??getLaterDiagram(index);
         scene.firstElementChild?.setAttribute('fill',cssStock(folioStock(index).face));
       }
     }
@@ -2003,7 +2045,7 @@ function fallbackPage(index:number):void {
   }
 }
 function destroy():void {
-  cancelAnimationFrame(frame);
+  cancelF09Run();cancelAnimationFrame(frame);
   window.removeEventListener('keydown',handleKeys);
   window.removeEventListener('keyup',releaseKey);
   window.removeEventListener('resize',resize);
@@ -2064,7 +2106,7 @@ try{
   function step(now:number):void {
     const dt=lastTime?Math.min(0.06,(now-lastTime)/1000):0;
     lastTime=now;
-    updatePhysicalBinding(dt);animate(dt);moveMini(dt);advanceFlight(dt);revealTick();controls?.update();renderer?.render(scene,camera);
+    updatePhysicalBinding(dt);animate(dt);advanceF09Run(dt);moveMini(dt);advanceFlight(dt);revealTick();controls?.update();renderer?.render(scene,camera);
     frame=requestAnimationFrame(step);
   }
   frame=requestAnimationFrame(step);
