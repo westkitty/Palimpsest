@@ -27,6 +27,7 @@ test('The exact pre-existing vellum crossing now also anchors the world geometry
   assert.match(read('revisionEarlyArt.ts'),/creaseGlint\*scoreGlint\*safeInterior/);
   assert.match(read('f02DepthField.ts'),/v=creasePoint\+loose\*mix/);
   assert.match(read('f02DepthField.ts'),/p=creasePoint\+\(p-creasePoint\)\*mix/);
+  assert.match(read('previewV2.ts'),/camera\.position\.set\(\.\.\.F02_RETURN_NEAR\);controls\.target\.copy\(crease\)/);
   assert.match(read('previewV2.ts'),/controls\.target\.copy\(crease\)\.lerp\(f\.lookTo,cue\.recede\)/);
 });
 

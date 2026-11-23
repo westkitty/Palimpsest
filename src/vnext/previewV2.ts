@@ -1926,14 +1926,18 @@ function advanceFlight(dt:number):void {
   if(f.destination==='overhead'){
     const cue=f02WitnessReturn(f.elapsed,reducedMotion);
     const crease=new THREE.Vector3(...F02_RETURN_CREASE);
-    if(reducedMotion||cue.recede>0){
+    if(cue.recede===1){
+      camera.position.copy(f.to);controls.target.copy(f.lookTo);
+    }else if(cue.recede>0){
       camera.position.set(...F02_RETURN_NEAR).lerp(f.to,cue.recede);
       controls.target.copy(crease).lerp(f.lookTo,cue.recede);
+    }else if(cue.approach===1){
+      camera.position.set(...F02_RETURN_NEAR);controls.target.copy(crease);
     }else{
       camera.position.copy(f.from).lerp(new THREE.Vector3(...F02_RETURN_NEAR),cue.approach);
       controls.target.copy(f.lookFrom).lerp(crease,cue.approach);
     }
-    const collapse=THREE.MathUtils.lerp(f.collapseFrom,1,cue.collapse);
+    const collapse=cue.collapse===1?1:THREE.MathUtils.lerp(f.collapseFrom,1,cue.collapse);
     setWitnessReduction(collapse,cue.glint);
     canvas.dataset.f02Return=JSON.stringify({...cue,collapse,at:f.elapsed,crease:F02_RETURN_CREASE,
       position:camera.position.toArray(),look:controls.target.toArray()});
