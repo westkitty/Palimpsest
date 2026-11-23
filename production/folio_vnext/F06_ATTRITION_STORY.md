@@ -39,3 +39,9 @@ visited paper creases visible. The original title moves onto the existing front 
 card to clear the enlarged relief; no existing text was rewritten. A steeper F06 reader
 angle keeps the whole wheel, environmental field and blank ledger visible together on
 portrait touch displays.
+
+### Local weather and the accidental tear
+
+The same crossing carries three real scored ribbons with bonded root/tip joints. The era wheel changes their local cadence and material from sheer air through gusts and low grit to a late lee eddy. The reduced-motion reading uses a stable pose for each era. This is editorial behavior, not a claim of dated weather events.
+
+At the last deterioration detent, the cut-fiber shoulders separate beneath the original bridge. One stock flap twists upward around its outer bonded hinge; pale paper plies and a few attached fibers expose the split. Once the rupture completes, the scar remains when reading an earlier era or revisiting the folio. Reset Study clears it. It is deliberately separate from the route/ink history, underlying geography data and six-leaf ledger, which never receives a count from this event.

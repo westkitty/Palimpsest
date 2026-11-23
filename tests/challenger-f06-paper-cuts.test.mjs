@@ -62,3 +62,34 @@ test('all four selections physically age the same coast, attached crossing and c
   assert.deepEqual(ribs.map(o=>o.position.toArray()),start);
   resetF06TerrainWear();
 });
+
+test('crossing weather has four distinct local readings and a steady reduced-motion pose',async()=>{
+  const {f06CrossingAir}=await import('../src/vnext/proof/f06AttritionLayers.ts');
+  const modes=[0,1,2,3].map(i=>f06CrossingAir(i,.72,false,0));
+  assert.equal(new Set(modes.map(p=>p.kind)).size,4);
+  for(let i=0;i<4;i++){
+    assert.notEqual(f06CrossingAir(i,.36,false,1).twist,f06CrossingAir(i,1.22,false,1).twist);
+    assert.deepEqual(f06CrossingAir(i,0,true,1),f06CrossingAir(i,20,true,1));
+  }
+});
+test('the final-era rupture uses an attached physical flap and rewinds only to its persistent scar',()=>{
+  resetF06TerrainWear();
+  const world=new THREE.Group(), terrain=attachF06AttritionTerrain(world);
+  const flap=world.getObjectByName('F06 torn stock still bonded at outer right crease');
+  const parent=flap.parent;
+  for(let i=0;i<3;i++){
+    const s=terrain.update(i,0,true);
+    assert.equal(s.tearOpen,0);assert.equal(s.crossingTorn,false);
+  }
+  const late=terrain.update(3,0,true);
+  assert.equal(late.crossingTorn,true);assert.equal(late.tearOpen,1);
+  assert.ok(flap.rotation.z<-1);assert.equal(flap.parent,parent);
+  assert.ok(flap.children.filter(n=>n.name.startsWith('One exposed pulp fiber')).every(n=>n.visible));
+  const early=terrain.update(0,0,true);
+  assert.equal(early.tearOpen,.43);assert.equal(early.crossingTorn,true);
+  assert.equal(early.weather,'sheer-air');
+  assert.ok(flap.rotation.z<-.42&&flap.rotation.z>-.50);
+  assert.equal(attachF06AttritionTerrain(new THREE.Group()).update(0,0,true).crossingTorn,true);
+  resetF06TerrainWear();
+  assert.equal(attachF06AttritionTerrain(new THREE.Group()).update(0,0,true).crossingTorn,false);
+});

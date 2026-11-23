@@ -1,7 +1,15 @@
 import * as THREE from 'three';
 
 const WEAR_KEY='palimpsest.living.f06.paper-wear.v1';
-let sessionWear=0;
+const TEAR_KEY='palimpsest.living.f06.crossing-tear.v1';
+let sessionWear=0, crossingTorn=false;
+function readTear():boolean{
+  try{return crossingTorn||sessionStorage.getItem(TEAR_KEY)==='1';}catch{return crossingTorn;}
+}
+function recordTear():void{
+  crossingTorn=true;
+  try{sessionStorage.setItem(TEAR_KEY,'1');}catch{ /* retain for this reader */ }
+}
 const clamp=(n:number)=>Math.min(1,Math.max(0,n));
 function previousWear():number{
   try{
@@ -10,8 +18,8 @@ function previousWear():number{
   }catch{return sessionWear;}
 }
 export function resetF06TerrainWear():void{
-  sessionWear=0;
-  try{sessionStorage.removeItem(WEAR_KEY);}catch{ /* optional local study evidence */ }
+  sessionWear=0;crossingTorn=false;
+  try{sessionStorage.removeItem(WEAR_KEY);sessionStorage.removeItem(TEAR_KEY);}catch{ /* optional local study evidence */ }
 }
 function recordWear(mask:number):void{
   sessionWear=mask;
@@ -45,6 +53,98 @@ function cutStock(root:THREE.Object3D,name:string,outline:readonly [number,numbe
 const ease=(x:number)=>THREE.MathUtils.smoothstep(clamp(x),0,1);
 const stress=[.065,.33,.66,1] as const;
 
+const weatherProfiles=[
+  {name:'sheer-air',speed:1.28,amplitude:.11,lean:.04,height:.060,color:0x9bc0c1,fold:.17},
+  {name:'driving-gust',speed:2.84,amplitude:.32,lean:.29,height:.049,color:0xb4aaa0,fold:.42},
+  {name:'low-grit',speed:3.97,amplitude:.24,lean:-.27,height:.018,color:0xb28060,fold:.28},
+  {name:'lee-eddies',speed:2.05,amplitude:.20,lean:.12,height:.024,color:0xc39068,fold:.60},
+] as const;
+export function f06CrossingAir(era:number,time:number,reduced:boolean,index:number){
+  const p=weatherProfiles[era];
+  const t=(reduced?0:time*p.speed)+index*.93;
+  const gust=Math.sin(t) + .31*Math.sin(t*2.08-.92);
+  const point=Math.cos(t+.39);
+  return {kind:p.name,color:p.color,roll:p.lean+p.amplitude*gust,
+    twist:p.lean*.55+point*p.amplitude*.88,flex:p.fold+gust*p.amplitude*.94,
+    height:p.height+point*.028};
+}
+function crossingWeather(parent:THREE.Group){
+  const root=new THREE.Group();root.name='F06 air in the lee of the one crossing';parent.add(root);
+  root.position.set(-.49,.17,-.125);
+  const cut=paper(0x9c8063);
+  // Story air is made of folded paper and retains its same attachment,
+  // rather than throwing independent particles or moving the camera.
+  box(root,'Bonding pad for the folded air study',.17,.029,.16,cut,0,-.026,0);
+  const base=paper(0x9bc0c1);
+  const troops=[0,1,2].map(i=>{
+    const joint=new THREE.Group();joint.position.set(i*.078,.011+i*.054,-i*.086);root.add(joint);
+    const body=cutStock(joint,'Scored crossing air ribbon',
+      [[0,-.026],[.24,-.049],[.39,-.036],[.38,.045],[.20,.055],[0,.032]],.010,base);
+    const tipPivot=new THREE.Group();tipPivot.position.set(.36,.004,0);joint.add(tipPivot);
+    const tip=cutStock(tipPivot,'Tip beyond the same air crease',
+      [[0,-.032],[.19,-.040],[.38,-.014],[.34,.019],[.17,.047],[0,.040]],.010,base);
+    body.castShadow=tip.castShadow=false;
+    return {joint,tipPivot};
+  });
+  let time=0,previous=-1;
+  return (era:number,dt:number,reduced:boolean)=>{
+    if(era!==previous){time=0;previous=era;}
+    if(!reduced)time+=Math.min(.12,Math.max(0,dt));
+    const still=f06CrossingAir(era,time,reduced,0);
+    base.color.setHex(still.color);
+    for(const [i,{joint,tipPivot}] of troops.entries()){
+      const a=f06CrossingAir(era,time,reduced,i);
+      joint.position.y=.014+i*.048+a.height;
+      joint.rotation.z=a.roll;
+      joint.rotation.y=a.twist-.13*i;
+      tipPivot.rotation.z=a.flex;
+      tipPivot.rotation.y=-a.twist*.84;
+    }
+    return {weather:still.kind,weatherRoll:Math.round(still.roll*1000)/1000};
+  };
+}
+
+function tornCrossingStock(crossing:THREE.Group){
+  const root=new THREE.Group();root.name='F06 through-cut crossing stock and attached torn flap';crossing.add(root);
+  root.position.y=-.033;
+  const faced=paper(0x8d7161),fold=paper(0xa38869),pulp=paper(0xebcf9f),depth=paper(0x624139);
+  const shared:[number,number][]=[[-.04,-.23],[.025,-.155],[-.071,-.092],[.06,-.005],[-.03,.083],[.070,.148],[.011,.23]];
+  // The stock patches meet at the scored line on arrival. They are actual
+  // solids with complementary cut contours, not an overlaid black decal.
+  const leftRim=cutStock(root,'Fixed left pulp edge until the crossing gives',
+    [[-.47,-.23],...shared,[-.47,.23]],.027,pulp);
+  const left=cutStock(root,'Fixed crossing stock outside the rupture',
+    [[-.47,-.23],...shared.map(([x,z])=>[x-.018,z] as [number,number]),[-.47,.23]],.014,faced);
+  left.position.y=.023;
+  const anchor=new THREE.Group();anchor.name='F06 torn stock still bonded at outer right crease';
+  anchor.position.set(.46,.006,0);root.add(anchor);
+  const right=shared.map(([x,z])=>[x-.46,z] as [number,number]);
+  cutStock(anchor,'Exposed inner paper ply on the attached flap',[...right,[.009,.23],[.009,-.23]],.027,pulp);
+  cutStock(anchor,'Attached flap outer face',[...right.map(([x,z])=>[x+.017,z] as [number,number]),[.009,.23],[.009,-.23]],.014,fold).position.y=.023;
+  box(root,'Remaining paper hinge saddle',.076,.038,.44,depth,.477,.011,0);
+  const strands=right.slice(1,-1).map(([x,z],i)=>{
+    const e=box(anchor,'One exposed pulp fiber still on the lifted edge',.060+i*.010,.020,.012,pulp,x-.020,.018,z);
+    e.rotation.y=.35*(i%2===0?1:-1);
+    return e;
+  });
+  let permanent=readTear(),tear=permanent?.43:0;
+  return (era:number,stressNow:number,dt:number,reduced:boolean)=>{
+    const opening=era===3?ease((stressNow-.80)/.18):0;
+    // A completed rupture persists as a local scar, but does not change any
+    // selected-era geography reading, print or casualties in the ledger.
+    if(opening>=.80&&!permanent){permanent=true;recordTear();}
+    const goal=Math.max(opening,permanent?.43:0);
+    const rate=Math.max(0,dt)*4.6;
+    tear=reduced?goal:tear+Math.sign(goal-tear)*Math.min(Math.abs(goal-tear),rate);
+    leftRim.position.x=-.05*tear;left.position.x=leftRim.position.x;
+    anchor.rotation.z=-1.02*tear;
+    anchor.rotation.x=.12*tear;
+    for(const [i,e] of strands.entries()){
+      e.visible=tear>.12;e.scale.x=.25+.75*tear;e.rotation.z=(i%2?-.24:.21)*tear;
+    }
+    return {crossingTorn:permanent,tearOpen:Math.round(tear*1000)/1000};
+  };
+}
 // These are four readings of the same teaching stock, not four planets,
 // reconstructed events, dated battle sites or a scale of casualties.
 export function attachF06AttritionTerrain(parent:THREE.Object3D){
@@ -92,6 +192,7 @@ export function attachF06AttritionTerrain(parent:THREE.Object3D){
     box(hinge,'Scored deck edge',.465,.024,.027,cut,-side*.232,.016,-.086);
     return hinge;
   });
+  const weather=crossingWeather(crossing),tearStock=tornCrossingStock(crossing);
   const brace=cutStock(relief,'Countermeasure: low bonded paper stitch across worn cut',
     [[-.39,.29],[-.16,.19],[.46,.23],[.44,.33],[-.14,.31],[-.48,.395]],.024,deepRust);
   // At the back of the same relief, air is scored as thin horizontal stock,
@@ -163,7 +264,7 @@ export function attachF06AttritionTerrain(parent:THREE.Object3D){
     // The pressed bridge/base get darker by use, even if an earlier
     // historical reading is reselected. No future physical state is projected.
     cut.color.setHex(age>2?0xa17055:0xc28d63);
-    return {wearMask:seen,routeLayerCount:age,paperRipple:stamp,terrainStress:shown,
+    return {wearMask:seen,routeLayerCount:age,paperRipple:stamp,terrainStress:shown,...weather(era,seconds,reduced),...tearStock(era,shown,seconds,reduced),
       climateCurl:atmosphere.rotation.x,bridgeFailure:lead,geographyRibs:terrain.length};
   }
   return {update};

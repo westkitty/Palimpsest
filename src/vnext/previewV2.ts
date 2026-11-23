@@ -1558,8 +1558,8 @@ function goFolio(index:number, deferCameraReset=false):void {
       laterRevision={root:staged.root,update:(actual,dt,reduce)=>{
         if(staged.root.userData.assetState==='ready'){
           staged.update(actual,dt,reduce);
-          const {era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell,physicalBlankApertures,specimenYaw,wearMask,routeLayerCount,paperRipple,terrainStress,climateCurl,bridgeFailure,geographyRibs}=staged.root.userData;
-          canvas.dataset.f06CandidateState=JSON.stringify({era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell,physicalBlankApertures,specimenYaw,wearMask,routeLayerCount,paperRipple,terrainStress,climateCurl,bridgeFailure,geographyRibs});
+          const {era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell,physicalBlankApertures,specimenYaw,wearMask,routeLayerCount,paperRipple,terrainStress,climateCurl,bridgeFailure,geographyRibs,weather,weatherRoll,crossingTorn,tearOpen}=staged.root.userData;
+          canvas.dataset.f06CandidateState=JSON.stringify({era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell,physicalBlankApertures,specimenYaw,wearMask,routeLayerCount,paperRipple,terrainStress,climateCurl,bridgeFailure,geographyRibs,weather,weatherRoll,crossingTorn,tearOpen});
         }else art.update(actual,dt,reduce);
       },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
     }
