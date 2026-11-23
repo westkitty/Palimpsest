@@ -66,6 +66,7 @@ export function bindF01Mechanisms(model: THREE.Group, clips: THREE.AnimationClip
   let active:Flight|null=null,flight:Flight|null=null,shown=0,hasInitialPose=false,idleClock=0;
   const isA=(f:Flight)=>Boolean((f.from^f.to)&1);
   const normalize=(f:Flight)=>f.from<f.to?f.progress:1-f.progress;
+  const aDuration=(to:number)=>to&1?3.65:1.55;
   const start=(from:number,to:number,progress:number):Flight=>{
     const name=edgeKey(from,to), authored=cache.get(name)!;
     active?.actions.forEach(a=>a.stop());
@@ -74,7 +75,7 @@ export function bindF01Mechanisms(model: THREE.Group, clips: THREE.AnimationClip
       action.reset().setLoop(THREE.LoopOnce,1).play();
       action.clampWhenFinished=true;action.paused=true;return action;
     });
-    return active={from,to,progress,name,duration:((from^to)&1)?3.65:authored[0].duration,actions:a};
+    return active={from,to,progress,name,duration:((from^to)&1)?aDuration(to):authored[0].duration,actions:a};
   };
   const sample=(f:Flight)=>{
     const normalized=normalize(f);
@@ -96,6 +97,7 @@ export function bindF01Mechanisms(model: THREE.Group, clips: THREE.AnimationClip
         if(flight&&target===flight.from){
           [flight.from,flight.to]=[flight.to,flight.from];
           flight.progress=1-flight.progress;
+          if(isA(flight))flight.duration=aDuration(flight.to);
         }
         if(!flight&&target!==shown)flight=start(shown,nextF01Detent(shown,target),0);
         if(flight){
