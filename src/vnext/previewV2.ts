@@ -165,6 +165,12 @@ function onPhysicalPointerDown(event:PointerEvent):void {
     return;
   }
   if(bookPhase!=='open' || physicalTurn || inspection!=='overview')return;
+  if(currentFolio===6&&canvas.dataset.blenderFolio==='07'){
+    const controls=(laterRevision?.root.userData.interactables??[]) as THREE.Mesh[];
+    // The generous page-turn hit volume extends behind an outer A/C tab.
+    // Its invisible plane must not swallow a tap on the actual mechanism.
+    if(controls.some(node=>bookHit(event,node)))return;
+  }
   const direction: -1|1|null =
     currentFolio<CODA_INDEX && bookHit(event,binding.rightCornerHit)?1:
     currentFolio>0 && bookHit(event,binding.leftCornerHit)?-1:null;
