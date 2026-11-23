@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { makeF05Offcut } from './f05Offcut';
 const stations=[-.98,.53,2.03,3.53];
 export function factoryRead(step:number,age:number,reduced:boolean){
   const bay=Math.max(0,Math.min(4,step));
@@ -43,6 +44,7 @@ export function makeFactoryFloor(parent:THREE.Group){
     pin.name='Conveyor · existing bonded paper pin '+(i+1);
     return pin;
   });
+  const offcut=makeF05Offcut(root);
   const carrier=new THREE.Group();carrier.name='The one batch of material through all four bays';root.add(carrier);
   box(.31,.038,.23,stock,0,-.035,0,carrier);
   const raw=new THREE.Mesh(new THREE.IcosahedronGeometry(.137,0),ochre);raw.position.y=.105;carrier.add(raw);
@@ -77,6 +79,7 @@ export function makeFactoryFloor(parent:THREE.Group){
     if(step===2){pressed.scale.set(1+.24*beat,1.92-.92*beat,1+.13*beat);}
     if(step===3){strip.scale.x=.15+.85*beat;strip.position.x=.12*(1-beat);}
     if(step===4){halves[0].position.x=-.24*(1-beat);halves[1].position.x=.24*(1-beat);}
-    return {...state,rhythm};
+    const offcutState=offcut.update(step>1&&(reduced||age>=.84),delta,reduced);
+    return {...state,rhythm,offcut:offcutState};
   };
 }
