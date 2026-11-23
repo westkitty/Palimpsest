@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import type { FolioActions } from './folioLogic.ts';
+import { bindF01EnvironmentalStage,f01CreaseProgress } from './f01EnvironmentalStage.ts';
 
 const prefix = 'F01_ABS_';
 const bits = [1, 2, 4] as const;
@@ -27,7 +28,7 @@ function disposeModel(model: THREE.Object3D): void {
   geometries.forEach(g => g.dispose());
 }
 
-type Flight = { from: number; to: number; progress: number; duration: number; action: THREE.AnimationAction };
+type Flight = { from:number;to:number;progress:number;duration:number;name:string;actions:THREE.AnimationAction[] };
 type Phase = 'loading' | 'ready' | 'fallback';
 export type F01Challenger = {
   root: THREE.Group;
@@ -35,88 +36,87 @@ export type F01Challenger = {
   dispose(): void;
 };
 
-/** Absolute, authored Blender detents. No mesh or motion substitutes on the success path. */
-function keyedMechanisms(model: THREE.Group, clips: THREE.AnimationClip[]) {
-  const byName = new Map(clips.map(clip => [clip.name, clip]));
-  const mixer = new THREE.AnimationMixer(model);
-  let idleMixer: THREE.AnimationMixer | null = null;
-  let active: THREE.AnimationAction | null = null;
-  let flight: Flight | null = null;
-  let shown = 0;
-  let hasInitialPose = false;
-  let authoredIdle: THREE.AnimationAction | null = null;
+/** Every track still comes from the actual authored clips. Only station timing is staged. */
+export function bindF01Mechanisms(model: THREE.Group, clips: THREE.AnimationClip[]) {
+  const byName=new Map(clips.map(clip=>[clip.name,clip]));
+  const mixer=new THREE.AnimationMixer(model);
+  const idleMixer=new THREE.AnimationMixer(model);
+  const layer=bindF01EnvironmentalStage(model);
+  const cache=new Map<string,THREE.AnimationClip[]>();
+  const station=(track:THREE.KeyframeTrack)=>Number(/^F01_(?:HINGE|GUSSET|DETAIL)_([123])(?:[_.]|$)/.exec(track.name)?.[1]??0)-1;
+  for(let i=0;i<8;i++)for(const bit of bits){
+    const j=i^bit;if(j<=i)continue;
+    const name=edgeKey(i,j),clip=byName.get(name);
+    if(!clip||!clip.tracks.length||clip.duration<=0)throw new Error('F01 challenger is missing authored detent: '+name);
+    const split=[0,1,2].map(s=>clip.tracks.filter(t=>station(t)===s));
+    if(split.some(group=>group.length!==10))throw new Error('F01 authored hinge/gusset station incomplete: '+name);
+    cache.set(name,split.map((tracks,s)=>new THREE.AnimationClip(name+'_station_'+s,clip.duration,tracks)));
+  }
 
-  for (let i = 0; i < 8; i++) for (const bit of bits) {
-    const j=i^bit;
-    if(j<=i)continue;
-    const clip=byName.get(edgeKey(i,j));
-    if (!clip || !clip.tracks.length || clip.duration <= 0) {
-      throw new Error('F01 challenger is missing an authored detent edge: ' + edgeKey(i,j));
-    }
-  }
   const idle=byName.get('F01_ACTOR_IDLE');
-  if (idle && idle.tracks.length && idle.duration > 0) {
-    idleMixer=new THREE.AnimationMixer(model);
-    authoredIdle=idleMixer.clipAction(idle);
-    authoredIdle.play();
-  }
+  // Preserve original source movements: pupil-free crystal edges, Wordstreamer's
+  // small bowed profile, and NiAlBu's paper brow/observation plate.
+  const idlePatterns=[/Tiger/i,/Wordstreamer|^Mesh199\./i,/NiAlBu/i];
+  const actions=idle?idlePatterns.map((rule,s)=>{
+    const clip=new THREE.AnimationClip('F01 authored actor '+s,idle.duration,idle.tracks.filter(t=>rule.test(t.name)));
+    if(!clip.tracks.length)throw new Error('F01 actor idle absent: '+s);
+    const action=idleMixer.clipAction(clip).play();
+    action.paused=true;return action;
+  }):[];
+  let active:Flight|null=null,flight:Flight|null=null,shown=0,hasInitialPose=false,idleClock=0;
+  const isA=(f:Flight)=>Boolean((f.from^f.to)&1);
+  const normalize=(f:Flight)=>f.from<f.to?f.progress:1-f.progress;
   const start=(from:number,to:number,progress:number):Flight=>{
-    const name=edgeKey(from,to);
-    const clip=byName.get(name)!;
-    const action=mixer.clipAction(clip);
-    active?.stop();
-    action.reset();
-    action.setLoop(THREE.LoopOnce,1);
-    action.clampWhenFinished=true;
-    action.play();
-    action.paused=true;
-    active=action;
-    return {from,to,progress,duration:clip.duration,action};
+    const name=edgeKey(from,to), authored=cache.get(name)!;
+    active?.actions.forEach(a=>a.stop());
+    const a=authored.map(c=>{
+      const action=mixer.clipAction(c);
+      action.reset().setLoop(THREE.LoopOnce,1).play();
+      action.clampWhenFinished=true;action.paused=true;return action;
+    });
+    return active={from,to,progress,name,duration:((from^to)&1)?3.65:authored[0].duration,actions:a};
   };
   const sample=(f:Flight)=>{
-    // Manual sampling holds endpoints and allows deterministic, reversible
-    // control on either side of the exact same authored Blender keyframes.
-    const normalized=f.from<f.to?f.progress:1-f.progress;
-    f.action.time=normalized*f.duration;
+    const normalized=normalize(f);
+    const phase=isA(f)?f01CreaseProgress(normalized):[normalized,normalized,normalized];
+    f.actions.forEach((a,i)=>a.time=phase[i]*a.getClip().duration);
     mixer.update(0);
   };
   const detent=(value:number)=>{
-    flight=null;
-    sample(start(value ^ 1,value,1));
-    shown=value;
+    flight=null;sample(start(value^1,value,1));shown=value;
   };
   return {
-    get idle() { return Boolean(authoredIdle); },
-    update(target:number,dt:number,reduced:boolean) {
-      if (reduced || !hasInitialPose) {
-        if (!hasInitialPose || target!==shown || flight) detent(target);
+    get idle(){return actions.length===3;},
+    update(target:number,dt:number,reduced:boolean){
+      const step=Math.min(Math.max(dt,0),.09);
+      if(reduced||!hasInitialPose){
+        if(!hasInitialPose||target!==shown||flight)detent(target);
         hasInitialPose=true;
-      } else {
-        if (flight && target===flight.from) {
+      }else{
+        if(flight&&target===flight.from){
           [flight.from,flight.to]=[flight.to,flight.from];
-          flight.progress=1-flight.progress; // no jump when a reader reverses a moving tab
+          flight.progress=1-flight.progress;
         }
-        if (!flight && target!==shown) flight=start(shown,nextF01Detent(shown,target),0);
-        if (flight) {
-          flight.progress=Math.min(1,flight.progress+Math.min(Math.max(dt,0),0.07)/flight.duration);
+        if(!flight&&target!==shown)flight=start(shown,nextF01Detent(shown,target),0);
+        if(flight){
+          flight.progress=Math.min(1,flight.progress+step/flight.duration);
           sample(flight);
-          if (flight.progress===1) {
-            shown=flight.to;
-            flight=null;
-          }
+          if(flight.progress===1){shown=flight.to;flight=null;}
         }
       }
-      // Idle animates only the separate child track set; it never fights A/B/C.
-      if (idleMixer) {
-        if (reduced) idleMixer.setTime(0);
-        else idleMixer.update(Math.min(Math.max(dt,0),0.07));
-      }
-      return {settled:shown, clip:flight?.action.getClip().name??active?.getClip().name??'', moving:Boolean(flight)};
+      const stage=layer.update(flight&&isA(flight)?normalize(flight):Number(Boolean(shown&1)));
+      if(!reduced)idleClock=(idleClock+step)%300;
+      const idleTimes=actions.map((a,i)=>{
+        const period=a.getClip().duration;
+        const t=reduced?0:(idleClock*[.77,1.05,.62][i]+[0,1.32,2.51][i])%period;
+        // Separate authored child bindings: no underfoot sliding, no blink while stored folded.
+        a.setEffectiveWeight(reduced?0:Math.max(0,(stage.stations[i]-.82)/.18));
+        a.time=t;return t;
+      });
+      idleMixer.update(0);
+      return {settled:shown,clip:flight?.name??active?.name??'',moving:Boolean(flight),stage:{...stage,idleTimes}};
     },
-    dispose() {
-      mixer.stopAllAction();mixer.uncacheRoot(model);
-      idleMixer?.stopAllAction();idleMixer?.uncacheRoot(model);
-    },
+    dispose(){mixer.stopAllAction();mixer.uncacheRoot(model);idleMixer.stopAllAction();idleMixer.uncacheRoot(model);},
   };
 }
 
@@ -132,7 +132,7 @@ export function createF01Challenger(
   let state=initial;
   let reduced=reducedMotion;
   let model:THREE.Group|null=null;
-  let animator:ReturnType<typeof keyedMechanisms>|null=null;
+  let animator:ReturnType<typeof bindF01Mechanisms>|null=null;
   const report=(phase:Phase)=>{
     root.userData.status=phase;
     if (!disposed) onPhase(phase);
@@ -141,7 +141,7 @@ export function createF01Challenger(
     if (disposed) {disposeModel(gltf.scene);return;}
     model=gltf.scene;
     try {
-      const candidate=keyedMechanisms(model,gltf.animations);
+      const candidate=bindF01Mechanisms(model,gltf.animations);
       model.name='F01 exported Blender paper stage';
       model.traverse(node=>{
         if (node instanceof THREE.Mesh) {

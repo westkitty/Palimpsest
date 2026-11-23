@@ -1210,7 +1210,7 @@ function goFolio(index:number, deferCameraReset=false):void {
   clear();authoredFigureCount=0;currentFolio=index;activeTime=0;
   canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
   delete canvas.dataset.revisionPhase;delete canvas.dataset.f10CandidateState;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;delete canvas.dataset.f11AuthoredFrame;delete canvas.dataset.f11Story;delete canvas.dataset.f07CandidateState;delete canvas.dataset.f08CandidateState;delete canvas.dataset.f09CandidateState;
-  delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;
+  delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;delete canvas.dataset.f01Stage;
   delete canvas.dataset.f02Challenger;delete canvas.dataset.f02Frame;delete canvas.dataset.f02Detent;delete canvas.dataset.f02Clip;
   delete canvas.dataset.f06CandidateState;
   delete canvas.dataset.f12CandidateState;
@@ -1250,6 +1250,7 @@ function goFolio(index:number, deferCameraReset=false):void {
               canvas.dataset.f01Detent=String(challenger.root.userData.settled);
               canvas.dataset.f01Clip=String(challenger.root.userData.clip);
               canvas.dataset.f01Moving=String(challenger.root.userData.moving);
+              canvas.dataset.f01Stage=JSON.stringify(challenger.root.userData.stage);
             }
           },
           dispose(){challenger.dispose();disposeSubtree(register.root);stage.clear();},
