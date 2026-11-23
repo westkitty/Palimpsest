@@ -35,8 +35,10 @@ const failures=[];
       else await wait({blenderFolio:String(n).padStart(2,'0')});
       const status=page.locator('#mechanism-status');
       const before=await status.textContent();
-      await press('a');
-      assert.notEqual(await status.textContent(),before,'folio '+n+' A changes study state');
+      // F03's status describes template/variation, not its A-open toggle.
+      const key=n===3?'b':'a';
+      await press(key);
+      assert.notEqual(await status.textContent(),before,'folio '+n+' '+key.toUpperCase()+' changes study state');
       assert.deepEqual(failures,[]);
       console.log('Native Blender runtime: F'+String(n).padStart(2,'0'));
     }

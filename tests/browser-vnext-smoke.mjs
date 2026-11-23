@@ -158,7 +158,12 @@ try {
         'F09 irreversible filament remains locked');
     }
   }
-  assert.equal(await page.locator('#next').isDisabled(),true,'F12 is the final living leaf');
+  assert.equal(await page.locator('#next').isDisabled(),false,'F12 leads to the distinct closing leaf');
+  await turnKeyboard(1);
+  assert.equal(await stage.getAttribute('data-revision-folio'),'coda');
+  assert.equal(await page.locator('#folio-description').textContent(),'Your fate is in our hands.');
+  assert.equal(await page.locator('#next').isDisabled(),true,'closing leaf is the end of the volume');
+  await turnKeyboard(-1);
   for(let i=0;i<6;i++)await turnKeyboard(-1);
   assert.match(await page.locator('#folio-title').textContent(),/Long Attrition/);
   await page.locator('[data-mechanism="B"]').click();
