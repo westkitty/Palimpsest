@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {makeF02DepthField} from './f02DepthField.ts';
 import {f02AnchoredHeight,f02ArmExtensions} from './f02Motion.ts';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 
@@ -58,6 +59,7 @@ export function bindF02AnchoredArms(model:THREE.Object3D){
 export function createF02Challenger(initial: F02Reveal, reducedMotion: boolean, report: (phase: Phase) => void) {
   const root = new THREE.Group();
   root.name = 'F02 actual Blender paper loom';
+  const deep=makeF02DepthField(root);
   let model: THREE.Group | null = null;
   let mixer: THREE.AnimationMixer | null = null;
   let action: THREE.AnimationAction | null = null;
@@ -123,10 +125,11 @@ export function createF02Challenger(initial: F02Reveal, reducedMotion: boolean, 
       const step=Math.min(Math.max(dt,0),0.07)*1.78;
       t=reduced||Math.abs(delta)<=step?destination:t+Math.sign(delta)*step;
       sample();
+      Object.assign(root.userData,deep.update(inkAdvance,Number(root.userData.frame),dt,reduce));
     },
     dispose() {
       if (disposed)return;
-      disposed=true;
+      disposed=true;deep.dispose();
       if (model){mixer?.stopAllAction();mixer?.uncacheRoot(model);disposeModel(model);}
       root.clear();model=null;action=null;mixer=null;armMotion=null;
     },

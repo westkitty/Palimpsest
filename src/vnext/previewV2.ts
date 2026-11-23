@@ -1254,7 +1254,7 @@ function goFolio(index:number, deferCameraReset=false):void {
   canvas.dataset.revisionFolio=index===CODA_INDEX?'coda':String(index+1);
   delete canvas.dataset.revisionPhase;delete canvas.dataset.f10CandidateState;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;delete canvas.dataset.f11AuthoredFrame;delete canvas.dataset.f11Story;delete canvas.dataset.f07CandidateState;delete canvas.dataset.f08CandidateState;delete canvas.dataset.f09CandidateState;
   delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;delete canvas.dataset.f01Stage;
-  delete canvas.dataset.f02Challenger;delete canvas.dataset.f02Frame;delete canvas.dataset.f02Detent;delete canvas.dataset.f02Clip;delete canvas.dataset.f02InkBeat;delete canvas.dataset.f02Arms;
+  delete canvas.dataset.f02Challenger;delete canvas.dataset.f02Frame;delete canvas.dataset.f02Detent;delete canvas.dataset.f02Clip;delete canvas.dataset.f02InkBeat;delete canvas.dataset.f02Arms;delete canvas.dataset.f02Depth;delete canvas.dataset.f02Witness;
   delete canvas.dataset.f06CandidateState;
   delete canvas.dataset.f03WorkshopState;
   delete canvas.dataset.f12CandidateState;
@@ -1336,6 +1336,7 @@ function goFolio(index:number, deferCameraReset=false):void {
                 canvas.dataset.f02Detent=String(challenger.root.userData.detent);
                 canvas.dataset.f02Clip=String(challenger.root.userData.clip);
                 canvas.dataset.f02Arms=JSON.stringify(challenger.root.userData.armExtensions);
+                canvas.dataset.f02Depth=JSON.stringify({lift:challenger.root.userData.lift,wake:challenger.root.userData.wake,beat:challenger.root.userData.depthBeat});
               }
             },
             dispose(){challenger.dispose();disposeSubtree(procedural.root);stage.clear();},
@@ -1729,13 +1730,15 @@ function advanceFlight(dt:number):void {
   f.elapsed=Math.min(f.seconds, f.elapsed+dt);
   const t=f.seconds===0?1:THREE.MathUtils.clamp(f.elapsed/f.seconds,0,1);
   const eased=t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+  if(f.destination==='overhead')controls.maxDistance=Math.max(19,f.to.distanceTo(f.lookTo)+3);
   camera.position.copy(f.from).lerp(f.to,eased);
   controls.target.copy(f.lookFrom).lerp(f.lookTo,eased);
   controls.update();
   if(t>=1){
     const inside=f.destination==='witness';
     controls.minDistance=inside?0.48:1.2;
-    controls.maxDistance=inside?9:19;
+    controls.maxDistance=inside?9:Math.max(19,f.to.distanceTo(f.lookTo)+3);
+    if(currentFolio===1)canvas.dataset.f02Witness=inside?'inside':'overhead';
     controls.maxPolarAngle=inside?Math.PI-0.12:1.51;
     controls.enabled=true;
     cameraFlight=null;
@@ -1746,10 +1749,12 @@ function toggleWitness():void {
   if(!witnessActive){
     witnessCamera={position:camera.position.clone(),target:controls.target.clone()};
     witnessActive=true;
-    beginFlight(new THREE.Vector3(1.47,1.71,1.86),new THREE.Vector3(.17,1.02,-.66),'witness');
+    canvas.dataset.f02Witness='entering';
+    beginFlight(new THREE.Vector3(.64,1.37,1.64),new THREE.Vector3(.13,.89,-.86),'witness');
     announce('Entering the paper galaxy. The first stars are held between the folds of the book. Return with G.');
   }else{
     witnessActive=false;
+    canvas.dataset.f02Witness='returning';
     beginFlight(witnessCamera?.position.clone()??new THREE.Vector3(0,6.5,9.9),witnessCamera?.target.clone()??new THREE.Vector3(0,0.25,0),'overhead');
     witnessCamera=null;
     announce('Returning to the open book.');
@@ -1772,8 +1777,10 @@ function fitBookCamera(openProgress:number):void {
   }else if(currentFolio===1&&openProgress>.99){
     // Read the low warm Zentrum hardware and the taller blue open Geode as
     // foreground / middle stage, against the raised spiral in the rear.
-    camera.position.set(3.05*scale,7.34*scale,9.92*scale);
-    controls?.target.set(0,.40,.08);
+    const storyScale=scale*THREE.MathUtils.lerp(.89,1,THREE.MathUtils.smoothstep(aspect,.48,1.25));
+    const side=THREE.MathUtils.lerp(1.65,3.05,THREE.MathUtils.smoothstep(aspect,.48,1.2));
+    camera.position.set(side*storyScale,7.34*storyScale,9.92*storyScale);
+    controls?.target.set(0,.55,.01);
   }else if(currentFolio===9&&openProgress>.99){
     const witnessScale=scale*THREE.MathUtils.lerp(.68,.98,THREE.MathUtils.smoothstep(aspect,.52,1.28));
     camera.position.set(.20*witnessScale,6.18*witnessScale,9.05*witnessScale);

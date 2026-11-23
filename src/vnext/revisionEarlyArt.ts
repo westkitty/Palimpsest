@@ -162,8 +162,13 @@ void main(){
   vellum *= 1.-.060*score-.034*press;
   float rings=.18+.82*noise(p*6.3);
   vec3 ink=mix(vec3(.012,.018,.027),vec3(.0035,.0061,.011),soak);
-  ink+=wet*vec3(.064,.088,.114)*rings;
-  ink+=(grain-.5)*.014;
+  // Thin moving meniscus followed by a low standing film, then matte soak.
+  // Finer fibers stay legible without turning the dark page into gravel.
+  float rimTide=(1.-smoothstep(.002,.014,abs(tide-.010)))*spread;
+  float runnels=.24+.76*noise(vec2(p.x*8.3+p.y*3.1,p.y*15.2)-vec2(advance*.9,0.));
+  ink+=wet*vec3(.043,.065,.101)*rings;
+  ink+=rimTide*vec3(.085,.120,.162)*runnels;
+  ink+=(grain-.5)*.0055;
   vec3 paper=mix(vellum,ink,spread);
   vec2 cell=clamp(vec2((p.x+4.56)/9.12,(p.y+2.85)/5.70),.002,.998);
   vec3 stars=texture2D(atlas,cell).rgb;
@@ -175,7 +180,7 @@ void main(){
   float galaxies=smoothstep(.683,.903,advance);
   vec3 stellar=stars.r*points*vec3(.66,.83,.99)
     +stars.g*clusters*vec3(.20,.56,.85)
-    +stars.b*galaxies*vec3(.74,.61,.42);
+    +stars.b*galaxies*vec3(.44,.34,.22);
   paper+=stellar*safeInterior;
   gl_FragColor=vec4(paper,1.);
   #include <colorspace_fragment>

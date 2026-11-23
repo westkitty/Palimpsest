@@ -17,3 +17,9 @@ The book and cut edges still arrive white. The original liquid ink spread, first
 - Four actual source strip meshes release in a stagger, with their own source printed edge and five matching source gussets following the same stock-normal motion. The bonded contact line and twenty feet are fixed. At the authored end frame, mesh positions and normals exactly match the underlying source. Reduced motion lands directly on the same stable result.
 - The Living Book overview separates warm near Zentrum from the blue Digital Geode cutaway and rear folds by an off-axis composition; the existing G view travels closer through the middle space. Only the Geode sculpture orientation changes, not the landmark coordinates, inspection target, reveal gate, or reader-controlled inputs.
 - Direct mechanism/mask verification: `node --test tests/challenger-f02.test.mjs tests/f02-environment-motion.test.mjs`.
+
+## Deep creation pass
+
+The liquid crossing has a moving black meniscus, subtle glossy runnels and a more matte soaked paper body. Printed stellar clusters continue to originate only on already soaked ink. The later native C spiral does not start the space effect by itself: both the facing leaf's ink and the authentic strip-rise window must agree. Twelve curved, depth-tested ink veils billow upward out of the four source folds; a small set of related light knots emerge between them rather than filling the room on arrival. There is no new galaxy diagram or appended story event. The paper print is deliberately quieter so the actual depth wins.
+
+The G route moves between the layered veils and returns to the same whole-book view. Phone framing makes the unfolded depth, cutaway Geode and Zentrum legible together. Reduced motion shows the same spatial composition in a stable posed state without drifting veils. The native Blender asset and original A/B/C, Geode inspection gate and archival reader are not modified.
