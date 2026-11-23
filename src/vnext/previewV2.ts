@@ -3,6 +3,7 @@ import { F08FolioWorld } from '../engine/folios/FoliosWar2';
 import { makeF08CandidateStage } from './proof/f08CandidateStage.ts';
 import { makeF04CandidateStage } from './proof/f04CandidateStage';
 import { makeF05CandidateStage } from './proof/f05CandidateStage';
+import { makeF06CandidateStage } from './proof/f06CandidateStage';
 import { cssStock, folioStock, isDarkStock } from './livingPaperStock.ts';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -408,7 +409,7 @@ function onPaperPointerUp(e:PointerEvent):void {
     }
     return;
   }
-  if((currentFolio===3&&canvas.dataset.blenderFolio==='04')||(currentFolio===4&&canvas.dataset.blenderFolio==='05')||(currentFolio===6&&canvas.dataset.blenderFolio==='07')){
+  if((currentFolio===3&&canvas.dataset.blenderFolio==='04')||(currentFolio===4&&canvas.dataset.blenderFolio==='05')||(currentFolio===5&&canvas.dataset.blenderFolio==='06')||(currentFolio===6&&canvas.dataset.blenderFolio==='07')){
     const slots:THREE.Mesh[]=laterRevision?.root.userData.interactables??[];
     for(const hit of mechanismRaycaster.intersectObjects(slots,false)){
       const slot=hit.object.userData.slot;
@@ -1208,6 +1209,7 @@ function goFolio(index:number, deferCameraReset=false):void {
   delete canvas.dataset.revisionPhase;delete canvas.dataset.inkAdvance;delete canvas.dataset.blenderFolio;delete canvas.dataset.f05CandidateState;delete canvas.dataset.f04CandidateState;delete canvas.dataset.f11AuthoredFrame;delete canvas.dataset.f07CandidateState;delete canvas.dataset.f08CandidateState;
   delete canvas.dataset.f01Challenger;delete canvas.dataset.f01Detent;delete canvas.dataset.f01Clip;delete canvas.dataset.f01Moving;
   delete canvas.dataset.f02Challenger;delete canvas.dataset.f02Frame;delete canvas.dataset.f02Detent;delete canvas.dataset.f02Clip;
+  delete canvas.dataset.f06CandidateState;
   if(index===CODA_INDEX){
     if(renderer)buildCoda();
   } else if(index<FIRST_LATER_FOLIO){
@@ -1366,6 +1368,26 @@ function goFolio(index:number, deferCameraReset=false):void {
           staged.update(actual,dt,reduce);
           const {ring,step,record,planetPhase,orbitalPhase}=staged.root.userData;
           canvas.dataset.f05CandidateState=JSON.stringify({ring,step,record,planetPhase,orbitalPhase});
+        }else art.update(actual,dt,reduce);
+      },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
+    }
+    if(index===5){
+      const folioRig=rig;
+      const legacy=[...folioRig.children];
+      const staged=makeF06CandidateStage(fiber,()=>{
+        if(rig!==folioRig||currentFolio!==5)return;
+        staged.update(laterStates[2],0,reducedMotion);
+        for(const node of legacy)node.visible=false;
+        canvas.dataset.blenderFolio='06';
+      },()=>{if(rig===folioRig){for(const node of legacy)node.visible=true;canvas.dataset.blenderFolio='unavailable';}});
+      staged.root.userData.interactables=staged.controls;
+      folioRig.add(staged.root);
+      const priorOwner=laterRevision;
+      laterRevision={root:staged.root,update:(actual,dt,reduce)=>{
+        if(staged.root.userData.assetState==='ready'){
+          staged.update(actual,dt,reduce);
+          const {era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell}=staged.root.userData;
+          canvas.dataset.f06CandidateState=JSON.stringify({era,ledgerEra,specimenId,cFrame,ledgerOpen,wheelDetent,ledgerJiggle,nativeLedgerLeaves,authoredBlankCasualtyCell});
         }else art.update(actual,dt,reduce);
       },dispose:()=>{staged.dispose();disposeRevision(priorOwner);}};
     }
