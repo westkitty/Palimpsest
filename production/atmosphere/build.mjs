@@ -6,6 +6,7 @@ import {createCommon} from './common.mjs';
 import {createEarly} from './early.mjs';
 import {createWar} from './war.mjs';
 import {createLate} from './late.mjs';
+import {bindPublicVolume} from './public-volume.mjs';
 
 const pin='32644a1183e38b948889838edfb7ebe7b304be7ae69e366f1097d840d3c040bd';
 const url=k=>new URL(k,import.meta.url);
@@ -34,7 +35,7 @@ const palAir=[${[createCommon,createEarly,createWar,createLate].map(f=>'('+f.toS
 const palAirClocks=new WeakMap();
 function palAtmosphereMount(root,i){
   palAirClocks.set(root,0);
-  for(const module of palAir)module.mount(root,i);
+  for(const module of (i===palNewSlot?[palAir[0]]:palAir))module.mount(root,i,i===palNewSlot);
 }
 function palAtmosphereStep(root,i,dt){
   if(!palAirClocks.has(root))return;
@@ -48,8 +49,8 @@ function palAtmosphereStep(root,i,dt){
     locked09:ND[5].interactions.B.locked,f09Locked:ND[5].interactions.B.locked,f09Time:g8,
     phase09:g8==null?null:UQ(g8,dP),f09ExtractFrame:i===8?JSON.parse(vA.dataset.f09CandidateState||'{}').authorFrame:0,wall10,nativeState:later,later,muteLight:palAirMuted};
   const proof=palAirProof?[]:null;
-  for(const module of palAir){const outcome=module.step(root,i,ctx);if(proof)proof.push(outcome??null);}
-  if(proof)vA.dataset.atmosphereProof=JSON.stringify({folio:i+1,t,ink,turn:ctx.turn,frame11:ctx.frame11,
+  for(const module of (i===palNewSlot?[palAir[0]]:palAir)){const outcome=module.step(root,i,ctx);if(proof)proof.push(outcome??null);}
+  if(proof)vA.dataset.atmosphereProof=JSON.stringify({folio:i===palNewSlot?4:i+1,publicPage:i===palCodaSlot?"coda":palNumber(i),t,ink,turn:ctx.turn,frame11:ctx.frame11,
     phase09:ctx.phase09,locked09:ctx.locked09,wall10,layers:proof,
     nodes:root.children.filter(n=>n.name.startsWith("Atmosphere")).map(n=>n.name)});
 }
@@ -60,7 +61,8 @@ const draw='(()=>{const cast=palCast.aroundDraw(_A,HA,C,dP,';
 patch(draw,'(()=>{palAtmosphereStep(_A,HA,C);const cast=palCast.aroundDraw(_A,HA,C,dP,');
 const wick='function dr(A){let P=gP(65,74,A);return{bead:gP(61.5,63.1,A)*(1-gP(65,71,A)),wet:P,strain:gP(67,76,A)*(1-.24*gP(78,95,A)),phase:A<62?"dry":A<65?"bead":A<73?"wicking":"stained"}}';
 patch(wick,'function dr(A){let P=gP(42.5,48.6,A);return{bead:gP(38.5,40.2,A)*(1-gP(42.5,47,A)),wet:P,strain:gP(43,49.2,A)*(1-.24*gP(78,95,A)),phase:A<39?"dry":A<42.5?"bead":A<48.6?"wicking":"stained"}}');
-patch('<title>PALIMPSEST — Twelve Living Folios</title>','<title>PALIMPSEST — Twelve Living Folios · Atmosphere</title>\n  <meta name="palimpsest-edition" content="paper-atmosphere-v1">');
+bindPublicVolume(patch);
+patch('<title>PALIMPSEST — Twelve Living Folios</title>','<title>PALIMPSEST — Thirteen Living Folios · Atmosphere</title>\n  <meta name="palimpsest-edition" content="paper-atmosphere-f13">');
 if(mode){
   patch('https://westkitty.github.io/Palimpsest/archive.html','./archive.html');
 }

@@ -20,7 +20,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 7
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -40,6 +40,7 @@ jobs:
         run: |
           bun test tests/living-twelve.test.mjs
           bun test tests/living-theatre.test.mjs
+          bun test tests/great-misunderstanding.test.mjs tests/public-folio-map.test.mjs
           node tests/panel-layout-contract.test.cjs
           node tests/awe-signature.test.cjs
           node tests/authored-assets-ink.test.cjs
@@ -50,16 +51,18 @@ jobs:
       - name: Build both standalone and integrated routes
         run: |
           bun run build
-          test -s dist/index.html && test -s dist/folio-vnext.html && test -s dist/archive.html
+          test -s dist/index.html && test -s dist/folio-vnext.html && test -s dist/archive.html && test -s dist/folio-vnext-classic.html
       - name: Setup Chromium
         run: |
           mkdir -p /tmp/palimpsest-e2e
           npm install --prefix /tmp/palimpsest-e2e --no-package-lock --ignore-scripts playwright
           command -v google-chrome || command -v google-chrome-stable || command -v chromium
-      - name: Exercise all twelve living folios in built Chromium
+      - name: Exercise the classic and public readers in built Chromium
         run: |
           bunx vite preview --host 127.0.0.1 --port 4173 > /tmp/palimpsest-preview.log 2>&1 &
           PREVIEW_PID=$!
           trap 'kill $PREVIEW_PID || true' EXIT
-          cp tests/browser-vnext-smoke.mjs /tmp/palimpsest-e2e/smoke.mjs
-          PALIMPSEST_CHROME_PATH="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)" node /tmp/palimpsest-e2e/smoke.mjs
+          cp tests/browser-vnext-smoke.mjs tests/browser-public-volume.mjs /tmp/palimpsest-e2e/
+          export PALIMPSEST_CHROME_PATH="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium)"
+          node /tmp/palimpsest-e2e/browser-vnext-smoke.mjs
+          node /tmp/palimpsest-e2e/browser-public-volume.mjs

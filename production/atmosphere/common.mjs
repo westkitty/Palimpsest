@@ -60,10 +60,10 @@ export function createCommon(T,fx){
      }
    }
  }
- function mount(root,i){
+ function mount(root,i,insertedSpread){
    const g=new Group();g.name='Atmosphere · bound stock and local bounce';root.add(g);
    const under=[],vellum=[],draft=[],dust=[];
-   if(i<12){
+   if(i<12||insertedSpread){
      for(const [x,z,w,l] of [[-2.13,-.37,3.1,1.58],[2.11,-.52,3.08,1.52],[-.48,.48,2.16,.87]]){
        const n=plane('#1b1b22',w,l,.205,0);n.position.set(x,.205,z);n.name='Folio stock · contact penumbra';under.push(n);g.add(n);
      }

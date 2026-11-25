@@ -47,7 +47,7 @@ async function dragPaper(direction){
 try {
   let ready=false;
   for(let i=0;i<25;i++) {
-    try {const res=await page.goto(origin+'/folio-vnext.html',{waitUntil:'domcontentloaded',timeout:5000}); if(res?.ok()){ready=true;break;}} catch{}
+    try {const res=await page.goto(origin+'/folio-vnext-classic.html',{waitUntil:'domcontentloaded',timeout:5000}); if(res?.ok()){ready=true;break;}} catch{}
     await wait(500);
   }
   assert.ok(ready,'Built review route must serve HTTP success');
@@ -245,16 +245,23 @@ try {
   await archivePage.waitForTimeout(600);
   assert.equal(await embedded.locator('#toggle-panels').getAttribute('aria-expanded'),'false','embedded Living Folios also start with unobstructed book');
   await embedded.locator('#toggle-panels').click();
-  assert.equal(await embedded.locator('#stage').getAttribute('data-authored-sculptures'),'3','unified opening uses original three figures');
+  const firstPlate=embedded.locator('[data-fb-folio="0"]');
+  assert.equal(await firstPlate.isVisible(),true);
+  assert.deepEqual((await firstPlate.locator('text').allTextContents()).slice(0,3),
+    ['THE SHARD-GOD','WORDSTREAMER','NiAlBu'],
+    'opening reading plate presents the original three figures');
   assert.equal(await joined.locator('nav button').count(),12,'one twelve-folio navigation rail');
   await joined.getByRole('button',{name:'Folio 02, living edition'}).click();
   await archivePage.waitForTimeout(400);
   assert.match(await embedded.locator('#folio-title').textContent(),/All Unfolds/);
-  assert.equal(await embedded.locator('#stage').getAttribute('data-authored-sculptures'),'1','unified F02 reuses Geode');
+  assert.equal(await embedded.locator('[data-fb-folio="1"]').getByText('DIGITAL GEODE').isVisible(),
+    true,'F02 reading plate presents the Geode');
   await joined.getByRole('button',{name:'Folio 03, living edition'}).click();
   await archivePage.waitForTimeout(400);
   assert.match(await embedded.locator('#folio-title').textContent(),/Notebook Program/);
-  assert.equal(await embedded.locator('#stage').getAttribute('data-authored-sculptures'),'0','no early Drakken');
+  const notebookPlate=embedded.locator('[data-fb-folio="2"]');
+  assert.equal(await notebookPlate.isVisible(),true);
+  assert.deepEqual(await notebookPlate.locator('text').allTextContents(),['SOURCE LEAVES','NOTEBOOK','WORLDS']);
   await embedded.locator('#next').click();
   assert.match(await embedded.locator('#folio-title').textContent(),/First Contact/);
   assert.equal(await joined.isVisible(),true,'F03 continues INSIDE the same living book');

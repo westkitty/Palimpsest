@@ -1,12 +1,14 @@
 # Paper Atmosphere edition
 
-The living book at `folio-vnext.html` is assembled at build time from the reviewed Paper Encore export. The SHA-256 of the decompressed Encore input is pinned in `build.mjs`. This preserves the 360 independently staged background actions, cast idles, validated story timings, and the existing 12-spread/coda and archive IDs. The Vite-native comparison build is still available as `folio-vnext-classic.html`. The site shell, archive, and staged thirteen-folio narration edition remain separate.
+The production reader at `folio-vnext.html` is assembled from the pinned Paper Encore export. `build.mjs` verifies the SHA-256 of the decompressed input and requires each compiler anchor to occur exactly once.
 
-The four editable modules add bound stock and local emitters, pre-stellar/early-page effects, wartime effects, and Gate/aftermath effects. Compressed Encore is an exact compiled baseline, not a substitute for the source of the classic edition. The compiler refuses unknown inputs and only installs at verified renderer, scene, and lifecycle anchors. No app credentials, services, or third-party runtime requests are required.
+`public-volume.mjs` binds the approved public map at the chapter, turn, deep-link and display boundaries. Source slots 0–11 and the incumbent coda slot 12 keep their original meaning. The Great Misunderstanding occupies its own scene slot and stores its study separately. Background actions, cast choreography, Atmosphere effects, and existing studies receive source slots. The archive’s embedded rail continues to accept source numbering. The public direct route accepts `?folio=1` through `?folio=13` plus `?folio=14` for the imprint.
+
+`great-misunderstanding.mjs` defines the three interactive paper mechanisms and their SVG reading plate. The inserted spread uses the shared physical leaf and general Atmosphere stock and curl treatment. The Vite-native comparison remains at `folio-vnext-classic.html`. The archive and public build require no new runtime credentials or network dependencies.
 
 ## Build and verify
 
-Run `bun install --frozen-lockfile`, `bun run lint`, and `bun run build`. The about-to-publish artifact can be served via `bun run preview` and opened at `folio-vnext.html`. The atmosphere route has an opt-in `?atmosphere-proof=1` diagnostic for scene-specific bindings; add `mute-spill=1` only to an isolated diagnostics run to compare the six additional emitted-light patches. Production rendering has no diagnostic overlay.
+Run `bun install --frozen-lockfile`, `bun run lint`, and `bun run build`. The about-to-publish artifact can be served via `bun run preview` and opened at `folio-vnext.html`. The atmosphere route has an opt-in `?atmosphere-proof=1` diagnostic for scene-specific bindings; add `mute-spill=1` only to an isolated diagnostics run to compare the six additional emitted-light patches. Production rendering has no diagnostic overlay. Folio numbers in the effect list below refer to original source worlds. The debug payload includes the current public page separately.
 
 ## Effects
 
