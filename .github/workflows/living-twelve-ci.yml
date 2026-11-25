@@ -8,6 +8,7 @@ on:
       - feat/open-book-minimal-ui-20261120
       - fix/physical-book-gesture-20261120
       - feat/physical-theatre-restoration-20261120
+      - feat/palimpsest-atmosphere-f13
   workflow_dispatch:
 
 permissions:
